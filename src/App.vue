@@ -1,32 +1,22 @@
-<script setup>
-import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
-</script>
-
 <template>
-  <header>
-    <!-- <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" /> -->
+  <header class="navbar">
+    <div class="nav-left">
+      <img src="@/assets/CLOthingsLogo.svg" alt="CLO.things logo" class="logo" />
+      <span class="brand">CLO.things</span>
+    </div>
 
-    <div class="wrapper">
-      <!-- <HelloWorld msg="You did it!" /> -->
+    <nav class="nav-center">
+      <RouterLink to="/">首頁</RouterLink>
+      <RouterLink to="/categories">分類</RouterLink>
+      <RouterLink :to="{ name: 'sampleCommunity' }">社群</RouterLink>
+      <RouterLink :to="{ name: 'sampleGroupShop' }">團購</RouterLink>
+      <RouterLink :to="{ name: 'login' }">會員</RouterLink>
+      <RouterLink :to="{ name: 'sampleShop' }">購物車</RouterLink>
+    </nav>
 
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-
-        <RouterLink :to="{ name: 'sampleShop' }" class="nav-item nav-link link-body-emphasis"
-          >商城</RouterLink
-        >
-        <RouterLink :to="{ name: 'sampleGroupShop' }" class="nav-item nav-link link-body-emphasis"
-          >團購</RouterLink
-        >
-        <RouterLink :to="{ name: 'sampleCommunity' }" class="nav-item nav-link link-body-emphasis"
-          >社群</RouterLink
-        >
-        <RouterLink :to="{ name: 'login' }" class="nav-item nav-link link-body-emphasis"
-          >使用者</RouterLink
-        >
-      </nav>
+    <div class="nav-right">
+      <input type="text" placeholder="Search in site" />
+      <i class="fa fa-search"></i>
     </div>
   </header>
 
@@ -34,68 +24,57 @@ import HelloWorld from './components/HelloWorld.vue'
 </template>
 
 <style scoped>
-body {
-  margin: 0;
-  padding: 0;
-}
-header {
-  line-height: 1.5;
-  max-height: 100vh;
-}
-
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
-}
-
-nav {
+.navbar {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
+  background-color: #000000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 2rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-nav a.router-link-exact-active {
-  color: var(--color-text);
+.nav-left {
+  display: flex;
+  align-items: center;
 }
 
-nav a.router-link-exact-active:hover {
-  background-color: transparent;
+.logo {
+  height: 32px;
+  margin-right: 0.5rem;
 }
 
-nav a {
-  display: inline-block;
-  padding: 0 1rem;
-  border-left: 1px solid var(--color-border);
+.brand {
+  font-weight: 600;
+  font-size: 1.1rem;
 }
 
-nav a:first-of-type {
-  border: 0;
+.nav-center a {
+  margin: 0 0.8rem;
+  color: #333;
+  text-decoration: none;
 }
 
-/* @media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
+.nav-center a:hover {
+  color: #000;
+}
 
-  .logo {
-    margin: 0 2rem 0 0;
-  }
+.nav-right {
+  display: flex;
+  align-items: center;
+}
 
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
+.nav-right input {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0.3rem 0.6rem;
+}
 
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
-
-    padding: 1rem 0;
-  }
-} */
+.nav-right i {
+  margin-left: 0.4rem;
+  color: #666;
+}
 </style>
