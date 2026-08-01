@@ -21,21 +21,21 @@ const router = createRouter({
 
     //Shop 在註解之間新增個人使用的路由 名字自行修改
     {
-      path: '/sample',
+      path: '/shop/sample',
       name: 'sampleShop',
       component: () => import('../views/Shop/SampleView.vue'),
     },
 
     //GroupShop 在註解之間新增個人使用的路由 名字自行修改
     {
-      path: '/sample',
+      path: '/groupshop/sample',
       name: 'sampleGroupShop',
       component: () => import('../views/GroupShop/SampleView.vue'),
     },
 
     //Community 在註解之間新增個人使用的路由 名字自行修改
     {
-      path: '/sample',
+      path: '/community/sample',
       name: 'sampleCommunity',
       component: () => import('../views/Community/SampleView.vue'),
     },
@@ -44,21 +44,31 @@ const router = createRouter({
     {
       path: '/login',
       name: 'login',
-      component: () => import('../views/User/LoginView.vue'),
+      component: () => import('../views/Users/LoginView.vue'),
     },
     {
-      path: '/User',
+      path: '/register',
+      name: 'register',
+      component: () => import('../views/Users/RegisterView.vue'),
+    },
+    {
+      path: '/user',
       meta: { requireMember: false },
       children: [
         {
-          path: 'UserInfo',
-          name: 'UserInfo',
-          component: () => import('@/views/User/LoginView.vue'),
+          path: 'userinfo',
+          name: 'userinfo',
+          component: () => import('@/views/Users/UserInfo.vue'),
         },
         {
-          path: 'UserProfile',
-          name: 'UserProfile',
-          component: () => import('@/views/User/LoginView.vue'),
+          path: 'userprofile',
+          name: 'userprofile',
+          component: () => import('@/views/Users/UserProfile.vue'),
+        },
+        {
+          path: 'useraddress',
+          name: 'useraddress',
+          component: () => import('@/views/Users/UserAddresses.vue'),
         },
       ],
     },
