@@ -141,15 +141,18 @@ const toggleFollow = (creator) => {
                 <!-- 貼文內容 -->
                 <div class="card-body p-3 d-flex flex-column justify-content-between">
                   <div>
-                    <div class="d-flex align-items-center mb-2">
+                  <!-- ⭕ 修改後：點擊頭像或名字直接跳去個人主頁 -->
+                  <div class="d-flex align-items-center mb-2">
+                    <router-link to="/community/profile" class="d-flex align-items-center text-decoration-none">
                       <img 
-                        :src="post.user.avatar" 
-                        class="rounded-circle me-2 border" 
-                        style="width: 28px; height: 28px;"
-                        alt="avatar" 
+                       :src="post.user.avatar" 
+                       class="rounded-circle me-2 border" 
+                       style="width: 28px; height: 28px;"
+                       alt="avatar" 
                       />
                       <span class="fw-bold small text-dark text-truncate">{{ post.user.name }}</span>
-                    </div>
+                   </router-link>
+                  </div>
 
                     <!-- 標題/文字：加上 router-link 跳轉 -->
                     <router-link :to="`/community/post/${post.postId || 8842}`" class="text-decoration-none">
@@ -186,28 +189,25 @@ const toggleFollow = (creator) => {
         <!-- 右側：側邊欄 -->
         <div class="col-12 col-lg-3">
           
-          <!-- 達人推薦 -->
-          <div class="card border-0 shadow-sm rounded-3 p-3 mb-4 bg-white">
-            <h6 class="fw-bold mb-3 text-dark">🔥 熱門穿搭達人</h6>
-            <div class="d-flex flex-column gap-3">
-              <div 
-                v-for="creator in creators" 
-                :key="creator.id" 
-                class="d-flex align-items-center justify-content-between"
-              >
-                <div class="d-flex align-items-center me-2">
-                  <img :src="creator.avatar" class="rounded-circle me-2 border" style="width: 36px; height: 36px;" />
-                  <span class="small fw-bold text-dark text-truncate" style="max-width: 90px;">{{ creator.name }}</span>
-                </div>
-                <button 
-                  class="btn btn-sm rounded-pill px-3 py-1 fw-medium border-0 transition-all"
-                  :class="creator.isFollowing ? 'btn-secondary text-white' : 'btn-outline-dark'"
-                  @click="toggleFollow(creator)"
-                >
-                  {{ creator.isFollowing ? '已追蹤' : '追蹤' }}
-                </button>
-              </div>
-            </div>
+          <!-- 右側達人列表 -->
+          <div 
+            v-for="creator in creators" 
+            :key="creator.id" 
+            class="d-flex align-items-center justify-content-between"
+          >
+            <!-- 用 router-link 把頭像跟名字包起來 -->
+            <router-link to="/community/profile" class="d-flex align-items-center me-2 text-decoration-none">
+              <img :src="creator.avatar" class="rounded-circle me-2 border" style="width: 36px; height: 36px;" />
+              <span class="small fw-bold text-dark text-truncate" style="max-width: 90px;">{{ creator.name }}</span>
+            </router-link>
+
+            <button 
+              class="btn btn-sm rounded-pill px-3 py-1 fw-medium border-0 transition-all"
+              :class="creator.isFollowing ? 'btn-secondary text-white' : 'btn-outline-dark'"
+              @click="toggleFollow(creator)"
+            >
+              {{ creator.isFollowing ? '已追蹤' : '追蹤' }}
+            </button>
           </div>
 
           <!-- 熱門商品標籤 -->

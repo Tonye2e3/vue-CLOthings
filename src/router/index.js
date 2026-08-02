@@ -35,16 +35,21 @@ const router = createRouter({
 
     //Community 在註解之間新增個人使用的路由 名字自行修改
     {
+      path: '/community/profile',
+      name: 'CommunityUserProfile',
+      component: () => import('@/views/Community/UserProfileView.vue'),
+    },
+    {
       path: '/community',
       name: 'Community',
-      component: () => import('../views/Community/CommunityView.vue'),
+      component: () => import('@/views/Community/CommunityView.vue'),
     },
     {
       path: '/community/post/:id',
       name: 'PostDetail',
-      component: () => import('../views/Community/PostDetailView.vue'),
+      component: () => import('@/views/Community/PostDetailView.vue'),
     },
-
+    
     //User 在註解之間新增個人使用的路由 名字自行修改
     {
       path: '/login',
