@@ -35,8 +35,8 @@ const router = createRouter({
 
     //Community 在註解之間新增個人使用的路由 名字自行修改
     {
-      path: '/sample',
-      name: 'sampleCommunity',
+      path: '/community',
+      name: 'Community',
       component: () => import('../views/Community/SampleView.vue'),
     },
 
