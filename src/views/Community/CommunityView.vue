@@ -131,10 +131,12 @@ const toggleFollow = (creator) => {
             
             <div v-for="post in posts" :key="post.postId" class="col-12 col-sm-6 col-md-4">
               <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden post-card bg-white">
-                <!-- 貼文圖片 -->
-                <div class="position-relative bg-light ratio ratio-4x5">
-                  <img :src="post.imageUrl" class="card-img-top object-fit-cover" :alt="post.title" />
-                </div>
+                <!-- 貼文圖片：加上 router-link 跳轉 -->
+                <router-link :to="`/community/post/${post.postId || 8842}`" class="d-block text-decoration-none">
+                  <div class="position-relative bg-light ratio ratio-4x5">
+                    <img :src="post.imageUrl" class="card-img-top object-fit-cover" :alt="post.title" />
+                  </div>
+                </router-link>
 
                 <!-- 貼文內容 -->
                 <div class="card-body p-3 d-flex flex-column justify-content-between">
@@ -149,9 +151,12 @@ const toggleFollow = (creator) => {
                       <span class="fw-bold small text-dark text-truncate">{{ post.user.name }}</span>
                     </div>
 
-                    <p class="card-text small text-secondary line-clamp-2 mb-3">
-                      {{ post.title }}
-                    </p>
+                    <!-- 標題/文字：加上 router-link 跳轉 -->
+                    <router-link :to="`/community/post/${post.postId || 8842}`" class="text-decoration-none">
+                      <p class="card-text small text-secondary line-clamp-2 mb-3">
+                         {{ post.title }}
+                      </p>
+                    </router-link>
                   </div>
 
                   <div class="d-flex justify-content-between align-items-center pt-2 border-top text-muted extra-small">

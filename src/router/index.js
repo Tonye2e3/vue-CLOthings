@@ -37,7 +37,12 @@ const router = createRouter({
     {
       path: '/community',
       name: 'Community',
-      component: () => import('../views/Community/SampleView.vue'),
+      component: () => import('../views/Community/CommunityView.vue'),
+    },
+    {
+      path: '/community/post/:id',
+      name: 'PostDetail',
+      component: () => import('../views/Community/PostDetailView.vue'),
     },
 
     //User 在註解之間新增個人使用的路由 名字自行修改
