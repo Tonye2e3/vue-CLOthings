@@ -13,7 +13,6 @@
       <RouterLink :to="{ name: 'sampleCommunity' }">社群</RouterLink>
       <RouterLink :to="{ name: 'sampleGroupShop' }">團購</RouterLink>
       <RouterLink :to="{ name: 'sampleShop' }">購物車</RouterLink>
-      <button class="btn btn-danger">測試按鈕</button>
     </nav>
 
     <div class="nav-right">
@@ -79,6 +78,7 @@
 .nav-right {
   display: flex;
   align-items: center;
+  color: #333;
 }
 
 .nav-right input {
