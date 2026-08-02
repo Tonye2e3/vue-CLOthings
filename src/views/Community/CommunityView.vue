@@ -78,9 +78,10 @@ const toggleFollow = (creator) => {
           <span class="fs-5 text-muted fw-normal">Outfit Community</span>
         </div>
         <div>
-          <button class="btn btn-dark rounded-pill px-4 py-2 text-white fw-medium shadow-sm w-100 w-sm-auto">
+          <!-- 修改後：改成 router-link 讓點擊後直接跳轉到發文頁 -->
+          <router-link to="/community/create" class="btn btn-dark rounded-pill px-4 py-2 text-white fw-medium shadow-sm text-decoration-none d-inline-block text-center">
             + 分享我的穿搭
-          </button>
+          </router-link>
         </div>
       </div>
 
@@ -186,31 +187,36 @@ const toggleFollow = (creator) => {
           </div>
         </div>
 
-        <!-- 右側：側邊欄 -->
+       <!-- 右側：側邊欄 -->
         <div class="col-12 col-lg-3">
           
-          <!-- 右側達人列表 -->
-          <div 
-            v-for="creator in creators" 
-            :key="creator.id" 
-            class="d-flex align-items-center justify-content-between"
-          >
-            <!-- 用 router-link 把頭像跟名字包起來 -->
-            <router-link to="/community/profile" class="d-flex align-items-center me-2 text-decoration-none">
-              <img :src="creator.avatar" class="rounded-circle me-2 border" style="width: 36px; height: 36px;" />
-              <span class="small fw-bold text-dark text-truncate" style="max-width: 90px;">{{ creator.name }}</span>
-            </router-link>
-
-            <button 
-              class="btn btn-sm rounded-pill px-3 py-1 fw-medium border-0 transition-all"
-              :class="creator.isFollowing ? 'btn-secondary text-white' : 'btn-outline-dark'"
-              @click="toggleFollow(creator)"
+          <!-- ⭕ 加上卡片外框，把達人列表包起來 -->
+          <div class="card border-0 shadow-sm rounded-3 p-3 mb-4 bg-white">
+            <h6 class="fw-bold mb-3 text-dark">✨ 熱門穿搭達人</h6>
+            
+            <!-- 右側達人列表 -->
+            <div 
+              v-for="creator in creators" 
+              :key="creator.id" 
+              class="d-flex align-items-center justify-content-between mb-3"
             >
-              {{ creator.isFollowing ? '已追蹤' : '追蹤' }}
-            </button>
+              <!-- 用 router-link 把頭像跟名字包起來 -->
+              <router-link to="/community/profile" class="d-flex align-items-center me-2 text-decoration-none">
+                <img :src="creator.avatar" class="rounded-circle me-2 border" style="width: 36px; height: 36px;" />
+                <span class="small fw-bold text-dark text-truncate" style="max-width: 90px;">{{ creator.name }}</span>
+              </router-link>
+
+              <button 
+                class="btn btn-sm rounded-pill px-3 py-1 fw-medium border-0 transition-all"
+                :class="creator.isFollowing ? 'btn-secondary text-white' : 'btn-outline-dark'"
+                @click="toggleFollow(creator)"
+              >
+                {{ creator.isFollowing ? '已追蹤' : '追蹤' }}
+              </button>
+            </div>
           </div>
 
-          <!-- 熱門商品標籤 -->
+          <!-- 熱門商品標籤 (原本的卡片保持不變) -->
           <div class="card border-0 shadow-sm rounded-3 p-3 mb-4 bg-white">
             <h6 class="fw-bold mb-3 text-dark">🏷️ 熱門商品標籤</h6>
             <div class="d-flex flex-wrap gap-2">
@@ -226,7 +232,6 @@ const toggleFollow = (creator) => {
           </div>
 
         </div>
-
       </div>
 
     </div>
