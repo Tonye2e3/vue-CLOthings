@@ -1,4 +1,15 @@
-<script></script>
+<script setup>
+import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
+
+const authStore = useAuthStore()
+const router = useRouter()
+
+function logout() {
+  authStore.clearAuth()
+  router.push('/login')
+}
+</script>
 
 <template>
   <header class="navbar">
@@ -20,14 +31,14 @@
        <input type="text" placeholder="Search in site" />
       <i class="fa fa-search"></i>  -->
 
-      <RouterLink :to="{ name: 'userinfo' }">使用者</RouterLink>
+      <RouterLink :to="{ name: 'user' }">使用者</RouterLink>
       <RouterLink :to="{ name: 'login' }">登入</RouterLink>
       <RouterLink :to="{ name: 'register' }">註冊</RouterLink>
       <a href="/logout">登出</a>
     </div>
   </header>
 
-  <div class="py-3">
+  <div style="margin: 60px 60px; width: 1000px">
     <!--頁面內容預留區-->
     <RouterView />
   </div>
@@ -67,22 +78,22 @@
 
 .nav-center a {
   margin: 0 0.8rem;
-  color: #333;
+  color: #000000;
   text-decoration: none;
 }
 
 .nav-center a:hover {
-  color: #000;
+  color: #000000;
 }
 
 .nav-right {
   display: flex;
   align-items: center;
-  color: #333;
+  color: #000000;
 }
 
 .nav-right input {
-  border: 1px solid #ccc;
+  border: 1px solid #000000;
   border-radius: 4px;
   padding: 0.3rem 0.6rem;
 }
