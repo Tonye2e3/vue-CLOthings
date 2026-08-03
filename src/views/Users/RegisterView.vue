@@ -14,7 +14,7 @@ import { isValidAccount, isValidPassword } from '@/utils/validator'
 </script>
 
 <template>
-  <div class="col-md-6 m-auto">
+  <div class="col-md-6 m-auto" style="width: 800px">
     <h3 class="mb-4 fw-bold">{{ title }}</h3>
 
     <!-- 表單區 -->

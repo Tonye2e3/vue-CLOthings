@@ -38,7 +38,7 @@ function logout() {
     </div>
   </header>
 
-  <div style="margin: 60px 60px; width: 1000px">
+  <div>
     <!--頁面內容預留區-->
     <RouterView />
   </div>
