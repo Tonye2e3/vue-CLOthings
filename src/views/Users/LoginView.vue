@@ -38,7 +38,7 @@ async function login() {
 
 <template>
   <div class="col-md-6 m-auto card p-4 mt-5 shadow" style="width: 800px">
-    <h3 class="mb-4 fw-bold">登入</h3>
+    <h3 class="mb-4 fw-bold text-center">登入</h3>
 
     <div class="mb-3">
       <label class="form-label">帳號</label>
@@ -50,6 +50,18 @@ async function login() {
     </div>
 
     <button class="btn btn-primary w-100 py-2" type="button" @click="login">登入</button>
+    <button
+      class="btn btn-outline-primary w-100 py-2 mt-2"
+      type="button"
+      @click="router.push('/register')"
+    >
+      註冊
+    </button>
+    <div class="text-center mt-3">其他登入方式</div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary w-50 py-2 mt-2" type="button">google 登入</button>
+      <button class="btn btn-outline-secondary w-50 py-2 mt-2" type="button">line 登入</button>
+    </div>
   </div>
 </template>
 
