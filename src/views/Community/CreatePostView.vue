@@ -9,9 +9,12 @@ const router = useRouter()
 // 表單雙向綁定資料
 const postForm = ref({
   title: '',
-  imageUrl: '',
   selectedProduct: ''
 })
+
+// 圖片檔案與預覽用的 URL
+const imageFile = ref(null)
+const imagePreviewUrl = ref('')
 
 // 模擬商城可標記的熱門單品
 const availableProducts = ref([
@@ -22,10 +25,20 @@ const availableProducts = ref([
   { id: 5, name: '百褶及膝裙' }
 ])
 
-// 模擬送出發文
+// 處理檔案選取與即時預覽
+const handleFileChange = (event) => {
+  const file = event.target.files[0]
+  if (file) {
+    imageFile.value = file
+    // 利用 URL.createObjectURL 產生本地端預覽網址
+    imagePreviewUrl.value = URL.createObjectURL(file)
+  }
+}
+
+/// 模擬送出發文
 const handleSubmit = () => {
-  if (!postForm.value.title || !postForm.value.imageUrl) {
-    alert('請填寫貼文標題並提供圖片連結！')
+  if (!imageFile.value || !postForm.value.title) {
+    alert('請上傳穿搭照片並填寫貼文心得！')
     return
   }
   
@@ -59,18 +72,19 @@ const handleSubmit = () => {
       <div class="card border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white">
         <form @submit.prevent="handleSubmit">
           
-          <!-- 1. 圖片網址輸入與預覽 -->
+          <!-- 1. 檔案上傳與即時預覽區 -->
           <div class="mb-4">
-            <label class="form-label fw-bold text-dark">📸 穿搭照片連結 (Image URL)</label>
+            <label class="form-label fw-bold text-dark">📸 上傳穿搭照片</label>
             <input 
-              type="text" 
+              type="file" 
               class="form-control rounded-pill px-3 py-2" 
-              v-model="postForm.imageUrl" 
-              placeholder="請輸入圖片網址 (例如: https://picsum.photos/400/500)"
+              accept="image/*"
+              @change="handleFileChange"
             />
-            <!-- 圖片即時預覽框 -->
-            <div v-if="postForm.imageUrl" class="mt-3 text-center bg-light rounded-3 p-2 border" style="max-height: 250px; overflow: hidden;">
-              <img :src="postForm.imageUrl" class="img-fluid rounded object-fit-contain" style="max-height: 230px;" alt="預覽圖" />
+            
+            <!-- 選擇圖片後的即時預覽縮圖 -->
+            <div v-if="imagePreviewUrl" class="mt-3 text-center bg-light rounded-3 p-2 border" style="max-height: 280px; overflow: hidden;">
+              <img :src="imagePreviewUrl" class="img-fluid rounded object-fit-contain" style="max-height: 250px;" alt="上傳預覽" />
             </div>
           </div>
 
