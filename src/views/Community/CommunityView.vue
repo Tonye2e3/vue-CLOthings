@@ -72,56 +72,46 @@ const toggleFollow = (creator) => {
     <div class="container-fluid container-lg pb-5">
 
       <!-- 1. 頁面標題與分享按鈕 -->
-      <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3 mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h2 class="fw-bold m-0 d-inline-block me-2 text-dark">穿搭社群</h2>
           <span class="fs-5 text-muted fw-normal">Outfit Community</span>
         </div>
-        <div>
-          <!-- 修改後：改成 router-link 讓點擊後直接跳轉到發文頁 -->
-          <router-link to="/community/create" class="btn btn-dark rounded-pill px-4 py-2 text-white fw-medium shadow-sm text-decoration-none d-inline-block text-center">
-            + 分享我的穿搭
-          </router-link>
-        </div>
+        
       </div>
 
-      <!-- 2. 頁籤與熱門商品標籤膠囊 -->
-      <div class="d-flex align-items-center gap-2 mb-4 flex-wrap">
-        <div class="btn-group bg-white p-1 rounded-pill border shadow-sm" role="group">
-          <button 
-            class="btn rounded-pill px-3 px-sm-4 py-1 border-0 fw-medium transition-all" 
-            :class="currentTab === 'hot' ? 'btn-dark text-white' : 'text-secondary bg-transparent'"
-            @click="currentTab = 'hot'"
-          >
-            熱門
-          </button>
-          <button 
-            class="btn rounded-pill px-3 px-sm-4 py-1 border-0 fw-medium transition-all" 
-            :class="currentTab === 'new' ? 'btn-dark text-white' : 'text-secondary bg-transparent'"
-            @click="currentTab = 'new'"
-          >
-            最新
-          </button>
-          <button 
-            class="btn rounded-pill px-3 px-sm-4 py-1 border-0 fw-medium transition-all" 
-            :class="currentTab === 'follow' ? 'btn-dark text-white' : 'text-secondary bg-transparent'"
-            @click="currentTab = 'follow'"
-          >
-            追蹤中
-          </button>
-        </div>
+      <!-- 2. 分頁按鈕與分享按鈕並排 -->
+     <div class="d-flex align-items-center gap-3 mb-4">
+       <!-- 自製的標籤切換列（取代 btn-group） -->
+       <div class="bg-white p-1 rounded-pill border shadow-sm d-flex align-items-center gap-1">
+         <button 
+           class="btn rounded-pill px-3 px-sm-4 py-1 border-0 fw-medium transition-all" 
+           :class="currentTab === 'hot' ? 'btn-dark text-white' : 'text-secondary bg-transparent'"
+           @click="currentTab = 'hot'"
+         >
+           熱門
+         </button>
+         <button 
+           class="btn rounded-pill px-3 px-sm-4 py-1 border-0 fw-medium transition-all" 
+           :class="currentTab === 'new' ? 'btn-dark text-white' : 'text-secondary bg-transparent'"
+           @click="currentTab = 'new'"
+         >
+           最新
+         </button>
+         <button 
+           class="btn rounded-pill px-3 px-sm-4 py-1 border-0 fw-medium transition-all" 
+           :class="currentTab === 'follow' ? 'btn-dark text-white' : 'text-secondary bg-transparent'"
+           @click="currentTab = 'follow'"
+         >
+           追蹤中
+         </button>
+       </div>
 
-        <!-- 快速篩選商品 -->
-        <div class="d-flex gap-2 flex-wrap ms-0 ms-md-2 mt-2 mt-md-0">
-          <span 
-            v-for="product in popularProducts.slice(0, 3)" 
-            :key="product.id"
-            class="badge tag-badge rounded-pill px-3 py-2 border style-tag"
-          >
-            🏷️ {{ product.name }}
-          </span>
-        </div>
-      </div>
+       <!-- 分享按鈕 -->
+       <router-link to="/community/create" class="btn btn-dark rounded-pill px-4 py-2 text-white fw-medium shadow-sm text-decoration-none">
+         + 分享我的穿搭
+       </router-link>
+     </div>
 
       <!-- 3. 主要內容區 (響應式：電腦多欄 / 手機單欄) -->
       <div class="row g-4">

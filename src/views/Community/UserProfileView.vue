@@ -20,7 +20,7 @@ const userProfile = ref({
 // 當前頁籤 (穿搭作品, 收藏, 同款商品, 關於我)
 const activeTab = ref('works')
 
-// 穿搭作品列表 (使用固定 Unsplash/Picsum ID 避免重新整理隨機跑掉)
+// 穿搭作品列表 (改回帶有 # 的標籤格式)
 const userPosts = ref([
   {
     id: 1,
@@ -28,7 +28,7 @@ const userPosts = ref([
     image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&auto=format&fit=crop&q=80',
     likes: '2,341',
     comments: '128',
-    tags: ['#韓系', '#洋裝', '#春季']
+    tags: ['#法式碎花洋裝', '#皮革側背包']
   },
   {
     id: 2,
@@ -36,7 +36,7 @@ const userPosts = ref([
     image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=600&auto=format&fit=crop&q=80',
     likes: '1,876',
     comments: '94',
-    tags: ['#簡約', '#大衣', '#秋冬']
+    tags: ['#羊毛長大衣', '#親膚針織衫']
   },
   {
     id: 3,
@@ -44,7 +44,7 @@ const userPosts = ref([
     image: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=600&auto=format&fit=crop&q=80',
     likes: '3,102',
     comments: '210',
-    tags: ['#日常', '#針織', '#休閒']
+    tags: ['#V領軟糯針織', '#高腰休閒褲']
   },
   {
     id: 4,
@@ -52,7 +52,7 @@ const userPosts = ref([
     image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=600&auto=format&fit=crop&q=80',
     likes: '1,542',
     comments: '76',
-    tags: ['#通勤', '#OL', '#配件']
+    tags: ['#質感西裝外套', '#真皮皮帶']
   }
 ])
 
@@ -73,14 +73,14 @@ const toggleFollow = () => {
     <div class="container-fluid container-lg pb-5">
       <div class="card border-0 shadow-sm rounded-4 bg-white overflow-hidden mb-4">
         
-        <!-- 頂部封面橫幅 (改為柔和暖調) -->
+        <!-- 頂部封面橫幅 -->
         <div class="profile-banner w-100" style="height: 140px; background-color: #EFE8E1;"></div>
 
         <!-- 個人核心資訊區塊 -->
         <div class="px-4 px-md-5 pb-4 position-relative">
           <div class="row align-items-end mb-3">
             
-            <!-- 大頭貼 (重疊在橫幅上，外框改為質感深灰/奶茶邊) -->
+            <!-- 大頭貼 -->
             <div class="col-auto position-relative" style="margin-top: -60px;">
               <div class="avatar-wrapper rounded-circle p-1 bg-white shadow-sm">
                 <img 
@@ -95,7 +95,7 @@ const toggleFollow = () => {
             <!-- 右側數據與動作按鈕 -->
             <div class="col d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3 mt-md-0">
               
-              <!-- 數據統計 (貼文, 粉絲, 追蹤中) -->
+              <!-- 數據統計 -->
               <div class="d-flex gap-4 gap-md-5 text-center ms-auto ms-md-0 me-md-auto">
                 <div>
                   <div class="fw-bold fs-5 text-dark">{{ userProfile.postsCount }}</div>
@@ -111,7 +111,7 @@ const toggleFollow = () => {
                 </div>
               </div>
 
-              <!-- 按鈕區 (追蹤, 訊息) -->
+              <!-- 按鈕區 -->
               <div class="d-flex gap-2">
                 <button 
                   class="btn rounded-pill px-4 py-2 fw-medium border-0 transition-all shadow-sm"
@@ -140,7 +140,7 @@ const toggleFollow = () => {
             </p>
           </div>
 
-          <!-- 頁籤導覽列 (穿搭作品 / 收藏 / 同款商品 / 關於我) -->
+          <!-- 頁籤導覽列 -->
           <div class="d-flex gap-4 border-bottom mt-4 pt-2">
             <button 
               class="btn nav-tab-btn pb-2 px-1 fw-bold position-relative text-nowrap"
@@ -206,12 +206,13 @@ const toggleFollow = () => {
                 </div>
               </div>
 
-              <!-- 標籤列表 (改成暖調色系) -->
+              <!-- 標籤列表 (帶有 # 字號的膠囊按鈕) -->
               <div class="d-flex flex-wrap gap-1 mt-1">
                 <span v-for="tag in post.tags" :key="tag" class="tag-pill extra-small px-2 py-1 rounded-pill">
                   {{ tag }}
                 </span>
               </div>
+
             </div>
 
           </div>
@@ -229,7 +230,6 @@ const toggleFollow = () => {
 </template>
 
 <style scoped>
-/* 破開全螢幕限制並套用統一暖奶油色系 */
 .community-page {
   position: absolute;
   top: 0;
@@ -245,7 +245,6 @@ const toggleFollow = () => {
   border-color: #4A4744 !important;
 }
 
-/* 標籤頁底線動畫 */
 .nav-tab-btn {
   border: none;
   background: transparent;
@@ -262,7 +261,7 @@ const toggleFollow = () => {
   border-radius: 2px;
 }
 
-/* 暖米色軟調標籤 */
+/* 暖米色軟調標籤樣式 */
 .tag-pill {
   background-color: #F4EFEA;
   color: #6C6661;

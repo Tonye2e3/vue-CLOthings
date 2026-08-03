@@ -3,6 +3,9 @@ import { ref } from 'vue'
 // 引入暫時導覽列組件
 import TempNavbar from '@/components/TempNavbar.vue'
 
+// 使用 import 引入本地 src/assets 下的圖片
+import postImage from '@/assets/Postimage/post2.jpg'
+
 // 貼文詳細資料
 const post = ref({
   id: 8842,
@@ -13,30 +16,35 @@ const post = ref({
     location: '台北'
   },
   isFollowing: false,
-  imageUrl: 'https://picsum.photos/800/600?random=20',
-  content: '今天走簡約韓系風格 🤍 這件針織上衣質感超好，寬褲版型顯瘦又舒服，很適合秋天約會或上班～ 全身都可以直接點連結購買！',
+  // 指向剛才 import 的本地圖片變數
+  imageUrl: postImage,
+  content: '今天走簡約韓系風格 🤍 這套針織上衣與打褶寬褲質感超好，版型顯瘦又舒服，很適合秋天約會或上班～ 全身都可以直接點連結購買！',
   likesCount: '1,248',
   commentsCount: 86,
   isLiked: false,
   isSaved: false,
   taggedProducts: [
-    { id: 101, name: '針織上衣', x: '20%', y: '80%' },
-    { id: 102, name: '高腰寬褲', x: '70%', y: '45%' }
+    { id: 101, name: '針織上衣', x: '45%', y: '35%' },
+    { id: 102, name: '高腰寬褲', x: '50%', y: '70%' },
+    { id: 103, name: '托特包', x: '30%', y: '90%' }
   ]
 })
 
 // 這套穿搭的商品清單
 const products = ref([
-  { id: 101, name: '奶油白圓領針織上衣', price: '690', image: 'https://picsum.photos/150/150?random=31' },
-  { id: 102, name: '高腰垂墜寬褲 (卡其)', price: '890', image: 'https://picsum.photos/150/150?random=32' },
-  { id: 103, name: '小方包 (焦糖棕)', price: '1,280', image: 'https://picsum.photos/150/150?random=33' }
+  { id: 101, name: '奶油白V領針織上衣', price: '690', image: 'https://i.pinimg.com/1200x/dc/94/75/dc9475c6d350370bcf6c471e3ee6d6fb.jpg' },
+  { id: 102, name: '高腰垂墜寬褲 (卡其)', price: '890', image: 'https://i.pinimg.com/1200x/f3/dd/f4/f3ddf4c34ff005240958bddb9a8080d0.jpg' },
+  { id: 103, 
+  name: '復古麻編單肩托特包', 
+  price: '680', 
+  image: 'https://i.pinimg.com/736x/f2/cf/7b/f2cf7b273ca7445dce8800f855051f93.jpg' }
 ])
 
 // 相似穿搭推薦
 const similarPosts = ref([
-  { id: 1, image: 'https://picsum.photos/200/250?random=41' },
-  { id: 2, image: 'https://picsum.photos/200/250?random=42' },
-  { id: 3, image: 'https://picsum.photos/200/250?random=43' }
+  { id: 1, image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80' },
+  { id: 2, image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=300&auto=format&fit=crop&q=80' },
+  { id: 3, image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=300&auto=format&fit=crop&q=80' }
 ])
 
 // 留言列表
@@ -99,7 +107,7 @@ const addComment = () => {
 
             <!-- 主圖 (附帶商品標籤) -->
             <div class="position-relative bg-light rounded-3 overflow-hidden mb-3">
-              <img :src="post.imageUrl" class="w-100 object-fit-cover" style="max-height: 550px;" alt="post image" />
+             <img :src="post.imageUrl" class="w-100 object-fit-contain bg-white" style="height: 550px;" alt="post image" />
               
               <!-- 模擬相片上的商品標籤 -->
               <span 
@@ -191,7 +199,7 @@ const addComment = () => {
               </div>
             </div>
 
-            <!-- 一鍵購買按鈕 (已將原桃紅色改為質感深灰色) -->
+            <!-- 一鍵購買按鈕 -->
             <button class="btn btn-dark rounded-pill w-100 py-2 fw-medium shadow-sm">
               🛒 一鍵購買全套穿搭 · NT$ 2,860
             </button>
@@ -217,7 +225,6 @@ const addComment = () => {
 </template>
 
 <style scoped>
-/* 破開 App.vue Flex 限制並套用相同的暖奶油底色 #F9F4F0 */
 .community-page {
   position: absolute;
   top: 0;
@@ -229,7 +236,6 @@ const addComment = () => {
   z-index: 10;
 }
 
-/* 標籤膠囊 (暖灰/米色調，與主頁統一) */
 .tag-badge {
   background-color: #EFE8E1 !important;
   color: #4A4744 !important;
