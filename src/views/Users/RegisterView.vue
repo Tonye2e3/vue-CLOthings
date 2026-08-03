@@ -4,37 +4,54 @@ const title = ref('會員註冊')
 const agree = ref(false)
 
 const member = reactive({
-  name: '',
+  username: '',
   account: '',
+  phone: '',
   password: '',
   confirmPassword: '',
 })
 
-import { isValidAccount, isValidPassword } from '@/utils/validator'
+import { isValidAccount, isValidPassword, isValidPhone } from '@/utils/validator'
 </script>
 
 <template>
-  <div class="col-md-6 m-auto" style="width: 800px">
-    <h3 class="mb-4 fw-bold">{{ title }}</h3>
+  <div class="col-md-6 m-auto card p-4 mt-5 shadow" style="width: 800px">
+    <h3 class="mb-4 fw-bold text-center">{{ title }}</h3>
 
     <!-- 表單區 -->
-    <div class="mb-3">
-      <label class="form-label">姓名</label>
-      <input type="text" class="form-control" v-model="member.name" />
-    </div>
-    <div class="mb-3">
+    <div class="form-floating mb-3">
+      <input type="text" class="form-control" placeholder="帳號" v-model="member.account" />
       <label class="form-label">帳號</label>
-      <input type="text" class="form-control" v-model="member.account" />
       <span class="form-text text-danger">{{ isValidAccount(member.account) }}</span>
     </div>
-    <div class="mb-3">
+    <div class="form-floating mb-3">
+      <input type="text" class="form-control" placeholder="暱稱" v-model="member.username" />
+      <label class="form-label">暱稱</label>
+    </div>
+    <div class="form-floating mb-3">
+      <input type="password" class="form-control" placeholder="密碼" v-model="member.password" />
       <label class="form-label">密碼</label>
-      <input type="password" class="form-control" v-model="member.password" />
       <span class="form-text text-danger">{{ isValidPassword(member.password) }}</span>
     </div>
-    <div class="mb-3">
+    <div class="form-floating mb-3">
+      <input
+        type="password"
+        class="form-control"
+        placeholder="確認密碼"
+        v-model="member.confirmPassword"
+      />
       <label class="form-label">確認密碼</label>
-      <input type="password" class="form-control" v-model="member.confirmPassword" />
+    </div>
+    <div class="form-floating mb-3">
+      <input
+        type="text"
+        maxlength="10"
+        class="form-control"
+        placeholder="電話"
+        v-model="member.phone"
+      />
+      <label class="form-label">電話</label>
+      <span class="form-text text-danger">{{ isValidPhone(member.phone) }}</span>
     </div>
     <div class="form-check mb-4">
       <input class="form-check-input" type="checkbox" id="agreeCheck" v-model="agree" />
@@ -56,6 +73,7 @@ import { isValidAccount, isValidPassword } from '@/utils/validator'
     </div>
 
     <button class="btn btn-primary w-100 py-2" :disabled="agree == false">完成註冊</button>
+    <div></div>
   </div>
 </template>
 
