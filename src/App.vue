@@ -13,9 +13,9 @@ import HelloWorld from './components/HelloWorld.vue'
       <nav>
         <RouterLink to="/">Home</RouterLink>
         <RouterLink to="/about">About</RouterLink>
-
+        
         <RouterLink :to="{ name: 'sampleShop' }" class="nav-item nav-link link-body-emphasis"
-          >商城</RouterLink
+          >商城2</RouterLink
         >
         <RouterLink :to="{ name: 'sampleGroupShop' }" class="nav-item nav-link link-body-emphasis"
           >團購</RouterLink
