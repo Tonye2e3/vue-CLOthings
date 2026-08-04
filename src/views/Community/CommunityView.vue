@@ -1,7 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-// 1. 引入抽出來的暫時導覽列組件
-import TempNavbar from '@/components/TempNavbar.vue'
+
 
 // 分頁 Tab 狀態
 const currentTab = ref('hot')
@@ -74,8 +73,7 @@ const toggleFollow = (creator) => {
 
   <div class="community-page min-vh-100 w-100">
 
-    <!-- 導覽列 -->
-    <TempNavbar />
+    
 
     <div class="container-fluid container-lg pb-5">
 
@@ -231,10 +229,8 @@ const toggleFollow = (creator) => {
 
 <style scoped>
 .community-page {
-  position: absolute;
   top: 0;
   left: 0;
-  width: 100vw !important;
   min-height: 100vh;
   background-color: #F9F4F0 !important;
   box-sizing: border-box;

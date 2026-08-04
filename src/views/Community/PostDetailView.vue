@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 // 引入暫時導覽列組件
-import TempNavbar from '@/components/TempNavbar.vue'
+// import TempNavbar from '@/components/TempNavbar.vue'
 
 // 使用 import 引入本地 src/assets 下的圖片
 import postImage from '@/assets/Postimage/post2.jpg'
@@ -78,7 +78,7 @@ const addComment = () => {
 
   <div class="community-page min-vh-100 w-100">
     <!-- 暫時導覽列 -->
-    <TempNavbar />
+    <!-- <TempNavbar /> -->
 
     <div class="container-fluid container-lg pb-5">
       <div class="row g-4">
@@ -226,10 +226,10 @@ const addComment = () => {
 
 <style scoped>
 .community-page {
-  position: absolute;
+  /* position: absolute; */
   top: 0;
   left: 0;
-  width: 100vw !important;
+  /* width: 100vw !important; */
   min-height: 100vh;
   background-color: #F9F4F0 !important;
   box-sizing: border-box;

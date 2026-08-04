@@ -1,8 +1,8 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-// 引入共用的暫時導覽列
-import TempNavbar from '@/components/TempNavbar.vue'
+// // 引入共用的暫時導覽列
+// import TempNavbar from '@/components/TempNavbar.vue'
 
 const router = useRouter()
 
@@ -55,8 +55,8 @@ const handleSubmit = () => {
   </component>
 
   <div class="create-post-page min-vh-100 w-100">
-    <!-- 頂部導覽列 -->
-    <TempNavbar />
+    <!-- 頂部導覽列
+    <TempNavbar /> -->
 
     <div class="container container-md py-4">
       
@@ -130,10 +130,10 @@ const handleSubmit = () => {
 <style scoped>
 /* 破開全版限制，套用暖奶油背景 */
 .create-post-page {
-  position: absolute;
+  /* position: absolute; */
   top: 0;
   left: 0;
-  width: 100vw !important;
+  /* width: 100vw !important; */
   min-height: 100vh;
   background-color: #F9F4F0 !important;
   box-sizing: border-box;

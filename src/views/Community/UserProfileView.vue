@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 // 引入暫時導覽列組件
-import TempNavbar from '@/components/TempNavbar.vue'
+// import TempNavbar from '@/components/TempNavbar.vue'
 
 // 使用者個人資料
 const userProfile = ref({
@@ -68,7 +68,7 @@ const toggleFollow = () => {
 
   <div class="community-page min-vh-100 w-100">
     <!-- 暫時導覽列 -->
-    <TempNavbar />
+    <!-- <TempNavbar /> -->
 
     <div class="container-fluid container-lg pb-5">
       <div class="card border-0 shadow-sm rounded-4 bg-white overflow-hidden mb-4">
@@ -231,10 +231,10 @@ const toggleFollow = () => {
 
 <style scoped>
 .community-page {
-  position: absolute;
+  /* position: absolute; */
   top: 0;
   left: 0;
-  width: 100vw !important;
+  /* width: 100vw !important; */
   min-height: 100vh;
   background-color: #F9F4F0 !important;
   box-sizing: border-box;
