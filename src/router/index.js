@@ -21,8 +21,8 @@ const router = createRouter({
 
     //Shop 在註解之間新增個人使用的路由 名字自行修改
     {
-      path: '/sample',
-      name: 'sampleShop',
+      path: '/shop/sample',
+      name: 'Shop',
       component: () => import('../views/Shop/SampleView.vue'),
     },
 
@@ -50,30 +50,60 @@ const router = createRouter({
 
     //Community 在註解之間新增個人使用的路由 名字自行修改
     {
-      path: '/sample',
-      name: 'sampleCommunity',
-      component: () => import('../views/Community/SampleView.vue'),
+      path: '/community/profile',
+      name: 'CommunityUserProfile',
+      component: () => import('@/views/Community/UserProfileView.vue'),
+    },
+    {
+      path: '/community/create',
+      name: 'CreatePost',
+      component: () => import('@/views/Community/CreatePostView.vue'),
+    },
+    {
+      path: '/community',
+      name: 'Community',
+      component: () => import('@/views/Community/CommunityView.vue'),
+    },
+    {
+      path: '/community/post/:id',
+      name: 'PostDetail',
+      component: () => import('@/views/Community/PostDetailView.vue'),
     },
 
     //User 在註解之間新增個人使用的路由 名字自行修改
     {
       path: '/login',
       name: 'login',
-      component: () => import('../views/User/LoginView.vue'),
+      component: () => import('../views/Users/LoginView.vue'),
     },
     {
-      path: '/User',
+      path: '/register',
+      name: 'register',
+      component: () => import('../views/Users/RegisterView.vue'),
+    },
+    {
+      path: '/user',
       meta: { requireMember: false },
       children: [
         {
-          path: 'UserInfo',
-          name: 'UserInfo',
-          component: () => import('@/views/User/LoginView.vue'),
+          path: 'user',
+          name: 'user',
+          component: () => import('@/views/Users/User.vue'),
         },
         {
-          path: 'UserProfile',
-          name: 'UserProfile',
-          component: () => import('@/views/User/LoginView.vue'),
+          path: 'userinfo',
+          name: 'userinfo',
+          component: () => import('@/views/Users/UserInfo.vue'),
+        },
+        {
+          path: 'userprofile',
+          name: 'userprofile',
+          component: () => import('@/views/Users/UserProfile.vue'),
+        },
+        {
+          path: 'useraddress',
+          name: 'useraddress',
+          component: () => import('@/views/Users/UserAddresses.vue'),
         },
       ],
     },
