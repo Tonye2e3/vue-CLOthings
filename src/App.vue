@@ -19,7 +19,7 @@ import HelloWorld from './components/HelloWorld.vue'
         <RouterLink :to="{ name: 'sampleShop' }" class="nav-item nav-link link-body-emphasis"
           >商城2</RouterLink
         >
-        <RouterLink :to="{ name: 'sampleGroupShop' }" class="nav-item nav-link link-body-emphasis"
+        <RouterLink :to="{ name: 'GroupProducts' }" class="nav-item nav-link link-body-emphasis"
           >團購</RouterLink
         >
         <RouterLink :to="{ name: 'Community' }" class="nav-item nav-link link-body-emphasis"
