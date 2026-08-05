@@ -9,12 +9,11 @@ const router = useRouter()
 // 表單雙向綁定資料
 const postForm = ref({
   title: '',
-  selectedProduct: ''
+  selectedProducts: [] // 改為陣列，支援複選
 })
 
-// 圖片檔案與預覽用的 URL
-const imageFile = ref(null)
-const imagePreviewUrl = ref('')
+// 圖片檔案與預覽用的 URL（改為陣列，支援多張照片）
+const imageFiles = ref([]) // [{ file, url }]
 
 // 模擬商城可標記的熱門單品
 const availableProducts = ref([
@@ -33,30 +32,39 @@ const filteredProducts = computed(() => {
   return availableProducts.value.filter(p => p.name.toLowerCase().includes(q))
 })
 
-// 處理檔案選取與即時預覽
+// 處理檔案選取與即時預覽（可一次選多張，也可分次加選）
 const handleFileChange = (event) => {
-  const file = event.target.files[0]
-  if (file) {
-    imageFile.value = file
-    // 利用 URL.createObjectURL 產生本地端預覽網址
-    imagePreviewUrl.value = URL.createObjectURL(file)
+  const files = Array.from(event.target.files || [])
+  files.forEach(file => {
+    imageFiles.value.push({
+      file,
+      // 利用 URL.createObjectURL 產生本地端預覽網址
+      url: URL.createObjectURL(file)
+    })
+  })
+  // 清空 input 的值，避免選同一張圖片時不觸發 change
+  event.target.value = ''
+}
+
+// 移除單一張已選圖片
+const removeImage = (index) => {
+  imageFiles.value.splice(index, 1)
+}
+
+// 點選商品標籤：已選就取消，未選就加入（複選）
+const toggleProduct = (name) => {
+  const list = postForm.value.selectedProducts
+  const idx = list.indexOf(name)
+  if (idx === -1) {
+    list.push(name)
+  } else {
+    list.splice(idx, 1)
   }
-}
-
-// 移除已選圖片，回到上傳區
-const clearImage = () => {
-  imageFile.value = null
-  imagePreviewUrl.value = ''
-}
-
-// 從搜尋結果點選商品標籤
-const selectProduct = (name) => {
-  postForm.value.selectedProduct = name
 }
 
 /// 模擬送出發文
 const handleSubmit = () => {
-  if (!imageFile.value || !postForm.value.title) {
+  if (imageFiles.value.length === 0 || !postForm.value.title) {
     alert('請上傳穿搭照片並填寫貼文心得！')
     return
   }
@@ -102,31 +110,49 @@ const handleSubmit = () => {
             <div class="compose-media">
               <span class="tag-label">封面預覽</span>
 
-              <label class="dropzone" :class="{ 'has-image': imagePreviewUrl }">
+              <label class="dropzone" :class="{ 'has-image': imageFiles.length }">
                 <input
                   type="file"
                   class="file-input-hidden"
                   accept="image/*"
+                  multiple
                   @change="handleFileChange"
                 />
 
-                <div v-if="!imagePreviewUrl" class="dropzone-empty">
+                <div v-if="imageFiles.length === 0" class="dropzone-empty">
                   <span class="dz-icon">📷</span>
                   <span class="dz-title">點擊上傳穿搭照片</span>
-                  <span class="dz-sub">建議直式構圖，光線自然最好看</span>
+                  <span class="dz-sub">可一次選取多張，建議直式構圖，光線自然最好看</span>
                 </div>
 
-                <img v-else :src="imagePreviewUrl" alt="上傳預覽" class="dropzone-preview" />
+                <img v-else :src="imageFiles[0].url" alt="封面預覽" class="dropzone-preview" />
 
-                <div v-if="imagePreviewUrl" class="dropzone-hover">更換照片</div>
+                <div v-if="imageFiles.length" class="dropzone-hover">更換封面照片</div>
               </label>
 
-              <button
-                v-if="imagePreviewUrl"
-                type="button"
-                class="btn-remove"
-                @click="clearImage"
-              >✕ 移除照片</button>
+              <!-- 已選照片縮圖列 -->
+              <div class="thumb-row" v-if="imageFiles.length">
+                <div class="thumb-item" v-for="(img, idx) in imageFiles" :key="idx">
+                  <img :src="img.url" alt="縮圖" />
+                  <span v-if="idx === 0" class="thumb-cover-badge">封面</span>
+                  <button type="button" class="thumb-remove" @click="removeImage(idx)">✕</button>
+                </div>
+
+                <label class="thumb-add">
+                  <input
+                    type="file"
+                    class="file-input-hidden"
+                    accept="image/*"
+                    multiple
+                    @change="handleFileChange"
+                  />
+                  ＋
+                </label>
+              </div>
+
+              <p class="upload-hint" v-if="imageFiles.length">
+                已選 {{ imageFiles.length }} 張照片，第一張會作為封面，點縮圖右上角可移除
+              </p>
             </div>
 
             <!-- 右側：文字內容 -->
@@ -143,7 +169,7 @@ const handleSubmit = () => {
               </div>
 
               <div class="field-block">
-                <label class="field-label">🔍 搜尋標籤商品</label>
+                <label class="field-label">🏷️ 標記標籤商品（選填，可複選）</label>
                 <div class="search-bar">
                   <svg class="search-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.6"/>
@@ -169,26 +195,20 @@ const handleSubmit = () => {
                     :key="product.id"
                     type="button"
                     class="tag-chip selectable"
-                    :class="{ active: postForm.selectedProduct === product.name }"
-                    @click="selectProduct(product.name)"
+                    :class="{ active: postForm.selectedProducts.includes(product.name) }"
+                    @click="toggleProduct(product.name)"
                   >#{{ product.name }}</button>
 
                   <span v-if="filteredProducts.length === 0" class="tag-empty">
                     找不到符合「{{ productSearch }}」的商品
                   </span>
                 </div>
-              </div>
 
-              <div class="field-block">
-                <label class="field-label">🏷️ 標記搭配商品（選填）</label>
-                <select class="field-select" v-model="postForm.selectedProduct">
-                  <option disabled value="">請選擇您使用的商城單品</option>
-                  <option v-for="product in availableProducts" :key="product.id" :value="product.name">
-                    {{ product.name }}
-                  </option>
-                </select>
-                <div class="tag-preview" v-if="postForm.selectedProduct">
-                  <span class="tag-chip">#{{ postForm.selectedProduct }}</span>
+                <div class="tag-preview" v-if="postForm.selectedProducts.length">
+                  <span v-for="name in postForm.selectedProducts" :key="name" class="tag-chip selected-chip">
+                    #{{ name }}
+                    <button type="button" class="chip-remove" @click="toggleProduct(name)">✕</button>
+                  </span>
                 </div>
               </div>
 
@@ -325,15 +345,51 @@ const handleSubmit = () => {
 }
 .dropzone.has-image:hover .dropzone-hover{ opacity:1; }
 
-.btn-remove{
-  align-self:flex-start;
+.thumb-row{
+  display:flex; flex-wrap:wrap; gap:.6rem;
   margin-top:.9rem;
-  background:none; border:none;
-  font-size:.8rem; color:var(--ink-soft);
-  text-decoration:underline;
-  padding:0;
 }
-.btn-remove:hover{ color:var(--plum); }
+.thumb-item{
+  position:relative;
+  width:64px; height:64px;
+  border-radius:6px;
+  overflow:hidden;
+  border:1px solid var(--hairline);
+  flex-shrink:0;
+}
+.thumb-item img{ width:100%; height:100%; object-fit:cover; display:block; }
+.thumb-cover-badge{
+  position:absolute; bottom:0; left:0; right:0;
+  background:rgba(42,36,32,.72);
+  color:#fff; font-size:.58rem; text-align:center;
+  padding:.1rem 0;
+}
+.thumb-remove{
+  position:absolute; top:2px; right:2px;
+  width:18px; height:18px; border-radius:50%;
+  background:rgba(42,36,32,.75); color:#fff;
+  border:none; font-size:.62rem; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .18s ease;
+}
+.thumb-remove:hover{ background:var(--plum); }
+
+.thumb-add{
+  width:64px; height:64px;
+  border-radius:6px;
+  border:1.5px dashed var(--hairline);
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.3rem; color:var(--ink-soft);
+  cursor:pointer; position:relative;
+  flex-shrink:0;
+  transition:border-color .18s ease, color .18s ease;
+}
+.thumb-add:hover{ border-color:var(--plum); color:var(--plum); }
+
+.upload-hint{
+  font-size:.76rem; color:var(--ink-soft);
+  margin:.7rem 0 0;
+}
 
 /* ---------- 右：表單 ---------- */
 .compose-body{ padding:2rem 2rem 1.8rem; display:flex; flex-direction:column; }
@@ -361,25 +417,30 @@ const handleSubmit = () => {
 }
 .field-textarea::placeholder{ color:var(--ink-soft); }
 
-.field-select{
-  width:100%;
-  border:1px solid var(--hairline);
-  background:var(--cream);
-  border-radius:4px;
-  padding:.65rem 1.1rem;
-  font-size:.9rem;
-  color:var(--ink);
-  transition:border-color .18s ease, background .18s ease;
+.tag-preview{
+  margin-top:.9rem;
+  padding-top:.9rem;
+  border-top:1px dashed var(--hairline);
+  display:flex; flex-wrap:wrap; gap:.5rem;
 }
-.field-select:focus{ outline:none; border-color:var(--plum); background:var(--paper); }
-
-.tag-preview{ margin-top:.7rem; }
 .tag-chip{
   display:inline-block;
   font-size:.78rem; padding:.4rem .9rem; border-radius:999px;
   background:var(--cream); border:1px solid var(--ochre); color:var(--ochre);
   font-weight:600;
 }
+.tag-chip.selected-chip{
+  display:inline-flex; align-items:center; gap:.4rem;
+  background:var(--plum); border-color:var(--plum); color:#fff;
+}
+.chip-remove{
+  background:rgba(255,255,255,.25); border:none; color:#fff;
+  width:16px; height:16px; border-radius:50%;
+  font-size:.6rem; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .18s ease;
+}
+.chip-remove:hover{ background:rgba(255,255,255,.45); }
 
 /* ---------- 搜尋標籤商品 ---------- */
 .search-bar{
