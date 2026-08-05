@@ -21,16 +21,31 @@ const router = createRouter({
 
     //Shop 在註解之間新增個人使用的路由 名字自行修改
     {
-      path: '/sample',
-      name: 'sampleShop',
+      path: '/shop/sample',
+      name: 'Shop',
       component: () => import('../views/Shop/SampleView.vue'),
     },
 
     //GroupShop 在註解之間新增個人使用的路由 名字自行修改
     {
-      path: '/sample',
-      name: 'sampleGroupShop',
-      component: () => import('../views/GroupShop/SampleView.vue'),
+      path: '/GroupShop',
+      name: 'GroupProducts',
+      component: () => import('../views/GroupShop/GroupProductsView.vue'),
+    },
+    {
+      path: '/GroupShop/product/:id',
+      name: 'GroupProductDetail',
+      component: () => import('../views/GroupShop/GroupProductDetail.vue'),
+    },
+    {
+      path: '/GroupShop/checkout',
+      name: 'GroupCheckout',
+      component: () => import('../views/GroupShop/GroupCheckoutView.vue'),
+    },
+    {
+      path: '/GroupShop/orders',
+      name: 'GroupOrders',
+      component: () => import('../views/GroupShop/GroupOrdersView.vue'),
     },
 
     //Community 在註解之間新增個人使用的路由 名字自行修改
@@ -54,26 +69,41 @@ const router = createRouter({
       name: 'PostDetail',
       component: () => import('@/views/Community/PostDetailView.vue'),
     },
-    
+
     //User 在註解之間新增個人使用的路由 名字自行修改
     {
       path: '/login',
       name: 'login',
-      component: () => import('../views/User/LoginView.vue'),
+      component: () => import('../views/Users/LoginView.vue'),
     },
     {
-      path: '/User',
+      path: '/register',
+      name: 'register',
+      component: () => import('../views/Users/RegisterView.vue'),
+    },
+    {
+      path: '/user',
       meta: { requireMember: false },
       children: [
         {
-          path: 'UserInfo',
-          name: 'UserInfo',
-          component: () => import('@/views/User/LoginView.vue'),
+          path: 'user',
+          name: 'user',
+          component: () => import('@/views/Users/User.vue'),
         },
         {
-          path: 'UserProfile',
-          name: 'UserProfile',
-          component: () => import('@/views/User/LoginView.vue'),
+          path: 'userinfo',
+          name: 'userinfo',
+          component: () => import('@/views/Users/UserInfo.vue'),
+        },
+        {
+          path: 'userprofile',
+          name: 'userprofile',
+          component: () => import('@/views/Users/UserProfile.vue'),
+        },
+        {
+          path: 'useraddress',
+          name: 'useraddress',
+          component: () => import('@/views/Users/UserAddresses.vue'),
         },
       ],
     },
