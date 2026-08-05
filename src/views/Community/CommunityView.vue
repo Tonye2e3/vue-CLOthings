@@ -29,7 +29,7 @@ const posts = ref([
     user: { name: 'Amy_穿搭日記', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Amy' },
     title: '秋季奶茶色系穿搭，寬褲+針織的溫柔搭配',
     desc: '用奶茶色打底，寬褲修飾比例，針織外套增加層次，走在街上也很有電影感。',
-    imageUrl: 'https://picsum.photos/seed/outfit-cream-knit/900/720',
+    imageUrl: 'https://loremflickr.com/900/720/knitwear,sweater,fashion',
     likesCount: '1.2k',
     commentsCount: 89,
     taggedProducts: [{ id: 3, name: '羊毛混紡針織外套' }]
@@ -39,7 +39,7 @@ const posts = ref([
     user: { name: 'Kevin.style', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Kevin' },
     title: '極簡工裝風 | 大地色機能外套通勤也好看',
     desc: '極簡工裝風，大地色機能外套通勤也好看，口袋設計實用又有型。',
-    imageUrl: 'https://picsum.photos/seed/outfit-utility-jacket/700/560',
+    imageUrl: 'https://loremflickr.com/700/560/jacket,menswear,fashion',
     likesCount: '856',
     commentsCount: 42,
     taggedProducts: [{ id: 1, name: '經典圓領短T' }]
@@ -49,7 +49,7 @@ const posts = ref([
     user: { name: '小雨 rainy', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Rainy' },
     title: '約會小心機 | 法式碎花洋裝配藤編包 🌸',
     desc: '約會小心機，法式碎花洋裝配藤編包，甜而不膩剛剛好。',
-    imageUrl: 'https://picsum.photos/seed/outfit-floral-dress/700/560',
+    imageUrl: 'https://loremflickr.com/700/560/dress,floral,fashion',
     likesCount: '2.4k',
     commentsCount: 158,
     taggedProducts: [{ id: 2, name: '法式碎花洋裝' }]
