@@ -9,7 +9,7 @@ const navItems = [
   { label: 'Home', to: { name: 'home' } },
   { label: 'Shop', to: { name: 'sampleShop' } },
   { label: 'Community', to: { name: 'Community' } },
-  { label: 'Group Buying', to: { name: 'sampleGroupShop' } },
+  { label: 'Group Buying', to: { name: 'GroupProducts' } },
 ]
 </script>
 
