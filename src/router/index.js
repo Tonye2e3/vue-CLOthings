@@ -90,21 +90,6 @@ const router = createRouter({
           name: 'user',
           component: () => import('@/views/Users/User.vue'),
         },
-        {
-          path: 'userinfo',
-          name: 'userinfo',
-          component: () => import('@/views/Users/UserInfo.vue'),
-        },
-        {
-          path: 'userprofile',
-          name: 'userprofile',
-          component: () => import('@/views/Users/UserProfile.vue'),
-        },
-        {
-          path: 'useraddress',
-          name: 'useraddress',
-          component: () => import('@/views/Users/UserAddresses.vue'),
-        },
       ],
     },
   ],
