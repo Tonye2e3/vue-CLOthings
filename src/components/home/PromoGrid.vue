@@ -7,10 +7,41 @@ const route = useRoute()
 const categories = ['WOMEN', 'MEN', 'KIDS', 'BABY']
 
 const products = [
-  { name: '寬版落肩T恤', desc: '柔軟純棉，寬鬆版型', price: 'NT$390', tag: '新品上市', category: 'WOMEN' },
-  { name: '輕薄羽絨外套', desc: '輕量保暖，可收納', price: 'NT$1,990', tag: '期間限定', category: 'MEN' },
-  { name: '直筒牛仔褲', desc: '百搭版型，彈性耐穿布料', price: 'NT$890', tag: '新品上市', category: 'KIDS' },
-  { name: '針織開襟衫', desc: '簡約線條，四季皆宜', price: 'NT$690', tag: '期間限定', category: 'BABY' },
+  {
+    name: '寬版落肩T恤',
+    desc: '柔軟純棉，寬鬆版型',
+    price: 'NT$390',
+    tag: '新品上市',
+    category: 'WOMEN',
+  },
+  {
+    name: '輕薄羽絨外套',
+    desc: '輕量保暖，可收納',
+    price: 'NT$1,990',
+    tag: '期間限定',
+    category: 'MEN',
+  },
+  {
+    name: '直筒牛仔褲',
+    desc: '百搭版型，彈性耐穿布料',
+    price: 'NT$890',
+    tag: '新品上市',
+    category: 'KIDS',
+  },
+  {
+    name: '針織開襟衫',
+    desc: '簡約線條，四季皆宜',
+    price: 'NT$690',
+    tag: '期間限定',
+    category: 'BABY',
+  },
+  {
+    name: '針織開襟衫',
+    desc: '簡約線條，四季皆宜',
+    price: 'NT$690',
+    tag: '期間限定',
+    category: 'BABY',
+  },
 ]
 
 const selectedCategory = computed(() => {
@@ -19,9 +50,7 @@ const selectedCategory = computed(() => {
 })
 
 const filteredProducts = computed(() =>
-  selectedCategory.value
-    ? products.filter((p) => p.category === selectedCategory.value)
-    : products,
+  selectedCategory.value ? products.filter((p) => p.category === selectedCategory.value) : products,
 )
 </script>
 

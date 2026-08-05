@@ -4,9 +4,9 @@ body {
 }
 
 #app {
-  max-width: 1280px;
-  margin: 50px auto;
-  padding: 2rem;
+  max-width:  auto;
+  margin: auto;
+  padding: auto;
   font-weight: normal;
 }
 

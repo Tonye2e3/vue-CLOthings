@@ -8,7 +8,7 @@ import TheWelcome from '../components/TheWelcome.vue'
   </main>
 </template> -->
 <script setup>
-import SiteHeader from '@/components/home/SiteHeader.vue'
+// import SiteHeader from '@/components/home/SiteHeader.vue'
 import HeroCarousel from '@/components/home/HeroCarousel.vue'
 import PromoGrid from '@/components/home/PromoGrid.vue'
 import CollabBanner from '@/components/home/CollabBanner.vue'
@@ -41,11 +41,6 @@ import SiteFooter from '@/components/home/SiteFooter.vue'
 
   background: var(--home-bg);
   color: var(--home-text);
-  font-family:
-    'Noto Sans TC',
-    'Helvetica Neue',
-    Helvetica,
-    Arial,
-    sans-serif;
+  font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 </style>
