@@ -22,22 +22,52 @@ const router = createRouter({
     //Shop 在註解之間新增個人使用的路由 名字自行修改
     {
       path: '/shop/sample',
-      name: 'sampleShop',
+      name: 'Shop',
       component: () => import('../views/Shop/SampleView.vue'),
     },
 
     //GroupShop 在註解之間新增個人使用的路由 名字自行修改
     {
-      path: '/groupshop/sample',
-      name: 'sampleGroupShop',
-      component: () => import('../views/GroupShop/SampleView.vue'),
+      path: '/GroupShop',
+      name: 'GroupProducts',
+      component: () => import('../views/GroupShop/GroupProductsView.vue'),
+    },
+    {
+      path: '/GroupShop/product/:id',
+      name: 'GroupProductDetail',
+      component: () => import('../views/GroupShop/GroupProductDetail.vue'),
+    },
+    {
+      path: '/GroupShop/checkout',
+      name: 'GroupCheckout',
+      component: () => import('../views/GroupShop/GroupCheckoutView.vue'),
+    },
+    {
+      path: '/GroupShop/orders',
+      name: 'GroupOrders',
+      component: () => import('../views/GroupShop/GroupOrdersView.vue'),
     },
 
     //Community 在註解之間新增個人使用的路由 名字自行修改
     {
-      path: '/community/sample',
-      name: 'sampleCommunity',
-      component: () => import('../views/Community/SampleView.vue'),
+      path: '/community/profile',
+      name: 'CommunityUserProfile',
+      component: () => import('@/views/Community/UserProfileView.vue'),
+    },
+    {
+      path: '/community/create',
+      name: 'CreatePost',
+      component: () => import('@/views/Community/CreatePostView.vue'),
+    },
+    {
+      path: '/community',
+      name: 'Community',
+      component: () => import('@/views/Community/CommunityView.vue'),
+    },
+    {
+      path: '/community/post/:id',
+      name: 'PostDetail',
+      component: () => import('@/views/Community/PostDetailView.vue'),
     },
 
     //User 在註解之間新增個人使用的路由 名字自行修改
