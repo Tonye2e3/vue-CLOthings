@@ -1,7 +1,9 @@
 <script></script>
 
 <template>
-  <H1>HelloWorld</H1>
+  <div class="userprofile">
+    <h1>User Profile</h1>
+  </div>
 </template>
 
 <style scoped></style>
