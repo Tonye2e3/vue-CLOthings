@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref, computed } from 'vue'
+import { reactive, ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
@@ -7,10 +7,7 @@ const route = useRoute()
 const searchKeyword = ref('')
 const navItems = [
   { label: '專案瀏覽', icon: '👤', to: '/GroupShop' },
-  { label: '團購紀錄', icon: '↺', to: '/GroupShop/orders' },
-  { label: '會員專區', icon: '🎖' },
-  { label: '設定', icon: '⚙' },
-  { label: '登出', icon: '⏻' }
+  { label: '團購紀錄', icon: '↺', to: '/GroupShop/orders' }
 ]
 const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : route.path.startsWith(to))
 
@@ -18,41 +15,28 @@ const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : rout
 const memberName = ref(localStorage.getItem('memberName') || '會員')
 const router = useRouter()
 
-// 主購物車項目：第一筆帶入從 Product 頁面傳來的選擇，其餘為模擬假資料
-const cartItems = reactive([
-  {
-    id: 1,
-    name: route.query.productName || '時尚休閒連帽衛衣',
-    spec: route.query.specName || '米白色 (早鳥專案)',
-    qty: parseInt(route.query.qty) || 2,
-    listPrice: 1280,
-    unlockedPrice: parseInt(route.query.unitPrice) || 1200,
-    imageUrl: 'https://images.unsplash.com/photo-1614975059251-992f11792b9f?w=200&auto=format&fit=crop'
-  },
-  {
-    id: 2,
-    name: '復古格紋寬褲',
-    spec: '咖啡色 (經典專案)',
-    qty: 1,
-    listPrice: 1580,
-    unlockedPrice: 1485,
-    imageUrl: 'https://images.unsplash.com/photo-1517438476312-10d79c077509?w=200&auto=format&fit=crop'
-  },
-  {
-    id: 3,
-    name: '有機棉圓領 T-shirt',
-    spec: '純白',
-    qty: 1,
-    listPrice: 980,
-    unlockedPrice: null,
-    imageUrl: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200&auto=format&fit=crop'
+// 購物車存放於 localStorage，與商品詳情頁的「加入此團購」共用同一份資料
+const CART_KEY = 'cloCart'
+
+const readCart = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CART_KEY) || '[]')
+    if (Array.isArray(saved)) return saved
+  } catch {
+    // 讀取失敗則視為空購物車
   }
-])
+  return []
+}
+
+const cartItems = reactive(readCart())
+
+// 品項增減、數量調整時同步寫回 localStorage
+watch(cartItems, () => {
+  localStorage.setItem(CART_KEY, JSON.stringify(cartItems))
+}, { deep: true })
 
 // 團購加購專區（可為空陣列，無加購商品時不顯示此區塊）
 const addonItems = reactive([])
-
-const shippingOption = ref('group') // group: 團購免運 / standard: 一般運費
 
 const removeItem = (id) => {
   const idx = cartItems.findIndex(i => i.id === id)
@@ -67,18 +51,10 @@ const subtotal = computed(() =>
   allItems.value.reduce((sum, i) => sum + unitPriceOf(i) * i.qty, 0)
 )
 
-const freight = computed(() => (shippingOption.value === 'group' ? 0 : 60))
+// 滿 $1,000 免運，未滿則加收運費 $60
+const freight = computed(() => (subtotal.value >= 1000 ? 0 : 60))
 
-// 團購價與原價的差額總和，即折扣金額
-const discountAmount = computed(() => {
-  return allItems.value.reduce((sum, i) => {
-    if (!i.unlockedPrice) return sum
-    return sum + (i.listPrice - i.unlockedPrice) * i.qty
-  }, 0)
-})
-
-const estimatedTotal = computed(() => subtotal.value + freight.value)
-const grandTotal = computed(() => estimatedTotal.value)
+const grandTotal = computed(() => subtotal.value + freight.value)
 
 const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
 
@@ -87,19 +63,13 @@ const continueShopping = () => {
 }
 
 const handleCheckout = () => {
-  alert('🎉 模擬結帳成功！即將轉導至訂單列表頁面。')
-  router.push('/GroupShop/orders')
+  router.push('/GroupShop/checkout/confirm')
 }
 </script>
 
 <template>
   <div class="clo-shell">
     <header class="clo-header">
-      <router-link to="/GroupShop" class="clo-brand">
-        <span class="brand-main">CLO</span>
-        <span class="brand-sub">CLO.things</span>
-      </router-link>
-
       <div class="clo-search">
         <input v-model="searchKeyword" type="text" placeholder="搜尋項目" />
         <button class="search-btn" type="button" aria-label="搜尋">🔍</button>
@@ -108,7 +78,13 @@ const handleCheckout = () => {
       <div class="clo-user">
         <span class="user-greet">你好，{{ memberName }}</span>
         <router-link to="/GroupShop/checkout" class="cart-link">
-          <span class="cart-icon">🛒</span>
+          <span class="cart-icon">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="9" cy="21" r="1"></circle>
+              <circle cx="20" cy="21" r="1"></circle>
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+            </svg>
+          </span>
           <span class="cart-badge">{{ allItems.length }}</span>
         </router-link>
       </div>
@@ -143,10 +119,13 @@ const handleCheckout = () => {
         <h4 class="fw-bold mb-3">購物車 ({{ cartItems.length }})</h4>
 
         <div class="cart-list-card mb-4">
+          <div v-if="cartItems.length === 0" class="empty-cart">
+            購物車目前是空的，快去挑選喜歡的商品加入團購吧！
+          </div>
           <div v-for="item in cartItems" :key="item.id" class="cart-row">
             <img :src="item.imageUrl" class="cart-img" :alt="item.name" />
             <div class="cart-item-info">
-              <h6 class="fw-bold mb-1">{{ item.name }} - {{ item.spec }}</h6>
+              <h6 class="fw-bold mb-1">{{ item.name }}</h6>
               <div class="d-flex align-items-center gap-2 mb-1">
                 <label class="small text-muted mb-0">數量</label>
                 <input type="number" min="1" v-model.number="item.qty" class="qty-input" />
@@ -167,7 +146,7 @@ const handleCheckout = () => {
           <div v-for="item in addonItems" :key="item.id" class="addon-row">
             <img :src="item.imageUrl" class="cart-img" :alt="item.name" />
             <div class="cart-item-info">
-              <h6 class="fw-bold mb-1">{{ item.name }} {{ item.spec }}</h6>
+              <h6 class="fw-bold mb-1">{{ item.name }}</h6>
               <div class="d-flex align-items-center gap-2 mb-1">
                 <label class="small text-muted mb-0">數量</label>
                 <input type="number" min="1" v-model.number="item.qty" class="qty-input" />
@@ -193,28 +172,16 @@ const handleCheckout = () => {
               <span class="fw-bold">${{ formatCurrency(subtotal) }}</span>
             </div>
 
-            <div class="mb-2">
-              <span class="d-block mb-1">運費</span>
-              <label class="radio-line">
-                <input type="radio" value="group" v-model="shippingOption" />
-                團購免運
-              </label>
-              <label class="radio-line">
-                <input type="radio" value="standard" v-model="shippingOption" />
-                一般運費 ($60)
-              </label>
-            </div>
-
-            <hr />
-
             <div class="d-flex justify-content-between mb-2">
-              <span>預估總計</span>
-              <span class="fw-bold">${{ formatCurrency(estimatedTotal) }}</span>
+              <span>運費</span>
+              <span class="fw-bold">
+                <template v-if="freight === 0">團購免運</template>
+                <template v-else>${{ formatCurrency(freight) }}</template>
+              </span>
             </div>
-            <div class="d-flex justify-content-between mb-2">
-              <span>折扣金額</span>
-              <span class="fw-bold text-accent">${{ formatCurrency(discountAmount) }}</span>
-            </div>
+            <p class="small text-muted shipping-hint mb-0">
+              {{ freight === 0 ? '已滿 $1,000，享免運優惠' : `未滿 $1,000，加收運費 $60（還差 $${formatCurrency(1000 - subtotal)} 即可免運）` }}
+            </p>
 
             <hr />
 
@@ -224,7 +191,13 @@ const handleCheckout = () => {
             </div>
 
             <button class="btn btn-outline w-100 mb-2" @click="continueShopping">繼續購物</button>
-            <button class="btn btn-main w-100" @click="handleCheckout">前往結帳</button>
+            <button
+              class="btn btn-main w-100"
+              :disabled="allItems.length === 0"
+              @click="handleCheckout"
+            >
+              前往結帳
+            </button>
           </div>
         </div>
       </div>
@@ -328,13 +301,15 @@ const handleCheckout = () => {
   color: #4a3e3d;
 }
 
-.radio-line {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.88rem;
-  margin-bottom: 4px;
-  cursor: pointer;
+.shipping-hint {
+  font-size: 0.78rem;
+}
+
+.empty-cart {
+  padding: 40px 20px;
+  text-align: center;
+  color: #a9998e;
+  font-size: 0.9rem;
 }
 
 .btn-main {
@@ -348,6 +323,14 @@ const handleCheckout = () => {
 .btn-main:hover {
   background-color: #362d2c;
   color: #fff;
+}
+.btn-main:disabled {
+  background-color: #d8c3b5;
+  color: #fff;
+  cursor: not-allowed;
+}
+.btn-main:disabled:hover {
+  background-color: #d8c3b5;
 }
 .btn-outline {
   background-color: #fff;
@@ -376,24 +359,6 @@ const handleCheckout = () => {
   border-bottom: 1px solid #e6dccf;
 }
 
-.clo-brand {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.1;
-  text-decoration: none;
-  color: #4a3e3d;
-  flex-shrink: 0;
-}
-.brand-main {
-  font-size: 1.6rem;
-  font-weight: 800;
-  letter-spacing: 2px;
-}
-.brand-sub {
-  font-size: 0.65rem;
-  letter-spacing: 1px;
-  color: #b87352;
-}
 
 .clo-search {
   flex: 1;
@@ -440,9 +405,9 @@ const handleCheckout = () => {
 .cart-link {
   position: relative;
   display: inline-flex;
+  align-items: center;
   color: #4a3e3d;
   text-decoration: none;
-  font-size: 1.3rem;
 }
 .cart-badge {
   position: absolute;
