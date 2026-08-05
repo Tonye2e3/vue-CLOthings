@@ -4,6 +4,9 @@ import { useRouter } from 'vue-router'
 // // 引入共用的暫時導覽列
 // import TempNavbar from '@/components/TempNavbar.vue'
 
+// 全站共用的貼文清單（跟 CommunityView.vue 共用同一份資料，直接 import 那個檔案）
+import { addPost, currentUser } from '@/views/Community/CommunityView.vue'
+
 const router = useRouter()
 
 // 表單雙向綁定資料
@@ -62,14 +65,28 @@ const toggleProduct = (name) => {
   }
 }
 
-/// 模擬送出發文
+/// 送出發文：組出貼文資料，加進全站共用的貼文清單
 const handleSubmit = () => {
   if (imageFiles.value.length === 0 || !postForm.value.title) {
     alert('請上傳穿搭照片並填寫貼文心得！')
     return
   }
 
-  // 這裡之後可以串接 API，目前先跳回社群動態牆
+  addPost({
+    postId: Date.now(),
+    user: { name: currentUser.name, avatar: currentUser.avatar },
+    // 目前表單只有一個文字欄位，標題／內文先共用同一段文字
+    title: postForm.value.title,
+    desc: postForm.value.title,
+    // 用第一張照片當封面圖（本地預覽網址，僅在目前分頁有效）
+    imageUrl: imageFiles.value[0].url,
+    publishedAt: new Date().toISOString(),
+    likesCount: '0',
+    commentsCount: 0,
+    taggedProducts: postForm.value.selectedProducts.map(name => ({ name }))
+  })
+
+  // 這裡之後可以串接真正的 API 上傳，目前先跳回社群動態牆
   alert('發文成功！即將返回社群首頁。')
   router.push('/community')
 }

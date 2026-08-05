@@ -1,7 +1,73 @@
+<script>
+import { reactive } from 'vue'
+
+// 全站共用的貼文清單。這裡用一般的 <script>（非 setup）宣告並 export 出去，
+// 跟下面的 <script setup> 是同一個模組、同一份記憶體資料，
+// CreatePostView.vue 直接 import 這個檔案就能共用、不用另外新增 store 檔案。
+export const currentUser = {
+  name: 'Emily 艾米莉',
+  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily'
+}
+
+export const posts = reactive([
+  {
+    postId: 1,
+    user: { name: 'Amy_穿搭日記', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Amy' },
+    title: '秋季奶茶色系穿搭，寬褲+針織的溫柔搭配',
+    desc: '用奶茶色打底，寬褲修飾比例，針織外套增加層次，走在街上也很有電影感。',
+    imageUrl: 'https://loremflickr.com/900/720/knitwear,sweater,fashion',
+    publishedAt: '2026-08-04T09:00:00',
+    likesCount: '1.2k',
+    commentsCount: 89,
+    taggedProducts: [{ id: 3, name: '羊毛混紡針織外套' }]
+  },
+  {
+    postId: 2,
+    user: { name: 'Kevin.style', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Kevin' },
+    title: '極簡工裝風 | 大地色機能外套通勤也好看',
+    desc: '極簡工裝風，大地色機能外套通勤也好看，口袋設計實用又有型。',
+    imageUrl: 'https://loremflickr.com/700/560/jacket,menswear,fashion',
+    publishedAt: '2026-08-02T15:30:00',
+    likesCount: '856',
+    commentsCount: 42,
+    taggedProducts: [{ id: 1, name: '經典圓領短T' }]
+  },
+  {
+    postId: 3,
+    user: { name: '小雨 rainy', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Rainy' },
+    title: '約會小心機 | 法式碎花洋裝配藤編包 🌸',
+    desc: '約會小心機，法式碎花洋裝配藤編包，甜而不膩剛剛好。',
+    imageUrl: 'https://loremflickr.com/700/560/dress,floral,fashion',
+    publishedAt: '2026-08-05T08:10:00',
+    likesCount: '2.4k',
+    commentsCount: 158,
+    taggedProducts: [{ id: 2, name: '法式碎花洋裝' }]
+  },
+  {
+    postId: 4,
+    user: { name: 'Leo_urban', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Leo' },
+    title: '街頭機能風 | 背心＋工裝褲率性感',
+    desc: '機能背心＋工裝褲，街頭感十足，鞋款選厚底增加率性。',
+    imageUrl: 'https://loremflickr.com/700/560/streetwear,outfit,fashion',
+    publishedAt: '2026-08-01T11:00:00',
+    likesCount: '631',
+    commentsCount: 27,
+    taggedProducts: [{ id: 4, name: '修身牛仔褲' }]
+  }
+])
+
+// 新增一篇貼文，加到清單最前面（CreatePostView.vue 發文成功時呼叫）
+export const addPost = (post) => {
+  posts.unshift(post)
+}
+</script>
+
 <script setup>
 import { ref, computed } from 'vue'
 // 1. 暫時導覽列元件（共用導覽列尚未合併，先註解掉，避免報錯）
 // import TempNavbar from '@/components/TempNavbar.vue'
+
+// posts 已經在上面的 <script> 區塊宣告並 export，這裡同一個檔案內可以直接使用，不用再 import
 
 // 分頁 Tab 狀態
 const currentTab = ref('hot')
@@ -22,47 +88,41 @@ const creators = ref([
   { id: 3, name: '小雨 rainy', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Rainy', meta: '3.4萬追蹤', isFollowing: true }
 ])
 
-// 穿搭貼文假資料（圖片改用穩定可顯示的穿搭情境圖，避免空白）
-const posts = ref([
-  {
-    postId: 1,
-    user: { name: 'Amy_穿搭日記', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Amy' },
-    title: '秋季奶茶色系穿搭，寬褲+針織的溫柔搭配',
-    desc: '用奶茶色打底，寬褲修飾比例，針織外套增加層次，走在街上也很有電影感。',
-    imageUrl: 'https://loremflickr.com/900/720/knitwear,sweater,fashion',
-    likesCount: '1.2k',
-    commentsCount: 89,
-    taggedProducts: [{ id: 3, name: '羊毛混紡針織外套' }]
-  },
-  {
-    postId: 2,
-    user: { name: 'Kevin.style', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Kevin' },
-    title: '極簡工裝風 | 大地色機能外套通勤也好看',
-    desc: '極簡工裝風，大地色機能外套通勤也好看，口袋設計實用又有型。',
-    imageUrl: 'https://loremflickr.com/700/560/jacket,menswear,fashion',
-    likesCount: '856',
-    commentsCount: 42,
-    taggedProducts: [{ id: 1, name: '經典圓領短T' }]
-  },
-  {
-    postId: 3,
-    user: { name: '小雨 rainy', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Rainy' },
-    title: '約會小心機 | 法式碎花洋裝配藤編包 🌸',
-    desc: '約會小心機，法式碎花洋裝配藤編包，甜而不膩剛剛好。',
-    imageUrl: 'https://loremflickr.com/700/560/dress,floral,fashion',
-    likesCount: '2.4k',
-    commentsCount: 158,
-    taggedProducts: [{ id: 2, name: '法式碎花洋裝' }]
-  }
-])
+// 頁籤文案（每個頁籤對應的封面卡標籤與副標）
+const tabCopy = {
+  hot:    { ribbon: '封面故事', role: '本週封面 · 秋季選品', empty: '目前沒有符合的熱門穿搭。' },
+  new:    { ribbon: '最新發布', role: '剛剛發布的穿搭',      empty: '目前還沒有最新的穿搭貼文。' },
+  follow: { ribbon: '追蹤精選', role: '來自你追蹤的達人',    empty: '你還沒有追蹤任何穿搭達人，去右側「熱門穿搭達人」追蹤幾位，這裡就會出現他們的貼文。' }
+}
+const currentTabCopy = computed(() => tabCopy[currentTab.value] || tabCopy.hot)
 
-// 搜尋（可搜尋貼文標題、標籤商品、用戶名）
+// 依照目前分頁 (熱門 / 最新 / 追蹤中) 先篩出對應的貼文清單
+const tabPosts = computed(() => {
+  if (currentTab.value === 'new') {
+    // 最新：依發布時間新到舊排序
+    return [...posts].sort(
+      (a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)
+    )
+  }
+  if (currentTab.value === 'follow') {
+    // 追蹤中：只顯示已追蹤達人的貼文
+    const followingNames = creators.value
+      .filter(c => c.isFollowing)
+      .map(c => c.name)
+    return posts.filter(p => followingNames.includes(p.user.name))
+  }
+  // 熱門：維持假資料原本的順序（可想像成已經依熱度排序好）
+  return posts
+})
+
+// 搜尋（可搜尋貼文標題、標籤商品、用戶名），在目前分頁的結果之上再過濾一次
 const searchQuery = ref('')
 
 const filteredPosts = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return posts.value
-  return posts.value.filter(post => {
+  const base = tabPosts.value
+  if (!q) return base
+  return base.filter(post => {
     const inTitle = post.title.toLowerCase().includes(q)
     const inUser = post.user.name.toLowerCase().includes(q)
     const inTags = (post.taggedProducts || []).some(p => p.name.toLowerCase().includes(q))
@@ -103,7 +163,8 @@ const toggleFollow = (creator) => {
 
   <div class="community-page min-vh-100 w-100">
 
-    
+    <!-- 導覽列：共用導覽列尚未合併，先註解掉 -->
+    <!-- <TempNavbar /> -->
 
     <div class="container-fluid container-lg pb-5">
 
@@ -128,7 +189,7 @@ const toggleFollow = (creator) => {
             type="text"
             v-model="searchQuery"
             class="search-input"
-            placeholder="搜尋穿搭、關鍵字或用戶..."
+            placeholder="搜尋、單品或用戶..."
           />
           <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''" aria-label="清除搜尋">✕</button>
         </div>
@@ -165,10 +226,10 @@ const toggleFollow = (creator) => {
         <!-- 左側：貼文列表區 -->
         <div class="col-12 col-lg-9">
 
-          <!-- 封面故事卡（取貼文第一筆） -->
+          <!-- 封面故事卡（依目前分頁取第一筆） -->
           <div class="feature-card" v-if="featurePost">
             <router-link :to="`/community/post/${featurePost.postId}`" class="feature-media d-block text-decoration-none">
-              <span class="tag-label">封面故事</span>
+              <span class="tag-label">{{ currentTabCopy.ribbon }}</span>
               <img :src="featurePost.imageUrl" :alt="featurePost.title" />
             </router-link>
             <div class="feature-body">
@@ -176,7 +237,7 @@ const toggleFollow = (creator) => {
                 <img class="avatar" :src="featurePost.user.avatar" alt="avatar" />
                 <div>
                   <div class="author-name">{{ featurePost.user.name }}</div>
-                  <div class="author-role">本週封面 · 秋季選品</div>
+                  <div class="author-role">{{ currentTabCopy.role }}</div>
                 </div>
               </router-link>
               <router-link :to="`/community/post/${featurePost.postId}`" class="text-decoration-none text-dark">
@@ -191,9 +252,9 @@ const toggleFollow = (creator) => {
             </div>
           </div>
 
-          <!-- 搜尋無結果 -->
-          <div class="empty-state" v-if="isSearching && filteredPosts.length === 0">
-            找不到符合「{{ searchQuery }}」的穿搭、關鍵字或用戶，換個關鍵字試試。
+          <!-- 沒有結果（搜尋無結果 / 追蹤中還沒有內容 等） -->
+          <div class="empty-state" v-if="filteredPosts.length === 0">
+            {{ isSearching ? `找不到符合「${searchQuery}」的穿搭、單品或用戶，換個關鍵字試試。` : currentTabCopy.empty }}
           </div>
 
           <!-- 其餘貼文：雙欄網格 -->
@@ -281,12 +342,10 @@ const toggleFollow = (creator) => {
 
 <style scoped>
 .community-page {
-  top: 0;
-  left: 0;
+  width: 100%;
   min-height: 100vh;
   background-color: #F9F4F0 !important;
   box-sizing: border-box;
-  z-index: 10;
   --cream:#F9F4F0;
   --paper:#FFFDFB;
   --ink:#2A2420;

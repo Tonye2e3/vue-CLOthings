@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 // 引入暫時導覽列組件
 // import TempNavbar from '@/components/TempNavbar.vue'
 
@@ -19,16 +19,24 @@ const post = ref({
   // 指向剛才 import 的本地圖片變數
   imageUrl: postImage,
   content: '今天走簡約韓系風格 🤍 這套針織上衣與打褶寬褲質感超好，版型顯瘦又舒服，很適合秋天約會或上班～ 全身都可以直接點連結購買！',
-  likesCount: '1,248',
   commentsCount: 86,
   isLiked: false,
   isSaved: false,
   taggedProducts: [
-    { id: 101, name: '針織上衣', x: '45%', y: '35%' },
-    { id: 102, name: '高腰寬褲', x: '50%', y: '70%' },
-    { id: 103, name: '托特包', x: '30%', y: '90%' }
+    { id: 101, name: '針織上衣', x: '75%', y: '35%' },
+    { id: 102, name: '高腰寬褲', x: '60%', y: '70%' },
+    { id: 103, name: '托特包', x: '35%', y: '80%' }
   ]
 })
+
+// 按讚數改用數字追蹤，方便按讚時 +1、取消時 -1；畫面顯示再轉成千分位字串
+const likesNumber = ref(1248) // 對應原本的 '1,248'
+const likesDisplay = computed(() => likesNumber.value.toLocaleString())
+
+const toggleLike = () => {
+  post.value.isLiked = !post.value.isLiked
+  likesNumber.value += post.value.isLiked ? 1 : -1
+}
 
 // 這套穿搭的商品清單
 const products = ref([
@@ -126,8 +134,8 @@ const addComment = () => {
             <!-- 按讚/分享/收藏 動作列 -->
             <div class="action-bar">
               <div class="action-left">
-                <button class="action-btn" :class="{ liked: post.isLiked }" @click="post.isLiked = !post.isLiked">
-                  ♥ {{ post.likesCount }}
+                <button class="action-btn" :class="{ liked: post.isLiked }" @click="toggleLike">
+                  ♥ {{ likesDisplay }}
                 </button>
                 <button class="action-btn">
                   💬 {{ post.commentsCount }}
