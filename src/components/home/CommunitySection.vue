@@ -12,7 +12,7 @@ const posts = [
   <section class="community">
     <div class="community-head">
       <h2 class="section-title">社群穿搭靈感</h2>
-      <RouterLink :to="{ name: 'sampleCommunity' }" class="community-link">前往社群 →</RouterLink>
+      <RouterLink :to="{ name: 'Community' }" class="community-link">前往社群 →</RouterLink>
     </div>
     <div class="community-grid">
       <article v-for="p in posts" :key="p.author" class="post-card">
