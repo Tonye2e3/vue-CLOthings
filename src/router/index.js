@@ -22,7 +22,7 @@ const router = createRouter({
     //Shop 在註解之間新增個人使用的路由 名字自行修改
     {
       path: '/shop/sample',
-      name: 'sampleShop',
+      name: 'Shop',
       component: () => import('../views/Shop/SampleView.vue'),
     },
 

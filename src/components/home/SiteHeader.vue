@@ -7,7 +7,7 @@ import IconCart from '@/components/icons/IconCart.vue'
 
 const navItems = [
   { label: 'Home', to: { name: 'home' } },
-  { label: 'Shop', to: { name: 'sampleShop' } },
+  { label: 'Shop', to: { name: 'Shop' } },
   { label: 'Community', to: { name: 'Community' } },
   { label: 'Group Buying', to: { name: 'GroupProducts' } },
 ]
