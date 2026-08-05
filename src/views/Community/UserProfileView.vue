@@ -56,6 +56,13 @@ const userPosts = ref([
   }
 ])
 
+const tabs = [
+  { key: 'works', label: '穿搭作品' },
+  { key: 'saved', label: '收藏' },
+  { key: 'products', label: '同款商品' },
+  { key: 'about', label: '關於我' }
+]
+
 const toggleFollow = () => {
   userProfile.value.isFollowing = !userProfile.value.isFollowing
 }
@@ -64,6 +71,7 @@ const toggleFollow = () => {
 <template>
   <component is="style">
     @import "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css";
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&amp;family=Noto+Sans+TC:wght@400;500;600;700&amp;display=swap');
   </component>
 
   <div class="community-page min-vh-100 w-100">
@@ -71,158 +79,107 @@ const toggleFollow = () => {
     <!-- <TempNavbar /> -->
 
     <div class="container-fluid container-lg pb-5">
-      <div class="card border-0 shadow-sm rounded-4 bg-white overflow-hidden mb-4">
-        
-        <!-- 頂部封面橫幅 -->
-        <div class="profile-banner w-100" style="height: 140px; background-color: #EFE8E1;"></div>
 
-        <!-- 個人核心資訊區塊 -->
-        <div class="px-4 px-md-5 pb-4 position-relative">
-          <div class="row align-items-end mb-3">
-            
+      <!-- 個人檔案卡 -->
+      <div class="profile-card mb-4">
+
+        <!-- 封面橫幅：改用斜紋質感取代純色平塗 -->
+        <div class="profile-banner"></div>
+
+        <div class="profile-body">
+          <div class="profile-top">
+
             <!-- 大頭貼 -->
-            <div class="col-auto position-relative" style="margin-top: -60px;">
-              <div class="avatar-wrapper rounded-circle p-1 bg-white shadow-sm">
-                <img 
-                  :src="userProfile.avatar" 
-                  class="rounded-circle border border-2 border-warm" 
-                  style="width: 110px; height: 110px; object-fit: cover;"
-                  alt="Avatar"
-                />
-              </div>
+            <div class="avatar-wrapper">
+              <img :src="userProfile.avatar" class="avatar-img" alt="Avatar" />
             </div>
 
-            <!-- 右側數據與動作按鈕 -->
-            <div class="col d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3 mt-md-0">
-              
-              <!-- 數據統計 -->
-              <div class="d-flex gap-4 gap-md-5 text-center ms-auto ms-md-0 me-md-auto">
-                <div>
-                  <div class="fw-bold fs-5 text-dark">{{ userProfile.postsCount }}</div>
-                  <div class="extra-small text-muted">貼文</div>
+            <!-- 數據與動作 -->
+            <div class="profile-meta">
+              <div class="stat-group">
+                <div class="stat-item">
+                  <div class="stat-num">{{ userProfile.postsCount }}</div>
+                  <div class="stat-label">貼文</div>
                 </div>
-                <div>
-                  <div class="fw-bold fs-5 text-dark">{{ userProfile.followersCount }}</div>
-                  <div class="extra-small text-muted">粉絲</div>
+                <div class="stat-item">
+                  <div class="stat-num">{{ userProfile.followersCount }}</div>
+                  <div class="stat-label">粉絲</div>
                 </div>
-                <div>
-                  <div class="fw-bold fs-5 text-dark">{{ userProfile.followingCount }}</div>
-                  <div class="extra-small text-muted">追蹤中</div>
+                <div class="stat-item">
+                  <div class="stat-num">{{ userProfile.followingCount }}</div>
+                  <div class="stat-label">追蹤中</div>
                 </div>
               </div>
 
-              <!-- 按鈕區 -->
-              <div class="d-flex gap-2">
-                <button 
-                  class="btn rounded-pill px-4 py-2 fw-medium border-0 transition-all shadow-sm"
-                  :class="userProfile.isFollowing ? 'btn-secondary text-white' : 'btn-dark text-white'"
+              <div class="action-group">
+                <button
+                  class="btn-follow-main"
+                  :class="{ following: userProfile.isFollowing }"
                   @click="toggleFollow"
                 >
-                  {{ userProfile.isFollowing ? '已追蹤' : '+ 追蹤' }}
+                  {{ userProfile.isFollowing ? '已追蹤' : '＋ 追蹤' }}
                 </button>
-                <button class="btn btn-outline-dark rounded-pill px-4 py-2 fw-medium shadow-sm">
-                  ✉ 訊息
-                </button>
+                <button class="btn-message">✉ 訊息</button>
               </div>
-
             </div>
           </div>
 
-          <!-- 使用者姓名與簡介 -->
-          <div class="mt-2">
-            <h4 class="fw-bold text-dark mb-1">{{ userProfile.name }}</h4>
-            <div class="text-muted small mb-2">
-              <span class="me-2">{{ userProfile.handle }}</span> · 
-              <span class="ms-2 text-dark font-medium">{{ userProfile.bioTag }}</span>
+          <!-- 姓名與簡介 -->
+          <div class="profile-intro">
+            <h1 class="profile-name">{{ userProfile.name }}</h1>
+            <div class="profile-handle">
+              <span>{{ userProfile.handle }}</span>
+              <span class="dot">·</span>
+              <span class="tagline">{{ userProfile.bioTag }}</span>
             </div>
-            <p class="text-secondary small mb-0 lh-base" style="max-width: 650px;">
-              {{ userProfile.bio }}
-            </p>
+            <p class="profile-bio">{{ userProfile.bio }}</p>
           </div>
 
-          <!-- 頁籤導覽列 -->
-          <div class="d-flex gap-4 border-bottom mt-4 pt-2">
-            <button 
-              class="btn nav-tab-btn pb-2 px-1 fw-bold position-relative text-nowrap"
-              :class="activeTab === 'works' ? 'text-dark active' : 'text-muted'"
-              @click="activeTab = 'works'"
-            >
-              穿搭作品
-            </button>
-            <button 
-              class="btn nav-tab-btn pb-2 px-1 fw-bold position-relative text-nowrap"
-              :class="activeTab === 'saved' ? 'text-dark active' : 'text-muted'"
-              @click="activeTab = 'saved'"
-            >
-              收藏
-            </button>
-            <button 
-              class="btn nav-tab-btn pb-2 px-1 fw-bold position-relative text-nowrap"
-              :class="activeTab === 'products' ? 'text-dark active' : 'text-muted'"
-              @click="activeTab = 'products'"
-            >
-              同款商品
-            </button>
-            <button 
-              class="btn nav-tab-btn pb-2 px-1 fw-bold position-relative text-nowrap"
-              :class="activeTab === 'about' ? 'text-dark active' : 'text-muted'"
-              @click="activeTab = 'about'"
-            >
-              關於我
-            </button>
+          <!-- 頁籤 -->
+          <div class="tab-row">
+            <button
+              v-for="t in tabs"
+              :key="t.key"
+              class="tab-btn"
+              :class="{ active: activeTab === t.key }"
+              @click="activeTab = t.key"
+            >{{ t.label }}</button>
           </div>
-
         </div>
       </div>
 
-      <!-- 下方卡片列表牆 -->
-      <div v-if="activeTab === 'works'" class="row g-4">
-        <div v-for="post in userPosts" :key="post.id" class="col-12 col-sm-6 col-md-3">
-          <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden post-card bg-white">
-            
-            <!-- 貼文圖片 -->
-            <router-link :to="`/community/post/${post.id}`" class="d-block text-decoration-none">
-              <div class="position-relative bg-light ratio ratio-4x5 overflow-hidden">
-                <img :src="post.image" class="card-img-top object-fit-cover hover-scale" :alt="post.title" />
-              </div>
+      <!-- 穿搭作品牆 -->
+      <div v-if="activeTab === 'works'" class="post-grid">
+        <div v-for="post in userPosts" :key="post.id" class="post-card">
+
+          <router-link :to="`/community/post/${post.id}`" class="post-media d-block text-decoration-none">
+            <span class="tag-label" v-if="post.tags[0]">{{ post.tags[0].replace('#', '') }}</span>
+            <img :src="post.image" :alt="post.title" />
+          </router-link>
+
+          <div class="post-body">
+            <router-link :to="`/community/post/${post.id}`" class="text-decoration-none">
+              <h6 class="post-title">{{ post.title }}</h6>
             </router-link>
 
-            <!-- 內容描述與數據 -->
-            <div class="card-body p-3 d-flex flex-column justify-content-between">
-              <div>
-                <router-link :to="`/community/post/${post.id}`" class="text-decoration-none">
-                  <h6 class="card-title fw-bold text-dark fs-7 mb-2 line-clamp-1 hover-dark">
-                    {{ post.title }}
-                  </h6>
-                </router-link>
-                
-                <!-- 數據 -->
-                <div class="d-flex gap-3 text-muted extra-small mb-2">
-                  <span>♥ {{ post.likes }}</span>
-                  <span>💬 {{ post.comments }}</span>
-                  <router-link :to="`/community/post/${post.id}`" class="text-muted text-decoration-none ms-auto">
-                    🛍️ 查看同款
-                  </router-link>
-                </div>
-              </div>
-
-              <!-- 標籤列表 (帶有 # 字號的膠囊按鈕) -->
-              <div class="d-flex flex-wrap gap-1 mt-1">
-                <span v-for="tag in post.tags" :key="tag" class="tag-pill extra-small px-2 py-1 rounded-pill">
-                  {{ tag }}
-                </span>
-              </div>
-
+            <div class="post-stats">
+              <span>♥ {{ post.likes }}</span>
+              <span>💬 {{ post.comments }}</span>
+              <router-link :to="`/community/post/${post.id}`" class="ms-auto">查看同款</router-link>
             </div>
 
+            <div class="tag-cloud">
+              <span v-for="tag in post.tags" :key="tag" class="tag-chip">{{ tag }}</span>
+            </div>
           </div>
+
         </div>
       </div>
 
       <!-- 其它頁籤未開啟時的預設狀態 -->
-      <div v-else class="card border-0 shadow-sm rounded-4 p-5 text-center text-muted bg-white">
-        <div class="fs-1 mb-2">📁</div>
-        <div>該區塊內容載入中...</div>
+      <div v-else class="empty-state">
+        <div class="empty-icon">📁</div>
+        <p class="empty-note">「這裡的故事，還在整理中。」</p>
       </div>
 
     </div>
@@ -231,69 +188,205 @@ const toggleFollow = () => {
 
 <style scoped>
 .community-page {
-  /* position: absolute; */
-  top: 0;
-  left: 0;
-  /* width: 100vw !important; */
+  width: 100%;
   min-height: 100vh;
   background-color: #F9F4F0 !important;
   box-sizing: border-box;
-  z-index: 10;
+  --cream:#F9F4F0;
+  --paper:#FFFDFB;
+  --ink:#2A2420;
+  --ink-soft:#7A6E63;
+  --plum:#7A4B54;
+  --plum-deep:#5E3941;
+  --ochre:#B8862E;
+  --hairline:#E4D8CC;
+  color: var(--ink);
+  font-family: 'Noto Sans TC', sans-serif;
 }
 
-.border-warm {
-  border-color: #4A4744 !important;
+/* ---------- 個人檔案卡 ---------- */
+.profile-card{
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  border-radius:22px;
+  overflow:hidden;
 }
 
-.nav-tab-btn {
-  border: none;
-  background: transparent;
-  transition: color 0.2s ease;
+.profile-banner{
+  height:150px;
+  background:
+    repeating-linear-gradient(
+      135deg,
+      var(--cream) 0px, var(--cream) 22px,
+      #F1E6DC 22px, #F1E6DC 44px
+    );
+  position:relative;
 }
-.nav-tab-btn.active::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 3px;
-  background-color: #4A4744;
-  border-radius: 2px;
-}
-
-/* 暖米色軟調標籤樣式 */
-.tag-pill {
-  background-color: #F4EFEA;
-  color: #6C6661;
+.profile-banner::after{
+  content:"";
+  position:absolute; inset:0;
+  background:linear-gradient(180deg, rgba(122,75,84,.08), rgba(122,75,84,0) 60%);
 }
 
-.fs-7 {
-  font-size: 0.9rem;
+.profile-body{ padding:0 2.2rem 1.6rem; position:relative; }
+
+.profile-top{
+  display:flex; align-items:flex-end; justify-content:space-between;
+  flex-wrap:wrap; gap:1.2rem;
+  margin-top:-58px;
 }
 
-.extra-small {
-  font-size: 0.78rem;
+.avatar-wrapper{
+  width:112px; height:112px; border-radius:50%;
+  background:var(--paper); padding:5px;
+  box-shadow:0 0 0 2px var(--plum);
+  flex-shrink:0;
+}
+.avatar-img{ width:100%; height:100%; border-radius:50%; object-fit:cover; display:block; }
+
+.profile-meta{
+  flex:1;
+  display:flex; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; gap:1rem;
+  padding-bottom:.3rem;
 }
 
-.line-clamp-1 {
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+.stat-group{ display:flex; gap:2.2rem; }
+.stat-item{ text-align:center; }
+.stat-num{
+  font-family:'Noto Serif TC', serif;
+  font-weight:900; font-size:1.25rem; color:var(--ink); line-height:1.1;
+}
+.stat-label{ font-size:.74rem; color:var(--ink-soft); margin-top:.15rem; }
+
+.action-group{ display:flex; gap:.7rem; }
+.btn-follow-main{
+  background:var(--ink); color:var(--paper);
+  border:none; border-radius:4px;
+  padding:.6rem 1.5rem; font-size:.88rem; font-weight:600;
+  transition:background .18s ease, transform .18s ease;
+}
+.btn-follow-main:hover{ background:var(--plum-deep); transform:translateY(-1px); }
+.btn-follow-main.following{ background:var(--hairline); color:var(--ink-soft); }
+.btn-follow-main.following:hover{ background:var(--hairline); transform:none; }
+
+.btn-message{
+  background:transparent; color:var(--ink);
+  border:1px solid var(--ink); border-radius:4px;
+  padding:.6rem 1.4rem; font-size:.88rem; font-weight:500;
+  transition:all .18s ease;
+}
+.btn-message:hover{ background:var(--ink); color:var(--paper); }
+
+/* ---------- 姓名 / 簡介 ---------- */
+.profile-intro{ margin-top:1rem; }
+.profile-name{
+  font-family:'Noto Serif TC', serif;
+  font-weight:900; font-size:1.5rem;
+  margin:0 0 .3rem;
+  color:var(--ink);
+}
+.profile-handle{
+  font-size:.86rem; color:var(--ink-soft);
+  display:flex; align-items:center; gap:.4rem; margin-bottom:.6rem;
+}
+.profile-handle .dot{ color:var(--hairline); }
+.profile-handle .tagline{ color:var(--ochre); font-weight:600; }
+.profile-bio{
+  font-size:.9rem; color:var(--ink-soft); line-height:1.7;
+  max-width:640px; margin:0;
 }
 
-.hover-dark:hover {
-  color: #000000 !important;
+/* ---------- 頁籤 ---------- */
+.tab-row{
+  display:flex; gap:1.8rem;
+  border-bottom:1px solid var(--hairline);
+  margin-top:1.6rem;
+}
+.tab-btn{
+  background:none; border:none; padding:.8rem 0;
+  font-family:'Noto Serif TC', serif;
+  font-size:1rem; color:var(--ink-soft);
+  position:relative; cursor:pointer;
+}
+.tab-btn.active{ color:var(--ink); font-weight:700; }
+.tab-btn.active::after{
+  content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px;
+  background:var(--plum);
 }
 
-.hover-scale {
-  transition: transform 0.3s ease;
+/* ---------- 作品牆 ---------- */
+.post-grid{
+  display:grid;
+  grid-template-columns:repeat(4, 1fr);
+  gap:1.4rem;
+  margin-top:2rem;
 }
-.post-card:hover .hover-scale {
-  transform: scale(1.05);
+.post-card{
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  border-radius:16px;
+  overflow:hidden;
+  transition:transform .25s ease, box-shadow .25s ease;
+}
+.post-card:hover{
+  transform:translateY(-4px) rotate(-0.3deg);
+  box-shadow:0 16px 30px -20px rgba(42,36,32,.4);
 }
 
-.transition-all {
-  transition: all 0.2s ease-in-out;
+.post-media{ position:relative; aspect-ratio:4/5; overflow:hidden; display:block; background:var(--hairline); }
+.post-media img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform .5s ease; }
+.post-card:hover .post-media img{ transform:scale(1.06); }
+
+.tag-label{
+  position:absolute; top:12px; left:-6px; z-index:2;
+  background:var(--plum); color:#fff;
+  font-size:.66rem; letter-spacing:.04em; font-weight:600;
+  padding:.26rem .65rem .26rem .9rem;
+  box-shadow:0 4px 10px rgba(0,0,0,.18);
+}
+.tag-label::after{
+  content:""; position:absolute; left:0; bottom:-6px;
+  border-width:0 6px 6px 0; border-style:solid;
+  border-color:transparent var(--plum-deep) transparent transparent;
+}
+
+.post-body{ padding:.95rem 1rem 1.1rem; }
+.post-title{
+  font-family:'Noto Serif TC', serif;
+  font-weight:700; font-size:.92rem; color:var(--ink);
+  margin:0 0 .55rem;
+  display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden;
+}
+.post-stats{
+  display:flex; align-items:center; gap:.9rem;
+  font-size:.76rem; color:var(--ink-soft);
+}
+.post-stats a{ color:var(--plum); text-decoration:none; font-weight:600; }
+
+.tag-cloud{ display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.7rem; }
+.tag-chip{
+  font-size:.7rem; padding:.28rem .65rem; border-radius:4px;
+  background:var(--cream); border:1px solid var(--hairline); color:var(--ink-soft);
+}
+
+/* ---------- 其他頁籤空狀態 ---------- */
+.empty-state{
+  background:var(--paper); border:1px solid var(--hairline); border-radius:22px;
+  padding:3.5rem 2rem; text-align:center; margin-top:2rem;
+}
+.empty-icon{ font-size:2.2rem; margin-bottom:.8rem; opacity:.7; }
+.empty-note{
+  font-family:'Noto Serif TC', serif; font-style:italic;
+  color:var(--ink-soft); font-size:.95rem; margin:0;
+}
+
+@media (max-width: 991px){
+  .post-grid{ grid-template-columns:repeat(2, 1fr); }
+}
+@media (max-width: 640px){
+  .profile-top{ flex-direction:column; align-items:flex-start; }
+  .profile-meta{ width:100%; justify-content:space-between; }
+  .post-grid{ grid-template-columns:1fr; }
 }
 </style>
