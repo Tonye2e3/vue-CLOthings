@@ -1,20 +1,27 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { initialUserData } from '../../../services/userFakeData'
+import { isValidAccount, isValidPassword, isValidPhone } from '@/utils/userValidator'
 
 const userData = reactive({ ...initialUserData })
-const editForm = reactive({ ...initialUserData, password: '' })
+const backupData = reactive({}) // 用來暫存原始資料
 const isEditing = ref(false)
 
 const toggleEdit = () => {
-  if (!isEditing.value) {
-    Object.assign(editForm, { ...userData, password: '' })
-  }
-  isEditing.value = !isEditing.value
+  // 進入編輯模式時，先備份原始資料
+  Object.assign(backupData, userData)
+  isEditing.value = true
 }
+
+const cancel = () => {
+  // 還原原始資料
+  Object.assign(userData, backupData)
+  isEditing.value = false
+}
+
 const save = () => {
-  userData.password = editForm.password || userData.password
-  Object.assign(userData, editForm)
+  // 直接使用雙向繫結的 userData，不需要再複製
+  userData.account = backupData.account
   isEditing.value = false
 }
 </script>
@@ -35,18 +42,18 @@ const save = () => {
     </div>
 
     <div v-else>
-      <input v-model="editForm.account" class="form-control mb-2" placeholder="帳號" />
-      <input v-model="editForm.nickname" class="form-control mb-2" placeholder="暱稱" />
+      <input v-model="userData.account" class="form-control mb-2" placeholder="帳號" readonly />
+      <input v-model="userData.nickname" class="form-control mb-2" placeholder="暱稱" />
       <input
-        v-model="editForm.password"
+        v-model="userData.password"
         type="password"
         class="form-control mb-2"
-        placeholder="密碼 (留空不修改)"
+        placeholder="密碼"
       />
-      <input v-model="editForm.email" type="email" class="form-control mb-2" placeholder="郵件" />
-      <input v-model="editForm.phone" class="form-control mb-2" placeholder="電話" />
+      <input v-model="userData.email" type="email" class="form-control mb-2" placeholder="郵件" />
+      <input v-model="userData.phone" class="form-control mb-2" placeholder="電話" />
       <div class="d-flex gap-2 mt-3">
-        <button @click="isEditing = false" class="btn btn-secondary flex-grow-1">取消</button>
+        <button @click="cancel" class="btn btn-secondary flex-grow-1">取消</button>
         <button @click="save" class="btn btn-primary flex-grow-1">確定</button>
       </div>
     </div>

@@ -4,11 +4,14 @@ import { ref } from 'vue'
 const account = ref('')
 const password = ref('')
 
-// import api from '@/services/api'
-// import { useAuthStore } from '@/stores/auth'
-// const authStore = useAuthStore()
+import api from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
+const authStore = useAuthStore()
 
 import { useRouter } from 'vue-router'
+import IconLine from '@/components/icons/IconLine.vue'
+import IconGoogle from '@/components/icons/iconGoogle.vue'
+import IconLineColorful from '@/components/icons/IconLineColorful.vue'
 const router = useRouter()
 
 async function login() {
@@ -16,23 +19,24 @@ async function login() {
     account: account.value,
     password: password.value,
   }
-  const resp = await api.post('/User/Login', data)
-  // if (resp.status == 404) {
-  //     alert('帳號或密碼錯誤')
-  // } else if (resp.status == 200) {
-  //     alert('登入成功')
-  // } else {
-  //     alert('登入未知錯誤')
-  // }
-  if (resp.data) {
-    authStore.setAuth(resp.data)
-    alert('登入成功')
-    router.push({ name: 'home' })
-    // router.push('/')
-  } else {
-    alert('帳號或密碼錯誤')
+  // 模擬後端回傳的假資料
+  const fakeResp = {
+    data: {
+      token: 'fake-jwt-token-123',
+      user: {
+        id: 1,
+        name: '測試用戶',
+        role: 'admin',
+      },
+    },
+    status: 200,
   }
-  console.log('登入結果', resp)
+
+  // 模擬成功登入流程
+  authStore.setAuth(fakeResp.data)
+  alert('登入成功 (假資料)')
+  router.push({ name: 'home' })
+  console.log('登入結果', fakeResp)
 }
 </script>
 
@@ -59,8 +63,12 @@ async function login() {
     </button>
     <div class="text-center mt-3">其他登入方式</div>
     <div class="d-flex gap-2">
-      <button class="btn btn-outline-secondary w-50 py-2 mt-2" type="button">google 登入</button>
-      <button class="btn btn-outline-secondary w-50 py-2 mt-2" type="button">line 登入</button>
+      <button class="btn btn-outline-secondary w-50 py-2 mt-2" type="button">
+        <IconGoogle /> Google 登入
+      </button>
+      <button class="btn btn-outline-secondary w-50 py-2 mt-2" type="button">
+        <IconLineColorful /> Line 登入
+      </button>
     </div>
   </div>
 </template>

@@ -1,4 +1,5 @@
 <script setup>
+import { isValidAccount, isValidPassword, isValidPhone } from '@/utils/userValidator'
 import { ref, reactive } from 'vue'
 const title = ref('會員註冊')
 const agree = ref(false)
@@ -10,8 +11,6 @@ const member = reactive({
   password: '',
   confirmPassword: '',
 })
-
-import { isValidAccount, isValidPassword, isValidPhone } from '@/utils/validator'
 </script>
 
 <template>
