@@ -170,7 +170,9 @@ const handleSubmit = () => {
             <div class="compose-body">
 
               <div class="field-block">
-                <label class="field-label">✍️ 穿搭心得與介紹</label>
+                <label class="field-label">
+                  <i class="fa-solid fa-pen-to-square" style="color: rgb(122, 75, 84);"></i> 穿搭心得與介紹
+                </label>
                 <textarea
                   class="field-textarea"
                   rows="6"
@@ -180,7 +182,9 @@ const handleSubmit = () => {
               </div>
 
               <div class="field-block">
-                <label class="field-label">🏷️ 標記標籤商品（選填，可複選）</label>
+                <label class="field-label">
+                  <i class="fa-solid fa-hashtag" style="color: rgb(122, 75, 84);"></i> 標記標籤商品（選填，可複選）
+                </label>
                 <div class="search-bar">
                   <svg class="search-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.6"/>
@@ -238,6 +242,12 @@ const handleSubmit = () => {
 </template>
 
 <style scoped>
+/* 在最上方引入 Font Awesome CDN */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
+.fa-solid {
+  font-weight: 900 !important;
+}
 .create-post-page {
   width: 100%;
   min-height: 100vh;

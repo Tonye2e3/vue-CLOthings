@@ -22,9 +22,9 @@ const post = ref({
   isLiked: false,
   isSaved: false,
   taggedProducts: [
-    { id: 101, name: '針織上衣', x: '45%', y: '35%' },
-    { id: 102, name: '高腰寬褲', x: '50%', y: '70%' },
-    { id: 103, name: '托特包', x: '30%', y: '90%' }
+    { id: 101, name: '針織上衣', x: '65%', y: '35%' },
+    { id: 102, name: '高腰寬褲', x: '55%', y: '70%' },
+    { id: 103, name: '托特包', x: '41%', y: '90%' }
   ]
 })
 
@@ -57,7 +57,7 @@ const similarPosts = ref([
 // 留言列表
 const comments = ref([
   { id: 1, user: '小美', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=May', text: '這套超好看！請問褲子是什麼顏色？' },
-  { id: 2, user: '阿哲', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jerry', text: '已收藏！等發薪就下單 🤩' }
+  { id: 2, user: '阿哲', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jerry', text: '已收藏~等發薪就下單 !!!' }
 ])
 
 const newComment = ref('')
@@ -140,7 +140,8 @@ const addComment = () => {
                 </button>
               </div>
               <button class="action-btn" :class="{ saved: post.isSaved }" @click="post.isSaved = !post.isSaved">
-                📌 收藏
+                <i :class="['fa-bookmark', post.isSaved ? 'fa-solid' : 'fa-regular']"></i>
+                {{ post.isSaved ? '已收藏' : '收藏' }}
               </button>
             </div>
 
@@ -150,7 +151,7 @@ const addComment = () => {
             <!-- 留言區塊 -->
             <div class="comment-block">
               <div class="comment-title">
-                <span class="dot"></span>大家怎麼說
+                <span class="dot"></span>留言
               </div>
 
               <div class="comments-list">
@@ -220,6 +221,7 @@ const addComment = () => {
 </template>
 
 <style scoped>
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
 .community-page {
   width: 100%;
   min-height: 100vh;
