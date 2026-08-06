@@ -8,18 +8,15 @@ import TheWelcome from '../components/TheWelcome.vue'
   </main>
 </template> -->
 <script setup>
-// import SiteHeader from '@/components/home/SiteHeader.vue'
 import HeroCarousel from '@/components/home/HeroCarousel.vue'
 import PromoGrid from '@/components/home/PromoGrid.vue'
 import CollabBanner from '@/components/home/CollabBanner.vue'
 import CommunitySection from '@/components/home/CommunitySection.vue'
 import CategoryShowcase from '@/components/home/CategoryShowcase.vue'
-import SiteFooter from '@/components/home/SiteFooter.vue'
 </script>
 
 <template>
-  <div class="uniqlo-home">
-    <SiteHeader />
+  <div class="clo-home">
     <main>
       <HeroCarousel />
       <PromoGrid />
@@ -27,12 +24,11 @@ import SiteFooter from '@/components/home/SiteFooter.vue'
       <CommunitySection />
       <CategoryShowcase />
     </main>
-    <SiteFooter />
   </div>
 </template>
 
 <style scoped>
-.uniqlo-home {
+.clo-home {
   --home-bg: #ffffff;
   --home-bg-soft: #f5f5f5;
   --home-text: #111111;
