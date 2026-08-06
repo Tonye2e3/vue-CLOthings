@@ -121,9 +121,10 @@ const addComment = () => {
   // .trim()：去掉文字前後的空白。如果去掉空白後是空字串，代表使用者其實沒打字，
   // 直接 return（提早結束函式），不新增這則空白留言。
   if (!newComment.value.trim()) return
-  // .push(...)：把一筆新留言加到 comments 陣列的「最後面」
-  // （跟 CommunityView.vue 那邊用的 .unshift() 加到「最前面」不一樣，這裡是加到最後）。
-  comments.value.push({
+  // .unshift(...)：把一筆新留言加到 comments 陣列的「最前面」
+  // （原本用的是 .push()，加到最後面；改成 .unshift() 之後，
+  // 剛送出的留言就會排在留言列表最上方，最新的留言最先被看到）。
+  comments.value.unshift({
     id: Date.now(), // 用目前時間當作這則留言的唯一編號
     user: '我', // 這裡先寫死成「我」，之後接上真正的登入系統可以換成真實使用者名稱
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Me',
