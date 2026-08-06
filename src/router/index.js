@@ -44,8 +44,8 @@ const router = createRouter({
     },
     {
       path: '/GroupShop/checkout',
-      name: 'GroupCheckout',
-      component: () => import('../views/GroupShop/GroupCheckoutView.vue'),
+      name: 'GroupCart',
+      component: () => import('../views/GroupShop/GroupCartView.vue'),
     },
     {
       path: '/GroupShop/orders',
@@ -54,8 +54,8 @@ const router = createRouter({
     },
     {
       path: '/GroupShop/checkout/confirm',
-      name: 'GroupCheckoutConfirm',
-      component: () => import('../views/GroupShop/GroupCheckoutConfirmView.vue'),
+      name: 'GroupCheckout',
+      component: () => import('../views/GroupShop/GroupCheckoutView.vue'),
     },
 
     //Community 在註解之間新增個人使用的路由 名字自行修改
