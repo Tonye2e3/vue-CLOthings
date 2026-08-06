@@ -1,29 +1,34 @@
 <script setup>
+
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 
+// 團購購物車 store：跟商品詳情頁共用同一份購物車資料
+import { useGroupCartStore } from '@/stores/groupCart'
+// 已成立訂單累計件數 store：讓「已訂購件數」把已送出的訂單也算進去
+import { useGroupCommittedStore } from '@/stores/groupCommitted'
+
 const route = useRoute()
+const cartStore = useGroupCartStore()
+const committedStore = useGroupCommittedStore()
 
 const searchKeyword = ref('')
+
+// 左側選單項目
 const navItems = [
-  { label: '專案瀏覽', icon: '👤', to: '/GroupShop' },
-  { label: '團購紀錄', icon: '↺', to: '/GroupShop/orders' }
+  { label: '專案瀏覽', icon: 'user', to: '/GroupShop' },
+  { label: '團購紀錄', icon: 'history', to: '/GroupShop/orders' }
 ]
+// 判斷選單項目是否為目前所在頁面（用來加上醒目樣式）
 const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : route.path.startsWith(to))
 
 // 會員名稱：優先帶入登入後存下的會員資料，尚未登入則顯示預設值
 const memberName = ref(localStorage.getItem('memberName') || '會員')
-// 購物車商品數量：讀取與購物車頁共用的 localStorage 資料，跨頁面即時反映實際品項數
-const cartCount = computed(() => {
-  try {
-    const saved = JSON.parse(localStorage.getItem('cloCart') || '[]')
-    return Array.isArray(saved) ? saved.length : 0
-  } catch {
-    return 0
-  }
-})
+// 購物車商品數量：直接從 store 拿，跨頁面即時反映實際品項數
+const cartCount = computed(() => cartStore.items.length)
 
 // 商品目錄：原價 + 兩階層團購價（滿N件即可享該階層價格）
+// 這裡是寫死的假資料，之後要接真正的後端資料庫時，可以整段改成 API 呼叫
 const products = ref([
   {
     id: 1,
@@ -126,19 +131,14 @@ const products = ref([
   }
 ])
 
-// 讀取購物車裡此商品目前的數量（與商品詳情頁「加入此團購」共用同一份 localStorage）
+// 讀取購物車裡此商品目前的數量：直接從 store 裡的 items 陣列找
 const cartQtyOf = (id) => {
-  try {
-    const saved = JSON.parse(localStorage.getItem('cloCart') || '[]')
-    const item = Array.isArray(saved) ? saved.find(i => i.id === id) : null
-    return item ? item.qty : 0
-  } catch {
-    return 0
-  }
+  const item = cartStore.items.find(i => i.id === id)
+  return item ? item.qty : 0
 }
 
-// 目前已訂購件數 = 基礎件數 + 購物車裡實際加入的數量
-const orderedQtyOf = (p) => p.currentCount + cartQtyOf(p.id)
+// 目前已訂購件數 = 基礎件數 + 已成立訂單累計件數 + 購物車裡實際加入的數量
+const orderedQtyOf = (p) => p.currentCount + committedStore.committedQtyOf(p.id) + cartQtyOf(p.id)
 
 // 目前已解鎖的階層（尚未達第一階層則回傳 null）
 const currentTierOf = (p) => {
@@ -152,23 +152,41 @@ const currentTierOf = (p) => {
 // 目前可享團購價（尚未解鎖任何階層則顯示原價）
 const currentPriceOf = (p) => currentTierOf(p)?.price ?? p.listPrice
 
-// 最終階層（滿最多件數的那個階層）
+// 第二階層（陣列最後一個，也就是件數門檻最高、價格最低的那個階層）
 const finalTierOf = (p) => p.tiers[p.tiers.length - 1]
 
+// 判斷這個商品是否已經達到最終階層（也就是「已成團」）
 const isCompleted = (p) => orderedQtyOf(p) >= finalTierOf(p).qty
 
-const completedProducts = computed(() => products.value.filter(p => isCompleted(p)))
-const ongoingProducts = computed(() => products.value.filter(p => !isCompleted(p)))
+// 依搜尋關鍵字篩選商品：如果搜尋框是空的，全部商品都算符合（!searchKeyword.value 為 true）；
+// 有輸入文字的話，就比對商品名稱裡有沒有包含這段文字（跟課堂 ShopView.vue 的寫法一致）
+const filteredProducts = computed(() =>
+  products.value.filter(p =>
+    !searchKeyword.value || p.name.toLowerCase().includes(searchKeyword.value.toLowerCase())
+  )
+)
 
+// 已成團的商品清單：先套用搜尋篩選，再從篩選結果裡挑出已成團的
+const completedProducts = computed(() => filteredProducts.value.filter(p => isCompleted(p)))
+// 尚未成團、還在進行中的商品清單：邏輯相同，只是條件相反
+const ongoingProducts = computed(() => filteredProducts.value.filter(p => !isCompleted(p)))
+
+// 把數字格式化成千分位顯示（例如 1234 -> 1,234）
 const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
 </script>
 
 <template>
   <div class="clo-shell">
+    <!-- ============ 頁面最上方：搜尋欄 + 會員名稱 + 購物車圖示 ============ -->
     <header class="clo-header">
       <div class="clo-search">
         <input v-model="searchKeyword" type="text" placeholder="搜尋項目" />
-        <button class="search-btn" type="button" aria-label="搜尋">🔍</button>
+        <button class="search-btn" type="button" aria-label="搜尋">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </button>
       </div>
 
       <div class="clo-user">
@@ -187,6 +205,7 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
     </header>
 
     <div class="clo-body">
+      <!-- ============ 左側選單 ============ -->
       <aside class="clo-sidebar">
         <nav class="sidebar-nav">
           <template v-for="item in navItems" :key="item.label">
@@ -196,11 +215,31 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
               class="nav-item"
               :class="{ active: isActive(item.to) }"
             >
-              <span class="nav-icon">{{ item.icon }}</span>
+              <span class="nav-icon">
+                <!--顯示對應的嵌入式 SVG 圖示-->
+                <svg v-if="item.icon === 'user'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <svg v-else-if="item.icon === 'history'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="1 4 1 10 7 10"></polyline>
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                </svg>
+              </span>
               <span>{{ item.label }}</span>
             </router-link>
             <div v-else class="nav-item">
-              <span class="nav-icon">{{ item.icon }}</span>
+              <span class="nav-icon">
+                <!--顯示對應的嵌入式 SVG 圖示-->
+                <svg v-if="item.icon === 'user'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <svg v-else-if="item.icon === 'history'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="1 4 1 10 7 10"></polyline>
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                </svg>
+              </span>
               <span>{{ item.label }}</span>
             </div>
           </template>
@@ -208,17 +247,30 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
 
       </aside>
 
+      <!-- ============ 主要內容區：商品列表 ============ -->
       <main class="clo-main">
     <div class="page-header mb-4">
       <h2 class="fw-bold mb-1">團購專案首頁</h2>
       <p class="text-muted small mb-0">瀏覽所有進行中與完成的團購專案</p>
     </div>
 
+    <!-- 搜尋完全找不到符合的商品時顯示提示，避免使用者以為畫面壞掉 -->
+    <div v-if="filteredProducts.length === 0" class="empty-hint">
+      找不到符合「{{ searchKeyword }}」的商品
+    </div>
+
+    <!-- 已達團購數量（完成）區塊 -->
     <section class="mb-4">
       <div class="section-title bg-done">
-        <span>✅</span> 已達團購數量 (完成)
+        <span class="section-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
+        </span> 已達團購數量 (完成)
       </div>
       <div class="product-grid">
+        <!-- v-for 把 completedProducts 陣列裡每一筆商品，重複產生一張卡片 -->
         <div v-for="p in completedProducts" :key="p.id" class="product-card">
           <router-link :to="`/GroupShop/product/${p.id}`" class="card-img-wrap">
             <img :src="p.imageUrl" class="card-img" :alt="p.name" />
@@ -238,9 +290,15 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
       </div>
     </section>
 
+    <!-- 未達團購數量（進行中）區塊 -->
     <section>
       <div class="section-title bg-ongoing">
-        <span>⏰</span> 未達團購數量 (進行中)
+        <span class="section-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+        </span> 未達團購數量 (進行中)
       </div>
       <div class="product-grid">
         <div v-for="p in ongoingProducts" :key="p.id" class="product-card">
@@ -269,7 +327,18 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
 </template>
 
 <style scoped>
+/* 以下都是外觀樣式（顏色、間距、排版），跟商品邏輯無關，可以先不用管 */
 .page-header h2 { color: #4a3e3d; }
+
+.empty-hint {
+  padding: 16px 18px;
+  margin-bottom: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  color: #a9998e;
+  font-size: 0.9rem;
+  box-shadow: 0 1px 4px rgba(74, 62, 61, 0.08);
+}
 
 .section-title {
   display: flex;
@@ -283,6 +352,10 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
 }
 .bg-done { background-color: #4a7c59; }
 .bg-ongoing { background-color: #b8524f; }
+.section-icon {
+  display: inline-flex;
+  align-items: center;
+}
 
 .product-grid {
   display: grid;
@@ -383,6 +456,9 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
   color: #a9998e;
 }
 .search-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background-color: #4a3e3d;
   color: #fff;
@@ -471,8 +547,10 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
   border-left-color: #b87352;
 }
 .nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 18px;
-  text-align: center;
 }
 
 

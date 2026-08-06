@@ -21,9 +21,14 @@ const router = createRouter({
 
     //Shop 在註解之間新增個人使用的路由 名字自行修改
     {
-      path: '/shop/sample',
+      path: '/shop/shop',
       name: 'Shop',
-      component: () => import('../views/Shop/SampleView.vue'),
+      component: () => import('../views/Shop/ShopView.vue'),
+    },
+    {
+      path: '/shop/product',
+      name: 'product',
+      component: () => import('../views/Shop/ProductView.vue'),
     },
 
     //GroupShop 在註解之間新增個人使用的路由 名字自行修改
@@ -39,8 +44,8 @@ const router = createRouter({
     },
     {
       path: '/GroupShop/checkout',
-      name: 'GroupCheckout',
-      component: () => import('../views/GroupShop/GroupCheckoutView.vue'),
+      name: 'GroupCart',
+      component: () => import('../views/GroupShop/GroupCartView.vue'),
     },
     {
       path: '/GroupShop/orders',
@@ -48,10 +53,10 @@ const router = createRouter({
       component: () => import('../views/GroupShop/GroupOrdersView.vue'),
     },
     {
-  path: '/GroupShop/checkout/confirm',
-  name: 'GroupCheckoutConfirm',
-  component: () => import('../views/GroupShop/GroupCheckoutConfirmView.vue'),
-},
+      path: '/GroupShop/checkout/confirm',
+      name: 'GroupCheckout',
+      component: () => import('../views/GroupShop/GroupCheckoutView.vue'),
+    },
 
     //Community 在註解之間新增個人使用的路由 名字自行修改
     {

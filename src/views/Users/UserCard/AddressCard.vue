@@ -5,24 +5,22 @@ import { initialAddressData } from '../../../services/userFakeData'
 const addresses = ref([...initialAddressData])
 const isEditing = ref(false)
 const editingIndex = ref(null)
-const addressForm = reactive({
-  recipient_name: '',
-  recipient_phone: '',
-  postal_code: '',
-  address_detail: '',
-  is_default: false,
-})
+const backupData = reactive({}) // 暫存備份
 
+// 進入編輯模式
 const toggleEdit = (index) => {
   if (index === null && addresses.value.length >= 5) {
     alert('最多只能新增 5 筆收件地址')
     return
   }
+
   if (index !== null) {
-    Object.assign(addressForm, addresses.value[index])
+    // 編輯既有資料 → 備份原始資料
+    Object.assign(backupData, addresses.value[index])
     editingIndex.value = index
   } else {
-    Object.assign(addressForm, {
+    // 新增 → 建立空白表單
+    Object.assign(backupData, {
       recipient_name: '',
       recipient_phone: '',
       postal_code: '',
@@ -30,25 +28,38 @@ const toggleEdit = (index) => {
       is_default: false,
     })
     editingIndex.value = null
+    // 先 push 一筆暫存資料，直接雙向綁定
+    addresses.value.push({ ...backupData, address_id: Date.now() })
+    editingIndex.value = addresses.value.length - 1
   }
+
   isEditing.value = true
 }
 
+// 儲存
 const save = () => {
   // 確保只有一筆預設地址
-  if (addressForm.is_default) {
+  if (addresses.value[editingIndex.value].is_default) {
     addresses.value.forEach((addr, i) => {
       if (i !== editingIndex.value) addr.is_default = false
     })
   }
+  isEditing.value = false
+}
+
+// 取消 → 還原備份
+const cancel = () => {
   if (editingIndex.value !== null) {
-    Object.assign(addresses.value[editingIndex.value], addressForm)
-  } else {
-    addresses.value.push({ ...addressForm, address_id: Date.now() })
+    Object.assign(addresses.value[editingIndex.value], backupData)
+    // 如果是新增模式，取消時刪掉剛 push 的那筆
+    if (!backupData.address_id) {
+      addresses.value.splice(editingIndex.value, 1)
+    }
   }
   isEditing.value = false
 }
 
+// 刪除
 const remove = (index) => {
   if (confirm('確定要刪除這筆收件資料嗎？')) {
     addresses.value.splice(index, 1)
@@ -88,24 +99,36 @@ const remove = (index) => {
     <!-- 編輯模式 -->
     <div v-else>
       <input
-        v-model="addressForm.recipient_name"
+        v-model="addresses[editingIndex].recipient_name"
         class="form-control mb-2"
         placeholder="收件人姓名"
       />
-      <input v-model="addressForm.recipient_phone" class="form-control mb-2" placeholder="電話" />
-      <input v-model="addressForm.postal_code" class="form-control mb-2" placeholder="郵遞區號" />
-      <input v-model="addressForm.address_detail" class="form-control mb-2" placeholder="地址" />
+      <input
+        v-model="addresses[editingIndex].recipient_phone"
+        class="form-control mb-2"
+        placeholder="電話"
+      />
+      <input
+        v-model="addresses[editingIndex].postal_code"
+        class="form-control mb-2"
+        placeholder="郵遞區號"
+      />
+      <input
+        v-model="addresses[editingIndex].address_detail"
+        class="form-control mb-2"
+        placeholder="地址"
+      />
       <div class="form-check mb-3">
         <input
           type="checkbox"
           class="form-check-input"
-          v-model="addressForm.is_default"
+          v-model="addresses[editingIndex].is_default"
           id="defaultCheck"
         />
         <label class="form-check-label" for="defaultCheck">設為預設地址</label>
       </div>
       <div class="d-flex gap-2 mt-3">
-        <button @click="isEditing = false" class="btn btn-secondary flex-grow-1">取消</button>
+        <button @click="cancel" class="btn btn-secondary flex-grow-1">取消</button>
         <button @click="save" class="btn btn-primary flex-grow-1">確定</button>
       </div>
     </div>
