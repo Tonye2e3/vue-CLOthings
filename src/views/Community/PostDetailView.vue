@@ -146,15 +146,22 @@ const addComment = () => {
         <div class="col-12 col-lg-8">
           <div class="post-main-card">
 
-            <!-- 發文者資訊列 -->
+           <!-- 發文者資訊列 -->
             <div class="author-bar">
-              <div class="author-info">
+              <!--
+                把大頭貼跟名字包進 <router-link>，讓它可以點擊跳轉。
+                to="/community/profile"：這是我們專案裡「個人檔案頁」(UserProfileView.vue) 對應的網址，
+                跟 CommunityView.vue 側欄「熱門穿搭達人」點頭像時用的是同一個網址，
+                點下去就會切換到 UserProfileView.vue 那個頁面。
+                class="text-decoration-none"：Bootstrap 的工具 class，把 <a> 連結預設的底線拿掉。
+              -->
+              <router-link to="/community/profile" class="author-info text-decoration-none">
                 <img :src="post.user.avatar" class="author-avatar" alt="avatar" />
                 <div>
                   <h6 class="author-name">{{ post.user.name }}</h6>
                   <small class="author-meta">{{ post.user.time }} · {{ post.user.location }}</small>
                 </div>
-              </div>
+              </router-link>
               <button
                 class="btn-follow-main"
                 :class="{ following: post.isFollowing }"
