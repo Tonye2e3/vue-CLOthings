@@ -48,7 +48,7 @@ function logout() {
       <div class="header-actions">
         <button class="icon-btn" type="button" aria-label="搜尋"><IconSearch /></button>
         <button class="icon-btn" type="button" aria-label="收藏"><IconHeart /></button>
-        <RouterLink :to="{ name: 'login' }" class="icon-btn" aria-label="帳號"
+        <RouterLink :to="{ name: 'user' }" class="icon-btn" aria-label="帳號"
           ><IconUser
         /></RouterLink>
         <button class="icon-btn" type="button" aria-label="購物車"><IconCart /></button>

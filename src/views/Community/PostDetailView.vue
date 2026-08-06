@@ -1,7 +1,6 @@
 <script setup>
-import { ref } from 'vue'
-// 引入暫時導覽列組件
-// import TempNavbar from '@/components/TempNavbar.vue'
+import { ref, computed } from 'vue'
+
 
 // 使用 import 引入本地 src/assets 下的圖片
 import postImage from '@/assets/Postimage/post2.jpg'
@@ -19,7 +18,6 @@ const post = ref({
   // 指向剛才 import 的本地圖片變數
   imageUrl: postImage,
   content: '今天走簡約韓系風格 🤍 這套針織上衣與打褶寬褲質感超好，版型顯瘦又舒服，很適合秋天約會或上班～ 全身都可以直接點連結購買！',
-  likesCount: '1,248',
   commentsCount: 86,
   isLiked: false,
   isSaved: false,
@@ -29,6 +27,15 @@ const post = ref({
     { id: 103, name: '托特包', x: '30%', y: '90%' }
   ]
 })
+
+// 按讚數改用數字追蹤，方便按讚時 +1、取消時 -1；畫面顯示再轉成千分位字串
+const likesNumber = ref(1248) // 對應原本的 '1,248'
+const likesDisplay = computed(() => likesNumber.value.toLocaleString())
+
+const toggleLike = () => {
+  post.value.isLiked = !post.value.isLiked
+  likesNumber.value += post.value.isLiked ? 1 : -1
+}
 
 // 這套穿搭的商品清單
 const products = ref([
@@ -72,101 +79,100 @@ const addComment = () => {
 </script>
 
 <template>
-  <component is="style">
-    @import "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css";
-  </component>
+  
 
   <div class="community-page min-vh-100 w-100">
-    <!-- 暫時導覽列 -->
-    <!-- <TempNavbar /> -->
+    
 
-    <div class="container-fluid container-lg pb-5">
+    <div class="container-fluid container-lg pb-5 pt-4">
       <div class="row g-4">
-        
+
         <!-- 左側：貼文主體區 (大圖、內文、互動、留言) -->
         <div class="col-12 col-lg-8">
-          <div class="card border-0 shadow-sm rounded-4 p-3 p-md-4 bg-white">
-            
+          <div class="post-main-card">
+
             <!-- 發文者資訊列 -->
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <div class="d-flex align-items-center">
-                <img :src="post.user.avatar" class="rounded-circle me-3 border" style="width: 48px; height: 48px;" alt="avatar" />
+            <div class="author-bar">
+              <div class="author-info">
+                <img :src="post.user.avatar" class="author-avatar" alt="avatar" />
                 <div>
-                  <h6 class="fw-bold mb-0 text-dark">{{ post.user.name }}</h6>
-                  <small class="text-muted">{{ post.user.time }} · {{ post.user.location }}</small>
+                  <h6 class="author-name">{{ post.user.name }}</h6>
+                  <small class="author-meta">{{ post.user.time }} · {{ post.user.location }}</small>
                 </div>
               </div>
-              <button 
-                class="btn btn-sm rounded-pill px-3 py-1 fw-medium border-0 transition-all"
-                :class="post.isFollowing ? 'btn-secondary text-white' : 'btn-dark text-white'"
+              <button
+                class="btn-follow-main"
+                :class="{ following: post.isFollowing }"
                 @click="toggleFollow"
               >
-                {{ post.isFollowing ? '已追蹤' : '+ 追蹤' }}
+                {{ post.isFollowing ? '已追蹤' : '＋ 追蹤' }}
               </button>
             </div>
 
             <!-- 主圖 (附帶商品標籤) -->
-            <div class="position-relative bg-light rounded-3 overflow-hidden mb-3">
-             <img :src="post.imageUrl" class="w-100 object-fit-contain bg-white" style="height: 550px;" alt="post image" />
-              
-              <!-- 模擬相片上的商品標籤 -->
-              <span 
-                v-for="tag in post.taggedProducts" 
+            <div class="post-media">
+              <span class="tag-label" v-if="post.taggedProducts[0]">封面故事</span>
+              <img :src="post.imageUrl" class="post-image" alt="post image" />
+
+              <!-- 商品定位標籤：改為圓點 + 展開標籤的穿搭釘選樣式 -->
+              <span
+                v-for="tag in post.taggedProducts"
                 :key="tag.id"
-                class="position-absolute badge tag-badge shadow-sm rounded-pill px-3 py-2"
+                class="pin-tag"
                 :style="{ top: tag.y, left: tag.x }"
               >
-                🏷️ {{ tag.name }}
+                <span class="pin-dot"></span>
+                <span class="pin-label">{{ tag.name }}</span>
               </span>
             </div>
 
             <!-- 按讚/分享/收藏 動作列 -->
-            <div class="d-flex justify-content-between align-items-center py-2 border-bottom mb-3 text-secondary">
-              <div class="d-flex gap-4">
-                <button class="btn btn-link text-decoration-none p-0 text-secondary hover-dark" @click="post.isLiked = !post.isLiked">
-                  <span :class="{ 'text-danger': post.isLiked }">♥</span> {{ post.likesCount }}
+            <div class="action-bar">
+              <div class="action-left">
+                <button class="action-btn" :class="{ liked: post.isLiked }" @click="toggleLike">
+                  ♥ {{ likesDisplay }}
                 </button>
-                <button class="btn btn-link text-decoration-none p-0 text-secondary hover-dark">
+                <button class="action-btn">
                   💬 {{ post.commentsCount }}
                 </button>
-                <button class="btn btn-link text-decoration-none p-0 text-secondary hover-dark">
+                <button class="action-btn">
                   ↗ 分享
                 </button>
               </div>
-              <button class="btn btn-link text-decoration-none p-0 text-secondary hover-dark" @click="post.isSaved = !post.isSaved">
-                <span :class="{ 'text-warning': post.isSaved }">📌</span> 收藏
+              <button class="action-btn" :class="{ saved: post.isSaved }" @click="post.isSaved = !post.isSaved">
+                📌 收藏
               </button>
             </div>
 
             <!-- 貼文文字描述 -->
-            <p class="text-dark lh-base mb-4">
-              {{ post.content }}
-            </p>
+            <p class="post-content">{{ post.content }}</p>
 
             <!-- 留言區塊 -->
-            <div class="bg-light p-3 rounded-3">
-              <div class="comments-list mb-3 d-flex flex-column gap-2">
-                <div v-for="c in comments" :key="c.id" class="d-flex align-items-start gap-2">
-                  <img :src="c.avatar" class="rounded-circle border" style="width: 28px; height: 28px;" />
-                  <div class="bg-white p-2 px-3 rounded-3 shadow-sm border text-dark fs-7 w-100">
-                    <span class="fw-bold me-2">{{ c.user }}:</span>
+            <div class="comment-block">
+              <div class="comment-title">
+                <span class="dot"></span>大家怎麼說
+              </div>
+
+              <div class="comments-list">
+                <div v-for="c in comments" :key="c.id" class="comment-row">
+                  <img :src="c.avatar" class="comment-avatar" alt="avatar" />
+                  <div class="comment-bubble">
+                    <span class="comment-user">{{ c.user }}</span>
                     <span>{{ c.text }}</span>
                   </div>
                 </div>
               </div>
 
               <!-- 輸入留言 -->
-              <div class="d-flex gap-2">
-                <input 
-                  type="text" 
-                  v-model="newComment" 
-                  class="form-control rounded-pill border-0 shadow-sm px-3" 
-                  placeholder="留言..." 
+              <div class="comment-input-row">
+                <input
+                  type="text"
+                  v-model="newComment"
+                  class="comment-input"
+                  placeholder="留下你的想法..."
                   @keyup.enter="addComment"
                 />
-                <button class="btn btn-dark rounded-pill px-4 text-white text-nowrap" @click="addComment">
-                  送出
-                </button>
+                <button class="btn-send" @click="addComment">送出</button>
               </div>
             </div>
 
@@ -175,44 +181,33 @@ const addComment = () => {
 
         <!-- 右側：這套穿搭的商品與推薦區 -->
         <div class="col-12 col-lg-4">
-          
+
           <!-- 穿搭商品清單 -->
-          <div class="card border-0 shadow-sm rounded-4 p-3 p-md-4 mb-4 bg-white">
-            <h6 class="fw-bold mb-3 text-dark d-flex align-items-center gap-2">
-              🛍️ 這套穿搭的商品
-            </h6>
-            
-            <div class="d-flex flex-column gap-3 mb-3">
-              <div 
-                v-for="item in products" 
-                :key="item.id" 
-                class="p-2 rounded-3 bg-light d-flex align-items-center justify-content-between gap-2"
-              >
-                <img :src="item.image" class="rounded-2 object-fit-cover" style="width: 60px; height: 60px;" />
-                <div class="flex-grow-1 min-w-0">
-                  <p class="fw-bold text-dark small mb-1 text-truncate">{{ item.name }}</p>
-                  <p class="text-muted small mb-0">NT$ {{ item.price }}</p>
+          <div class="side-card">
+            <div class="side-title"><span class="dot"></span>這套穿搭的商品</div>
+
+            <div class="product-list">
+              <div v-for="item in products" :key="item.id" class="product-row">
+                <img :src="item.image" class="product-thumb" alt="product" />
+                <div class="product-info">
+                  <p class="product-name">{{ item.name }}</p>
+                  <p class="product-price">NT$ {{ item.price }}</p>
                 </div>
-                <button class="btn btn-dark btn-sm rounded-pill text-nowrap px-3 py-1">
-                  加入購物車
-                </button>
+                <button class="btn-cart">加入購物車</button>
               </div>
             </div>
 
-            <!-- 一鍵購買按鈕 -->
-            <button class="btn btn-dark rounded-pill w-100 py-2 fw-medium shadow-sm">
+            <button class="btn-buy-all">
               🛒 一鍵購買全套穿搭 · NT$ 2,860
             </button>
           </div>
 
           <!-- 相似穿搭推薦 -->
-          <div class="card border-0 shadow-sm rounded-4 p-3 p-md-4 bg-white">
-            <h6 class="fw-bold mb-3 text-dark">✨ 相似穿搭推薦</h6>
-            <div class="row g-2">
-              <div v-for="sim in similarPosts" :key="sim.id" class="col-4">
-                <div class="ratio ratio-3x4 rounded-3 overflow-hidden bg-light hover-scale">
-                  <img :src="sim.image" class="object-fit-cover w-100 h-100" />
-                </div>
+          <div class="side-card">
+            <div class="side-title"><span class="dot"></span>相似穿搭推薦</div>
+            <div class="similar-grid">
+              <div v-for="sim in similarPosts" :key="sim.id" class="similar-thumb">
+                <img :src="sim.image" alt="similar look" />
               </div>
             </div>
           </div>
@@ -226,46 +221,255 @@ const addComment = () => {
 
 <style scoped>
 .community-page {
-  /* position: absolute; */
-  top: 0;
-  left: 0;
-  /* width: 100vw !important; */
+  width: 100%;
   min-height: 100vh;
   background-color: #F9F4F0 !important;
   box-sizing: border-box;
-  z-index: 10;
+  --cream:#F9F4F0;
+  --paper:#FFFDFB;
+  --ink:#2A2420;
+  --ink-soft:#7A6E63;
+  --plum:#7A4B54;
+  --plum-deep:#5E3941;
+  --ochre:#B8862E;
+  --hairline:#E4D8CC;
+  color: var(--ink);
+  font-family: 'Noto Sans TC', sans-serif;
 }
 
-.tag-badge {
-  background-color: #EFE8E1 !important;
-  color: #4A4744 !important;
-  border: 1px solid #E2DED7 !important;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-.tag-badge:hover {
-  background-color: #5C5855 !important;
-  color: #FFFFFF !important;
+/* ---------- 主卡片 ---------- */
+.post-main-card{
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  border-radius:16px;
+  padding:1.6rem;
 }
 
-.fs-7 {
-  font-size: 0.875rem;
+/* ---------- 發文者列 ---------- */
+.author-bar{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:1.2rem;
+}
+.author-info{ display:flex; align-items:center; gap:.8rem; }
+.author-avatar{
+  width:48px; height:48px; border-radius:50%; object-fit:cover;
+  box-shadow:0 0 0 2px var(--plum);
+}
+.author-name{
+  font-family:'Noto Serif TC', serif; font-weight:700; font-size:.98rem;
+  margin:0; color:var(--ink);
+}
+.author-meta{ font-size:.78rem; color:var(--ink-soft); }
+
+.btn-follow-main{
+  background:var(--ink); color:var(--paper);
+  border:none; border-radius:4px;
+  padding:.5rem 1.3rem; font-size:.84rem; font-weight:600;
+  transition:background .18s ease, transform .18s ease;
+}
+.btn-follow-main:hover{ background:var(--plum-deep); transform:translateY(-1px); }
+.btn-follow-main.following{ background:var(--hairline); color:var(--ink-soft); }
+.btn-follow-main.following:hover{ background:var(--hairline); transform:none; }
+
+/* ---------- 主圖 ---------- */
+.post-media{
+  position:relative;
+  border-radius:8px;
+  overflow:hidden;
+  background:var(--cream);
+  margin-bottom:1.1rem;
+}
+.post-image{
+  width:100%; height:550px; object-fit:contain;
+  display:block; background:var(--paper);
 }
 
-.hover-dark:hover {
-  color: #212529 !important;
+.tag-label{
+  position:absolute; top:16px; left:-6px; z-index:2;
+  background:var(--plum); color:#fff;
+  font-size:.7rem; letter-spacing:.05em; font-weight:600;
+  padding:.3rem .75rem .3rem 1rem;
+  box-shadow:0 4px 10px rgba(0,0,0,.18);
+}
+.tag-label::after{
+  content:""; position:absolute; left:0; bottom:-6px;
+  border-width:0 6px 6px 0; border-style:solid;
+  border-color:transparent var(--plum-deep) transparent transparent;
 }
 
-.hover-scale {
-  transition: transform 0.2s ease;
-  cursor: pointer;
+.pin-tag{
+  position:absolute; transform:translate(-50%, -50%);
+  display:flex; align-items:center; gap:.4rem;
+  cursor:pointer;
 }
-.hover-scale:hover {
-  transform: scale(1.03);
+.pin-dot{
+  width:12px; height:12px; border-radius:50%;
+  background:var(--ochre);
+  box-shadow:0 0 0 4px rgba(184,134,46,.28);
+  flex-shrink:0;
+  animation:pulse 2.2s ease-in-out infinite;
+}
+@keyframes pulse{
+  0%, 100%{ box-shadow:0 0 0 4px rgba(184,134,46,.28); }
+  50%{ box-shadow:0 0 0 7px rgba(184,134,46,.14); }
+}
+.pin-label{
+  background:var(--ink);
+  color:#fff;
+  font-size:.72rem; font-weight:600;
+  padding:.28rem .7rem;
+  border-radius:4px;
+  white-space:nowrap;
+  opacity:.94;
+  transition:background .18s ease;
+}
+.pin-tag:hover .pin-label{ background:var(--plum); }
+
+/* ---------- 互動列 ---------- */
+.action-bar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:.7rem 0;
+  border-top:1px solid var(--hairline);
+  border-bottom:1px solid var(--hairline);
+  margin-bottom:1.2rem;
+}
+.action-left{ display:flex; gap:1.6rem; }
+.action-btn{
+  background:none; border:none; padding:0;
+  font-size:.88rem; color:var(--ink-soft);
+  transition:color .18s ease;
+}
+.action-btn:hover{ color:var(--ink); }
+.action-btn.liked{ color:#B4453A; font-weight:600; }
+.action-btn.saved{ color:var(--ochre); font-weight:600; }
+
+/* ---------- 內文 ---------- */
+.post-content{
+  font-size:.94rem; line-height:1.8; color:var(--ink);
+  margin-bottom:1.6rem;
 }
 
-.transition-all {
-  transition: all 0.2s ease-in-out;
+/* ---------- 留言區 ---------- */
+.comment-block{
+  background:var(--cream);
+  border-radius:8px;
+  padding:1.3rem;
+}
+.comment-title{
+  font-family:'Noto Serif TC', serif; font-weight:700; font-size:.95rem;
+  display:flex; align-items:center; gap:.5rem;
+  margin-bottom:1rem; color:var(--ink);
+}
+.comment-title .dot, .side-title .dot{
+  width:6px; height:6px; border-radius:50%; background:var(--ochre);
+}
+
+.comments-list{ display:flex; flex-direction:column; gap:.7rem; margin-bottom:1.1rem; }
+.comment-row{ display:flex; align-items:flex-start; gap:.6rem; }
+.comment-avatar{ width:28px; height:28px; border-radius:50%; object-fit:cover; flex-shrink:0; }
+.comment-bubble{
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  border-radius:4px;
+  padding:.55rem .9rem;
+  font-size:.85rem; color:var(--ink);
+  width:100%;
+}
+.comment-user{ font-weight:700; margin-right:.5rem; }
+
+.comment-input-row{ display:flex; gap:.6rem; }
+.comment-input{
+  flex:1;
+  border:1px solid var(--hairline);
+  background:var(--paper);
+  border-radius:4px;
+  padding:.6rem 1rem;
+  font-size:.86rem; color:var(--ink);
+  outline:none;
+  transition:border-color .18s ease;
+}
+.comment-input:focus{ border-color:var(--plum); }
+.comment-input::placeholder{ color:var(--ink-soft); }
+.btn-send{
+  background:var(--ink); color:var(--paper);
+  border:none; border-radius:4px;
+  padding:.6rem 1.4rem; font-size:.85rem; font-weight:600;
+  white-space:nowrap;
+  transition:background .18s ease;
+}
+.btn-send:hover{ background:var(--plum-deep); }
+
+/* ---------- 側邊欄 ---------- */
+.side-card{
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  border-radius:16px;
+  padding:1.4rem 1.3rem;
+  margin-bottom:1.5rem;
+}
+.side-title{
+  font-family:'Noto Serif TC', serif; font-weight:700; font-size:1.02rem;
+  display:flex; align-items:center; gap:.5rem;
+  margin-bottom:1.1rem; color:var(--ink);
+}
+
+.product-list{ display:flex; flex-direction:column; gap:.8rem; margin-bottom:1.2rem; }
+.product-row{
+  display:flex; align-items:center; gap:.7rem;
+  background:var(--cream);
+  border-radius:8px;
+  padding:.55rem;
+}
+.product-thumb{ width:56px; height:56px; border-radius:6px; object-fit:cover; flex-shrink:0; }
+.product-info{ flex:1; min-width:0; }
+.product-name{
+  font-size:.83rem; font-weight:700; color:var(--ink);
+  margin:0 0 .2rem;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.product-price{ font-size:.8rem; color:var(--ochre); font-weight:600; margin:0; }
+.btn-cart{
+  background:transparent; color:var(--ink);
+  border:1px solid var(--ink); border-radius:4px;
+  padding:.35rem .8rem; font-size:.74rem; white-space:nowrap;
+  transition:all .18s ease;
+}
+.btn-cart:hover{ background:var(--ink); color:var(--paper); }
+
+.btn-buy-all{
+  width:100%;
+  background:var(--ink); color:var(--paper);
+  border:none; border-radius:4px;
+  padding:.75rem; font-size:.88rem; font-weight:600;
+  transition:background .18s ease;
+}
+.btn-buy-all:hover{ background:var(--plum-deep); }
+
+.similar-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:.6rem; }
+.similar-thumb{
+  aspect-ratio:3/4; border-radius:6px; overflow:hidden;
+  background:var(--cream);
+  cursor:pointer;
+}
+.similar-thumb img{
+  width:100%; height:100%; object-fit:cover;
+  transition:transform .3s ease;
+}
+.similar-thumb:hover img{ transform:scale(1.06); }
+
+@media (max-width: 767px){
+  .post-image{ height:380px; }
+  .post-main-card{ padding:1.1rem; }
+}
+</style>
+
+<!--
+  這個區塊「不加 scoped」：scoped 樣式只會作用在這個元件模板裡面的元素上，
+  body 不在模板裡，寫在 scoped 區塊不會生效。不加 scoped 的話，
+  這段 CSS 編譯出來就是全域樣式，不用改共用的 App.vue 也能讓 body 變成統一背景色。
+-->
+<style>
+body {
+  background-color: #F9F4F0 !important;
 }
 </style>
