@@ -1,101 +1,242 @@
 <script setup>
-import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
+import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
+//======== SiteHeader.vue 開始==========
+import { RouterLink } from 'vue-router'
+import IconSearch from '@/components/icons/IconSearch.vue'
+import IconHeart from '@/components/icons/IconHeart.vue'
+import IconUser from '@/components/icons/IconUser.vue'
+import IconCart from '@/components/icons/IconCart.vue'
+//======== SiteHeader.vue 結束==========
+//======== Sitefooter.vue 開始==========
+import IconFacebook from '@/components/icons/IconFacebook.vue'
+import IconInstagram from '@/components/icons/IconInstagram.vue'
+import IconLine from '@/components/icons/IconLine.vue'
+import IconYoutube from '@/components/icons/IconYoutube.vue'
+//======== Sitefooter.vue 結束==========
+
+const authStore = useAuthStore()
+const router = useRouter()
+
+//======== SiteHeader.vue 開始==========
+const navItems = [
+  { label: 'Home', to: { name: 'home' } },
+  { label: 'Shop', to: { name: 'Shop' } },
+  { label: 'Community', to: { name: 'Community' } },
+  { label: 'Group Buying', to: { name: 'GroupProducts' } },
+]
+//======== SiteHeader.vue 結束==========
+//======== Sitefooter.vue 開始==========
+const links = ['客服中心', '常見問題（FAQ）', '公司資訊', '隱私政策', '電子報訂閱']
+//======== Sitefooter.vue 結束==========
+function logout() {
+  authStore.clearAuth()
+  router.push('/login')
+}
 </script>
 
 <template>
-  <header>
-    <!-- <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" /> -->
-
-    <div class="wrapper">
-      <!-- <HelloWorld msg="You did it!" /> -->
-
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-        
-        <RouterLink :to="{ name: 'sampleShop' }" class="nav-item nav-link link-body-emphasis"
-          >商城2</RouterLink
-        >
-        <RouterLink :to="{ name: 'sampleGroupShop' }" class="nav-item nav-link link-body-emphasis"
-          >團購</RouterLink
-        >
-        <RouterLink :to="{ name: 'sampleCommunity' }" class="nav-item nav-link link-body-emphasis"
-          >社群</RouterLink
-        >
-        <RouterLink :to="{ name: 'login' }" class="nav-item nav-link link-body-emphasis"
-          >使用者</RouterLink
-        >
+  <header class="site-header">
+    <div class="header-inner">
+      <img src="@/assets/CLO.things LOGO.png" alt="CLO.things logo" class="logo" />
+      <nav class="main-nav">
+        <RouterLink v-for="item in navItems" :key="item.label" :to="item.to" class="nav-link">
+          {{ item.label }}
+        </RouterLink>
       </nav>
+
+      <div class="header-actions">
+        <button class="icon-btn" type="button" aria-label="搜尋"><IconSearch /></button>
+        <button class="icon-btn" type="button" aria-label="收藏"><IconHeart /></button>
+        <RouterLink :to="{ name: 'login' }" class="icon-btn" aria-label="帳號"
+          ><IconUser
+        /></RouterLink>
+        <button class="icon-btn" type="button" aria-label="購物車"><IconCart /></button>
+      </div>
     </div>
   </header>
 
-  <RouterView />
+  <div class="main-container">
+    <!--頁面內容預留區-->
+    <RouterView />
+  </div>
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <nav class="footer-links">
+        <a v-for="l in links" :key="l" href="#">{{ l }}</a>
+      </nav>
+
+      <div class="social-icons">
+        <a href="#" aria-label="Facebook"><IconFacebook /></a>
+        <a href="#" aria-label="Instagram"><IconInstagram /></a>
+        <a href="#" aria-label="LINE"><IconLine /></a>
+        <a href="#" aria-label="YouTube"><IconYoutube /></a>
+      </div>
+
+      <p class="copyright">© 2026 CLOthings. All rights reserved.</p>
+    </div>
+  </footer>
 </template>
 
 <style scoped>
-body {
-  margin: 0;
-  padding: 0;
-}
-header {
-  line-height: 1.5;
-  max-height: 100vh;
+.main-container {
+  width: 100%;
+  max-width: 1200px; /* 依照設計需求調整內容的最大寬度 */
+  margin: 0 auto; /* 上下 0，左右自動置中 */
+  padding: 0 20px; /* 手機和平板時的左右安全邊距 */
+  box-sizing: border-box;
 }
 
 .logo {
-  display: block;
-  margin: 0 auto 2rem;
+  height: 40px;
+  padding-left: 15px;
+  object-fit: cover; /* 保持圖片比例填滿 */
+  overflow: hidden; /* 超出部分裁掉 */
+  justify-self: start; /* 靠左 */
+  /*border-radius: 50%;  讓元素變成圓形 */
 }
 
-nav {
-  position: fixed;
+.site-header {
+  position: sticky;
   top: 0;
-  left: 0;
-  width: 100%;
+  z-index: 100;
+  background: var(--home-bg);
+  border-bottom: 1px solid var(--home-border);
+  background-color: #f9f4f0;
 }
 
-nav a.router-link-exact-active {
-  color: var(--color-text);
+.header-inner {
+  max-width: 1180px;
+  /* width: 100%; */
+  margin: 0 auto;
+  height: 64px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px; /* 這個是左右安全邊距，可依需求調整大小 */
+  box-sizing: border-box;
+  position: relative;
 }
 
-nav a.router-link-exact-active:hover {
-  background-color: transparent;
+.main-nav {
+  display: flex;
+  gap: 32px;
+  justify-self: center; /* 永遠置中 */
 }
 
-nav a {
-  display: inline-block;
-  padding: 0 1rem;
-  border-left: 1px solid var(--color-border);
+.nav-link {
+  color: var(--home-text);
+  text-decoration: none;
+  font-size: 0.9rem;
+  letter-spacing: 0.03em;
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+  transition:
+    border-color 0.25s ease,
+    opacity 0.25s ease;
 }
 
-nav a:first-of-type {
-  border: 0;
+.nav-link:hover,
+.nav-link.router-link-active {
+  border-color: var(--home-accent);
 }
 
-/* @media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
+.header-actions {
+  display: flex;
+  gap: 4px;
+  justify-self: end; /* 靠右 */
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  color: var(--home-text);
+  cursor: pointer;
+  border-radius: 50%;
+  transition:
+    background-color 0.2s ease,
+    transform 0.15s ease;
+}
+
+.icon-btn:hover {
+  background: var(--home-bg-soft);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  .main-nav {
+    display: none;
   }
+}
 
-  .logo {
-    margin: 0 2rem 0 0;
-  }
+/* SiteFooter */
+.site-footer {
+  border-top: 1px solid var(--home-border);
+  background: var(--home-bg-soft);
+}
 
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
+.footer-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 48px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  text-align: center;
+}
 
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 24px;
+}
 
-    padding: 1rem 0;
-  }
-} */
+.footer-links a {
+  color: var(--home-text);
+  text-decoration: none;
+  font-size: 0.85rem;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+.footer-links a:hover {
+  opacity: 1;
+  color: var(--home-accent);
+}
+
+.social-icons {
+  display: flex;
+  gap: 16px;
+}
+
+.social-icons a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--home-text);
+  border: 1px solid var(--home-border);
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+.social-icons a:hover {
+  background: var(--home-accent);
+  color: #fff;
+  border-color: var(--home-accent);
+}
+
+.copyright {
+  font-size: 0.75rem;
+  color: #888;
+}
 </style>
