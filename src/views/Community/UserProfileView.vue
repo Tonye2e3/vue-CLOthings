@@ -297,7 +297,7 @@ const toggleFollow = () => {
 
         <!-- v-else（搭配上面裡層的 v-if）：收藏清單是空的時候，顯示這個提示，而不是一片空白 -->
         <div v-else class="empty-state">
-          <div class="empty-icon">📁</div>
+          <div class="empty-icon"></div>
           <p class="empty-note">「還沒有收藏任何穿搭，去社群逛逛按個收藏吧。」</p>
         </div>
       </div>
@@ -308,7 +308,9 @@ const toggleFollow = () => {
         意思是「works 不是、saved 也不是」，才會走到這裡。
       -->
       <div v-else class="empty-state">
-        <div class="empty-icon">📁</div>
+        <div class="empty-icon">
+          <i class="fa-solid fa-folder" style="color: rgb(122, 75, 84);"></i>
+        </div>
         <p class="empty-note">「這裡的故事，還在整理中。」</p>
       </div>
 
@@ -325,6 +327,7 @@ const toggleFollow = () => {
   然後把下面每一條 CSS 規則也自動加上同樣的屬性選擇器，
   這樣瀏覽器比對的時候就只會匹配到「這個檔案畫出來的元素」。
 */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
 .community-page {
   width: 100%;
   min-height: 100vh;
