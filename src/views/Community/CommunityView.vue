@@ -314,7 +314,7 @@ const toggleFollow = (creator) => {
             type="text"
             v-model="searchQuery"
             class="search-input"
-            placeholder="搜尋穿搭、標籤或用戶..."
+            placeholder="搜尋關鍵字、標籤或用戶..."
           />
           <!--
             v-if="searchQuery"：只有搜尋框裡有文字的時候，才顯示這個「清除」按鈕。
@@ -388,7 +388,7 @@ const toggleFollow = (creator) => {
               <div class="stat-row">
                 <span>♥ {{ featurePost.likesCount }}</span>
                 <span>💬 {{ featurePost.commentsCount }}</span>
-                <a href="#" class="link-out">查看單品 →</a>
+               
               </div>
             </div>
           </div>
@@ -433,7 +433,7 @@ const toggleFollow = (creator) => {
                 <div class="post-foot">
                   <span>♥ {{ post.likesCount }}</span>
                   <span>💬 {{ post.commentsCount }}</span>
-                  <a href="#">單品</a>
+                  
                 </div>
               </div>
             </div>
