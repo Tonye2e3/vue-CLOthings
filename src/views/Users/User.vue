@@ -2,6 +2,7 @@
 import AccountCard from './UserCard/AccountCard.vue'
 import AddressCard from './UserCard/AddressCard.vue'
 import ProfileCard from './UserCard/ProfileCard.vue'
+import oAuthCard from './UserCard/oAuthCard.vue'
 </script>
 
 <template>
@@ -9,5 +10,6 @@ import ProfileCard from './UserCard/ProfileCard.vue'
     <AccountCard />
     <ProfileCard />
     <AddressCard />
+    <oAuthCard />
   </div>
 </template>
