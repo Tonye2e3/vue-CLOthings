@@ -161,14 +161,13 @@ const toggleFollow = (creator) => {
 <template>
   <div class="community-page min-vh-100 w-100">
 
-    <!-- 導覽列：共用導覽列尚未合併，先註解掉 -->
-    <!-- <TempNavbar /> -->
+    
 
     <div class="container-fluid container-lg pb-5">
 
-      <!-- 頁首：眉題 + 手繪底線標題 -->
+      <!-- 頁首：有眉毛樣式 + 手繪底線標題 -->
       <div class="page-head">
-        <div class="eyebrow">Style Journal · 第 42 期</div>
+        <div class="eyebrow">Style Journal</div>
         <h1 class="page-title">
           穿搭社群
           <svg viewBox="0 0 260 14" preserveAspectRatio="none">
