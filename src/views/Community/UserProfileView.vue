@@ -23,7 +23,7 @@ const userProfile = ref({
   name: 'Emily 艾米莉',
   handle: '@emily_style',
   bioTag: '韓系 | 簡約 | 日常穿搭分享',
-  bio: '喜歡分享每天的穿搭靈感    點擊看板搭配同款單品，一起變美！',
+  bio: '喜歡分享每天的穿搭靈感，點擊看板搭配同款單品，一起變美！',
   avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily', // 大頭貼圖片網址
   bannerBg: '#EFE8E1', // 暖質感奶茶底色
   postsCount: '1,284',    // 貼文數（純文字顯示用，不是拿來計算的數字）

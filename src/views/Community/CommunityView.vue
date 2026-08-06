@@ -276,18 +276,18 @@ const toggleFollow = (creator) => {
 
     <div class="container-fluid container-lg pb-5">
 
-      <!-- 頁首：有眉毛樣式 + 手繪底線標題 -->
+      <!-- 頁首：韓風簡約版 — 左側細直線引導，字體維持原本的 Noto Serif TC -->
       <div class="page-head">
-        <div class="eyebrow">Style Journal</div>
-        <h1 class="page-title">
-          穿搭社群
-          <svg viewBox="0 0 260 14" preserveAspectRatio="none">
-            <path d="M2 8 C 40 2, 80 12, 120 6 S 200 2, 258 8" fill="none" stroke="#B8862E" stroke-width="2.5" stroke-linecap="round"/>
-          </svg>
-        </h1>
-        <p class="page-sub">Outfit Community — 紀錄每一天的穿著練習</p>
+        <div class="page-head-inner">
+          <div class="page-head-divider"></div>
+          <div class="page-head-text">
+            <div class="eyebrow">Style Journal</div>
+            <h1 class="page-title">CLO Daily</h1>
+            <p class="page-sub">紀錄每一天的 OOTD</p>
+          </div>
+        </div>
 
-        <!-- 搜尋列：可搜尋穿搭標籤、單品或用戶 -->
+        <!-- 搜尋列：可搜尋穿搭、標籤或用戶 -->
         <div class="search-bar">
           <svg class="search-icon" viewBox="0 0 24 24" fill="none">
             <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
@@ -303,7 +303,7 @@ const toggleFollow = (creator) => {
             type="text"
             v-model="searchQuery"
             class="search-input"
-            placeholder="搜尋穿搭、單品或用戶..."
+            placeholder="搜尋穿搭、標籤或用戶..."
           />
           <!--
             v-if="searchQuery"：只有搜尋框裡有文字的時候，才顯示這個「清除」按鈕。
@@ -510,27 +510,35 @@ const toggleFollow = (creator) => {
   font-family: 'Noto Sans TC', sans-serif;
 }
 
-/* ---------- 頁首 ---------- */
+/* ---------- 頁首：韓風簡約版（左側細直線引導） ---------- */
 .page-head{ padding:2.4rem 0 1.2rem; }
+.page-head-inner{
+  display:flex; align-items:center; gap:1.2rem;
+}
+.page-head-divider{
+  width:1px; align-self:stretch;
+  background:var(--hairline);
+  flex-shrink:0;
+}
+.page-head-text{ padding-left:.2rem; }
 .eyebrow{
-  font-size:.78rem; letter-spacing:.28em; text-transform:uppercase;
-  color:var(--ochre); font-weight:700; margin-bottom:.6rem;
+  font-size:.7rem; letter-spacing:.24em; text-transform:uppercase;
+  color:#A9A196; font-weight:600; margin-bottom:.4rem;
 }
 .page-title{
   font-family:'Noto Serif TC', serif;
   font-weight:900;
-  font-size:clamp(2rem, 4.5vw, 3rem);
-  line-height:1.05;
-  margin:0;
+  font-size:clamp(1.7rem, 3.2vw, 2.1rem);
+  line-height:1.1;
+  margin:0 0 .4rem;
   color: var(--ink);
 }
-.page-title svg{ display:block; width:220px; max-width:60%; height:14px; margin-top:2px; }
 .page-sub{
   font-family:'Noto Serif TC', serif;
   font-style:italic;
-  color:var(--ink-soft);
-  font-size:1.02rem;
-  margin-top:.6rem;
+  color:#9C9086;
+  font-size:.92rem;
+  margin:0;
 }
 
 /* ---------- 搜尋列 ---------- */

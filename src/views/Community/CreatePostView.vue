@@ -1,21 +1,34 @@
 <script setup>
 import { ref, computed } from 'vue'
+// useRouter：Vue Router 提供的功能，讓我們可以在 <script> 裡面「用程式的方式」
+// 切換網址（例如發文成功後自動跳轉回社群頁），而不是只能靠使用者自己點連結。
 import { useRouter } from 'vue-router'
 
 
 // 全站共用的貼文清單（跟 CommunityView.vue 共用同一份資料，直接 import 那個檔案）
+// 這裡 import 進來的 addPost、currentUser，就是 CommunityView.vue 裡面
+// 用 export 開放出來的那兩個東西（可以回去那個檔案最上面看說明）。
+// 因為兩邊抓到的是「同一份」資料，所以只要在這裡呼叫 addPost() 新增一篇貼文，
+// 回到 CommunityView.vue 的畫面上就會馬上看得到，不需要重新整理頁面、也不需要資料庫。
 import { addPost, currentUser } from '@/views/Community/CommunityView.vue'
 
+// useRouter() 執行後會拿到一個「路由控制器」物件，
+// 之後想切換頁面，就呼叫 router.push('網址') 就可以了。
 const router = useRouter()
 
 // 表單雙向綁定資料
+// 這個物件會透過 v-model 直接跟畫面上的輸入框「雙向同步」
+// （使用者打字，這裡的值自動更新；這裡的值變了，輸入框顯示也會變）。
 const postForm = ref({
-  title: '',
-  selectedProducts: [] // 改為陣列，支援複選
+  title: '', // 使用者輸入的穿搭心得文字
+  selectedProducts: [] // 改為陣列，支援複選；存放使用者勾選的商品標籤名稱
 })
 
 // 圖片檔案與預覽用的 URL（改為陣列，支援多張照片）
-const imageFiles = ref([]) // [{ file, url }]
+// 陣列裡每一筆長這樣：{ file, url }
+// file：使用者選取的原始檔案（瀏覽器的 File 物件，包含檔名、大小等資訊）
+// url：給 <img> 標籤顯示用的「本地暫時預覽網址」（不是真的上傳到網路上的網址）
+const imageFiles = ref([])
 
 // 模擬商城可標記的熱門單品
 const availableProducts = ref([
@@ -27,7 +40,10 @@ const availableProducts = ref([
 ])
 
 // 搜尋標籤商品
+// productSearch：使用者在「標記標籤商品」那個搜尋框打的文字。
 const productSearch = ref('')
+// filteredProducts：一個 computed，根據 productSearch 目前的內容，
+// 從 availableProducts 裡篩選出符合的商品，畫面上的標籤雲會顯示這個篩選後的結果。
 const filteredProducts = computed(() => {
   const q = productSearch.value.trim().toLowerCase()
   if (!q) return availableProducts.value
@@ -35,20 +51,33 @@ const filteredProducts = computed(() => {
 })
 
 // 處理檔案選取與即時預覽（可一次選多張，也可分次加選）
+// handleFileChange：當使用者透過檔案選擇視窗選好照片、按下「開啟」之後，
+// 瀏覽器會自動呼叫這個函式，並且傳進一個 event（事件）物件，
+// 裡面裝著使用者剛剛選了哪些檔案的資訊。
 const handleFileChange = (event) => {
+  // event.target.files：使用者這次選取的所有檔案（瀏覽器提供的一種特殊清單格式，不是真的陣列）。
+  // Array.from(...)：把它轉換成「真正的 JavaScript 陣列」，這樣才能用 .forEach 這種陣列方法。
+  // || []：如果 event.target.files 是空的（沒有選檔案），就改用空陣列，避免出錯。
   const files = Array.from(event.target.files || [])
+  // .forEach(file => { ... })：把剛剛選的每一個檔案都跑一次下面這段程式碼。
   files.forEach(file => {
     imageFiles.value.push({
       file,
-      // 利用 URL.createObjectURL 產生本地端預覽網址
+      // URL.createObjectURL(file)：瀏覽器內建的功能，可以幫一個「還沒上傳到網路」的
+      // 本地檔案，產生一個暫時的網址，讓 <img> 標籤可以直接拿來預覽，
+      // 但這個網址只在「現在這個分頁」有效，重新整理頁面就會失效。
       url: URL.createObjectURL(file)
     })
   })
   // 清空 input 的值，避免選同一張圖片時不觸發 change
+  // 如果不清空，使用者選過一次某張圖片後，下次再選「同一張」，
+  // 瀏覽器會覺得「值沒有改變」，就不會再次呼叫這個函式了。
   event.target.value = ''
 }
 
 // 移除單一張已選圖片
+// index：要移除的是陣列裡的第幾筆（從 0 開始算）。
+// splice(index, 1)：陣列內建方法，意思是「從 index 這個位置開始，刪除 1 筆資料」。
 const removeImage = (index) => {
   imageFiles.value.splice(index, 1)
 }
@@ -56,38 +85,49 @@ const removeImage = (index) => {
 // 點選商品標籤：已選就取消，未選就加入（複選）
 const toggleProduct = (name) => {
   const list = postForm.value.selectedProducts
+  // indexOf(name)：在陣列裡找 name 這個值「排在第幾個」，如果找不到會回傳 -1。
   const idx = list.indexOf(name)
   if (idx === -1) {
+    // 找不到，代表目前還沒選這個標籤 → 加進去
     list.push(name)
   } else {
+    // 找得到，代表已經選過了 → 從陣列裡移除（取消勾選）
     list.splice(idx, 1)
   }
 }
 
 /// 送出發文：組出貼文資料，加進全站共用的貼文清單
+// handleSubmit：使用者按下「確認發布」按鈕時，會執行這個函式。
 const handleSubmit = () => {
+  // 檢查：如果一張照片都沒選、或是心得文字是空的，就跳出提示視窗、不繼續往下執行。
   if (imageFiles.value.length === 0 || !postForm.value.title) {
     alert('請上傳穿搭照片並填寫貼文心得！')
-    return
+    return // return 在這裡的作用是「提早結束這個函式」，後面的程式碼都不會被執行。
   }
 
+  // 呼叫從 CommunityView.vue 拿來的 addPost 函式，
+  // 把使用者剛剛填寫的內容，組成跟 CommunityView.vue 裡 posts 陣列
+  // 一樣格式的物件，塞進那份共用的貼文清單。
   addPost({
-    postId: Date.now(),
-    user: { name: currentUser.name, avatar: currentUser.avatar },
+    postId: Date.now(), // Date.now() 會回傳「現在的時間」轉成一個數字，拿來當作這篇貼文的唯一編號很方便
+    user: { name: currentUser.name, avatar: currentUser.avatar }, // 發文者資訊，來自剛剛 import 的 currentUser
     // 目前表單只有一個文字欄位，標題／內文先共用同一段文字
     title: postForm.value.title,
     desc: postForm.value.title,
     // 用第一張照片當封面圖（本地預覽網址，僅在目前分頁有效）
     imageUrl: imageFiles.value[0].url,
-    publishedAt: new Date().toISOString(),
+    publishedAt: new Date().toISOString(), // 用「現在」當作發布時間
     likesCount: '0',
     commentsCount: 0,
+    // .map(name => ({ name }))：把選中的商品名稱陣列（字串陣列），
+    // 轉換成一個「物件陣列」，每個物件長得像 { name: '經典圓領短T' } 這樣，
+    // 這樣格式才會跟 CommunityView.vue 裡其他貼文的 taggedProducts 一致。
     taggedProducts: postForm.value.selectedProducts.map(name => ({ name }))
   })
 
   // 這裡之後可以串接真正的 API 上傳，目前先跳回社群動態牆
   alert('發文成功！即將返回社群首頁。')
-  router.push('/community')
+  router.push('/community') // 呼叫路由控制器，把畫面切換到 /community 這個網址
 }
 </script>
 
@@ -99,21 +139,28 @@ const handleSubmit = () => {
 
     <div class="container container-md py-4">
 
-      <!-- 返回與頁首 -->
+      <!-- 返回與頁首：韓風簡約版 — 左側細直線引導，字體維持原本的 Noto Serif TC -->
       <div class="page-head">
         <router-link to="/community" class="back-pill">← 返回社群</router-link>
-        <div class="eyebrow">New Entry · 寫下今天的穿著</div>
-        <h1 class="page-title">
-          分享你的穿搭心得
-          <svg viewBox="0 0 300 14" preserveAspectRatio="none">
-            <path d="M2 8 C 46 2, 92 12, 138 6 S 230 2, 298 8" fill="none" stroke="#B8862E" stroke-width="2.5" stroke-linecap="round"/>
-          </svg>
-        </h1>
-        <p class="page-sub">用一張照片、幾句話，紀錄今天想成為的樣子</p>
+        <div class="page-head-inner">
+          <div class="page-head-divider"></div>
+          <div class="page-head-text">
+            <div class="eyebrow">New Entry · 寫下今天的穿著</div>
+            <h1 class="page-title">分享你的穿搭心得</h1>
+            <p class="page-sub">用一張照片、幾句話，紀錄今天想成為的樣子</p>
+          </div>
+        </div>
       </div>
 
       <!-- 發文表單主卡片：左圖右文，呼應社群頁的封面故事卡 -->
       <div class="compose-card">
+        <!--
+          @submit.prevent="handleSubmit"：
+          @submit 是監聽「表單送出」這個事件（通常是按下 type="submit" 的按鈕觸發）。
+          .prevent 是 Vue 的「修飾符」，作用是「阻止瀏覽器預設的送出行為」，
+          因為表單原本預設送出時會「整頁重新整理」，我們不想要這樣，
+          只想單純執行 handleSubmit 這個函式，所以加了 .prevent。
+        -->
         <form @submit.prevent="handleSubmit">
           <div class="compose-grid">
 
@@ -121,6 +168,17 @@ const handleSubmit = () => {
             <div class="compose-media">
               <span class="tag-label">封面預覽</span>
 
+              <!--
+                這裡是「隱藏原生檔案輸入框、自己畫一個好看的上傳區」的常見技巧：
+                <label> 包住 <input type="file">，因為 HTML 規則是
+                「點擊 label，等於點擊它裡面包住的 input」，
+                所以使用者點這一整塊卡通感的區域，實際上就是在觸發檔案選擇視窗，
+                我們再用 CSS 把真正的 input 藏起來（opacity:0），只讓 label 的外觀顯示出來。
+
+                :class="{ 'has-image': imageFiles.length }"：
+                如果 imageFiles 陣列裡已經有照片了，就加上 has-image 這個 class，
+                讓這個區塊的樣式從「虛線空框」變成「顯示照片」的樣子。
+              -->
               <label class="dropzone" :class="{ 'has-image': imageFiles.length }">
                 <input
                   type="file"
@@ -130,14 +188,14 @@ const handleSubmit = () => {
                   @change="handleFileChange"
                 />
 
+                <!-- v-if：還沒選任何照片時，顯示這個提示畫面 -->
                 <div v-if="imageFiles.length === 0" class="dropzone-empty">
-                  <span class="dz-icon">
-                    <i class="fa-regular fa-image" style="color: rgb(122, 75, 84);"></i>
-                  </span>
+                  <span class="dz-icon"><i class="fa-solid fa-image" style="color: rgb(122, 75, 84);"></i></span>
                   <span class="dz-title">點擊上傳穿搭照片</span>
-                  <span class="dz-sub">可一次選取多張，建議直式構圖，光線自然最好看</span>
+                  <span class="dz-sub">可一次選取多張，建議直式構圖</span>
                 </div>
 
+                <!-- v-else：已經選了照片，改成顯示第一張照片當封面預覽 -->
                 <img v-else :src="imageFiles[0].url" alt="封面預覽" class="dropzone-preview" />
 
                 <div v-if="imageFiles.length" class="dropzone-hover">更換封面照片</div>
@@ -145,12 +203,19 @@ const handleSubmit = () => {
 
               <!-- 已選照片縮圖列 -->
               <div class="thumb-row" v-if="imageFiles.length">
+                <!--
+                  v-for="(img, idx) in imageFiles"：
+                  這種寫法可以同時拿到「這一筆資料」(img) 跟「這一筆資料排第幾個」(idx，從 0 開始算)。
+                  跟前面看到的 v-for="post in posts" 差別，是多拿了一個索引值 idx，
+                  下面會用它來判斷「這是不是第一張」、以及「要移除第幾張」。
+                -->
                 <div class="thumb-item" v-for="(img, idx) in imageFiles" :key="idx">
                   <img :src="img.url" alt="縮圖" />
                   <span v-if="idx === 0" class="thumb-cover-badge">封面</span>
                   <button type="button" class="thumb-remove" @click="removeImage(idx)">✕</button>
                 </div>
 
+                <!-- 這個「＋」縮圖其實也是另一個隱藏的檔案上傳框，讓使用者可以再加選照片 -->
                 <label class="thumb-add">
                   <input
                     type="file"
@@ -175,6 +240,10 @@ const handleSubmit = () => {
                 <label class="field-label">
                   <i class="fa-solid fa-pen-to-square" style="color: rgb(122, 75, 84);"></i> 穿搭心得與介紹
                 </label>
+                <!--
+                  v-model="postForm.title"：雙向綁定，
+                  使用者在這個文字框打的內容，會自動同步存進 postForm.title。
+                -->
                 <textarea
                   class="field-textarea"
                   rows="6"
@@ -207,6 +276,12 @@ const handleSubmit = () => {
                 </div>
 
                 <div class="tag-cloud">
+                  <!--
+                    :class="{ active: postForm.selectedProducts.includes(product.name) }"：
+                    .includes(...)：判斷陣列裡「有沒有」某個值。
+                    這裡的意思是：如果 selectedProducts 這個陣列裡已經有這個商品的名字，
+                    就幫這顆標籤按鈕加上 active 樣式（顯示成「已選中」的樣子）。
+                  -->
                   <button
                     v-for="product in filteredProducts"
                     :key="product.id"
@@ -221,6 +296,7 @@ const handleSubmit = () => {
                   </span>
                 </div>
 
+                <!-- 已選標籤預覽區：把使用者選中的標籤，各自畫成一個可以再點掉的小標籤 -->
                 <div class="tag-preview" v-if="postForm.selectedProducts.length">
                   <span v-for="name in postForm.selectedProducts" :key="name" class="tag-chip selected-chip">
                     #{{ name }}
@@ -231,6 +307,7 @@ const handleSubmit = () => {
 
               <div class="compose-actions">
                 <router-link to="/community" class="btn-cancel">取消</router-link>
+                <!-- type="submit"：這個按鈕會觸發上面 <form> 的 @submit.prevent="handleSubmit" -->
                 <button type="submit" class="btn-publish">確認發布</button>
               </div>
 
@@ -247,6 +324,14 @@ const handleSubmit = () => {
 /* 在最上方引入 Font Awesome CDN */
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
+/*
+  Font Awesome 的圖示有分「款式」(Style)，例如 Solid（實心）、Regular（外框空心）等，
+  瀏覽器要靠 font-weight（字重）這個數值，去挑選正確的圖示字型檔案來畫出圖案：
+  900 對應到 Solid、400 對應到 Regular。
+  如果圖示外面剛好包在某個設定了別的 font-weight 的元素裡（像這裡的 .field-label 設了 700），
+  子元素會「繼承」到那個字重，導致瀏覽器抓錯字型檔案、顯示成缺字的方框。
+  這裡強制 .fa-solid 一定要用字重 900，確保 Solid 款式的圖示不會因為繼承而抓錯字型。
+*/
 .fa-solid {
   font-weight: 900 !important;
 }
@@ -267,7 +352,7 @@ const handleSubmit = () => {
   font-family: 'Noto Sans TC', sans-serif;
 }
 
-/* ---------- 頁首 ---------- */
+/* ---------- 頁首：韓風簡約版（左側細直線引導） ---------- */
 .page-head{ padding:2rem 0 1.4rem; }
 .back-pill{
   display:inline-flex; align-items:center; gap:.3rem;
@@ -278,25 +363,33 @@ const handleSubmit = () => {
 }
 .back-pill:hover{ background:var(--ink); color:var(--cream); }
 
+.page-head-inner{
+  display:flex; align-items:center; gap:1.2rem;
+}
+.page-head-divider{
+  width:1px; align-self:stretch;
+  background:var(--hairline);
+  flex-shrink:0;
+}
+.page-head-text{ padding-left:.2rem; }
 .eyebrow{
-  font-size:.78rem; letter-spacing:.28em; text-transform:uppercase;
-  color:var(--ochre); font-weight:700; margin-bottom:.6rem;
+  font-size:.7rem; letter-spacing:.24em; text-transform:uppercase;
+  color:#A9A196; font-weight:600; margin-bottom:.4rem;
 }
 .page-title{
   font-family:'Noto Serif TC', serif;
   font-weight:900;
-  font-size:clamp(1.7rem, 4vw, 2.4rem);
+  font-size:clamp(1.5rem, 3.2vw, 1.9rem);
   line-height:1.15;
-  margin:0;
+  margin:0 0 .4rem;
   color:var(--ink);
 }
-.page-title svg{ display:block; width:240px; max-width:70%; height:14px; margin-top:4px; }
 .page-sub{
   font-family:'Noto Serif TC', serif;
   font-style:italic;
-  color:var(--ink-soft);
-  font-size:.98rem;
-  margin:.6rem 0 0;
+  color:#9C9086;
+  font-size:.9rem;
+  margin:0;
 }
 
 /* ---------- 主卡片 ---------- */

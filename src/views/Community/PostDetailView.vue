@@ -30,7 +30,7 @@ const post = ref({
   isFollowing: false,
   // 指向剛才 import 的本地圖片變數
   imageUrl: postImage,
-  content: '今天走簡約韓系風格 🤍 這套針織上衣與打褶寬褲質感超好，版型顯瘦又舒服，很適合秋天約會或上班～ 全身都可以直接點連結購買！',
+  content: '今天走簡約韓系風格 🤍 這套針織上衣與打褶寬褲質感超好，版型顯瘦又舒服，很適合秋天約會或上班～ 全身都可以直接再下方點擊購買！',
   commentsCount: 86,
   isLiked: false, // 「我」有沒有按讚
   // 這裡本來有個 isSaved 存「我」有沒有收藏，現在改成從共用的收藏清單
@@ -295,7 +295,7 @@ const addComment = () => {
             </div>
 
             <button class="btn-buy-all">
-              🛒 一鍵購買全套穿搭 · NT$ 2,860
+              一鍵購買全套穿搭 · NT$ 2,860
             </button>
           </div>
 
