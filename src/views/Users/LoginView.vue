@@ -1,5 +1,5 @@
 <script setup>
-import { isValidAccount, isValidPassword } from '@/utils/userValidator'
+import { isValidAccount, isValidPassword } from '@/utils/UserValidator'
 import { ref } from 'vue'
 
 const account = ref('')
@@ -10,7 +10,6 @@ import { useAuthStore } from '@/stores/auth'
 const authStore = useAuthStore()
 
 import { useRouter } from 'vue-router'
-import IconLine from '@/components/icons/IconLine.vue'
 import IconGoogle from '@/components/icons/iconGoogle.vue'
 import IconLineColorful from '@/components/icons/IconLineColorful.vue'
 const router = useRouter()
@@ -53,7 +52,7 @@ async function login() {
     <div class="mb-3">
       <label class="form-label">密碼</label>
       <input type="password" class="form-control" v-model="password" />
-      <span class="form-text text-danger">{{ isValidAccount(password) }}</span>
+      <span class="form-text text-danger">{{ isValidPassword(password) }}</span>
     </div>
 
     <button class="btn btn-primary w-100 py-2" type="button" @click="login">登入</button>
