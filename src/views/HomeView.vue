@@ -1,12 +1,3 @@
-<!-- <script setup>
-import TheWelcome from '../components/TheWelcome.vue'
-</script>
-
-<template>
-  <main>
-    <TheWelcome />
-  </main>
-</template> -->
 <script setup>
 import HeroCarousel from '@/components/home/HeroCarousel.vue'
 import PromoGrid from '@/components/home/PromoGrid.vue'

@@ -3,25 +3,33 @@ import { ref, reactive } from 'vue'
 import { initialProfileData } from '../../../services/userFakeData'
 
 const profileData = reactive({ ...initialProfileData })
-const profileForm = reactive({ ...initialProfileData })
+const backupData = reactive({}) // 暫存備份
 const isEditing = ref(false)
 
+// 進入編輯模式
 const toggleEdit = () => {
-  if (!isEditing.value) {
-    Object.assign(profileForm, { ...profileData })
-  }
-  isEditing.value = !isEditing.value
+  Object.assign(backupData, profileData) // 備份原始資料
+  isEditing.value = true
 }
+
+// 儲存
 const save = () => {
-  Object.assign(profileData, profileForm)
   isEditing.value = false
 }
+
+// 取消 → 還原備份
+const cancel = () => {
+  Object.assign(profileData, backupData)
+  isEditing.value = false
+}
+
+// 處理頭像上傳
 const handleAvatarChange = (event) => {
   const file = event.target.files[0]
   if (file) {
     const reader = new FileReader()
     reader.onload = (e) => {
-      profileForm.avatar = e.target.result
+      profileData.avatar = e.target.result
     }
     reader.readAsDataURL(file)
   }
@@ -35,6 +43,7 @@ const handleAvatarChange = (event) => {
       <button v-if="!isEditing" @click="toggleEdit" class="btn btn-outline-primary">編輯</button>
     </div>
 
+    <!-- 顯示模式 -->
     <div v-if="!isEditing">
       <p><strong>姓名：</strong>{{ profileData.fullname }}</p>
       <p><strong>性別：</strong>{{ profileData.gender }}</p>
@@ -51,23 +60,24 @@ const handleAvatarChange = (event) => {
       </div>
     </div>
 
+    <!-- 編輯模式 -->
     <div v-else>
-      <input v-model="profileForm.fullname" class="form-control mb-2" placeholder="姓名" />
-      <select v-model="profileForm.gender" class="form-control mb-2">
+      <input v-model="profileData.fullname" class="form-control mb-2" placeholder="姓名" />
+      <select v-model="profileData.gender" class="form-control mb-2">
         <option value="男">男</option>
         <option value="女">女</option>
         <option value="其他">其他</option>
       </select>
       <input
-        v-model="profileForm.birthday"
+        v-model="profileData.birthday"
         type="date"
         class="form-control mb-2"
         placeholder="生日"
       />
-      <input v-model="profileForm.address" class="form-control mb-2" placeholder="地址" />
+      <input v-model="profileData.address" class="form-control mb-2" placeholder="地址" />
       <div class="text-center mt-3">
         <img
-          :src="profileForm.avatar"
+          :src="profileData.avatar"
           alt="大頭貼"
           class="rounded-circle border mb-2"
           width="120"
@@ -76,7 +86,7 @@ const handleAvatarChange = (event) => {
         <input type="file" class="form-control" @change="handleAvatarChange" />
       </div>
       <div class="d-flex gap-2 mt-3">
-        <button @click="isEditing = false" class="btn btn-secondary flex-grow-1">取消</button>
+        <button @click="cancel" class="btn btn-secondary flex-grow-1">取消</button>
         <button @click="save" class="btn btn-primary flex-grow-1">確定</button>
       </div>
     </div>

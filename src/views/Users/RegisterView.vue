@@ -1,4 +1,5 @@
 <script setup>
+import { isValidAccount, isValidPassword, isValidPhone, isValidEmail } from '@/utils/userValidator'
 import { ref, reactive } from 'vue'
 const title = ref('會員註冊')
 const agree = ref(false)
@@ -6,12 +7,11 @@ const agree = ref(false)
 const member = reactive({
   username: '',
   account: '',
-  phone: '',
+  email: '',
   password: '',
   confirmPassword: '',
+  phone: '',
 })
-
-import { isValidAccount, isValidPassword, isValidPhone } from '@/utils/validator'
 </script>
 
 <template>
@@ -27,6 +27,11 @@ import { isValidAccount, isValidPassword, isValidPhone } from '@/utils/validator
     <div class="form-floating mb-3">
       <input type="text" class="form-control" placeholder="暱稱" v-model="member.username" />
       <label class="form-label">暱稱</label>
+    </div>
+    <div class="form-floating mb-3">
+      <input type="text" class="form-control" placeholder="郵件" v-model="member.email" />
+      <label class="form-label">郵件</label>
+      <span class="form-text text-danger">{{ isValidEmail(member.email) }}</span>
     </div>
     <div class="form-floating mb-3">
       <input type="password" class="form-control" placeholder="密碼" v-model="member.password" />
@@ -65,7 +70,7 @@ import { isValidAccount, isValidPassword, isValidPhone } from '@/utils/validator
     >
       <p class="fw-bold mb-2">📋 填寫預覽</p>
       <ul class="list-unstyled mb-0 small">
-        <li>姓名：{{ member.name }}</li>
+        <li>暱稱：{{ member.username }}</li>
         <li>帳號：{{ member.account }}</li>
         <li>確認密碼：{{ member.confirmPassword }}</li>
         <li>同意條款：{{ agree }}</li>
