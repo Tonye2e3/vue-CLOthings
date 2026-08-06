@@ -7,24 +7,28 @@ const route = useRoute()
 const searchKeyword = ref('')
 const navItems = [
   { label: '專案瀏覽', icon: '👤', to: '/GroupShop' },
-  { label: '團購紀錄', icon: '↺', to: '/GroupShop/orders' },
-  { label: '會員專區', icon: '🎖' },
-  { label: '設定', icon: '⚙' },
-  { label: '登出', icon: '⏻' }
+  { label: '團購紀錄', icon: '↺', to: '/GroupShop/orders' }
 ]
 const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : route.path.startsWith(to))
 
 // 會員名稱：優先帶入登入後存下的會員資料，尚未登入則顯示預設值
 const memberName = ref(localStorage.getItem('memberName') || '會員')
-// 購物車商品數量：目前為假資料，之後請改接實際購物車狀態（如 Pinia store）
-const cartCount = ref(3)
+// 購物車商品數量：讀取與購物車頁共用的 localStorage 資料，跨頁面即時反映實際品項數
+const cartCount = computed(() => {
+  try {
+    const saved = JSON.parse(localStorage.getItem('cloCart') || '[]')
+    return Array.isArray(saved) ? saved.length : 0
+  } catch {
+    return 0
+  }
+})
 
-// 商品目錄：原價 + 兩階層團購價（滿N人即可享該階層價格）
+// 商品目錄：原價 + 兩階層團購價（滿N件即可享該階層價格）
 const products = ref([
   {
     id: 1,
     name: '團購短T',
-    imageUrl: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&auto=format&fit=crop',
+    imageUrl: 'https://picsum.photos/seed/clo-shortT/400/300',
     listPrice: 340,
     tiers: [
       { qty: 5, price: 306 },
@@ -35,7 +39,7 @@ const products = ref([
   {
     id: 2,
     name: '團購牛仔褲',
-    imageUrl: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=400&auto=format&fit=crop',
+    imageUrl: 'https://picsum.photos/seed/clo-jeans/400/300',
     listPrice: 430,
     tiers: [
       { qty: 10, price: 387 },
@@ -46,7 +50,7 @@ const products = ref([
   {
     id: 3,
     name: '團購洋裝',
-    imageUrl: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=400&auto=format&fit=crop',
+    imageUrl: 'https://picsum.photos/seed/clo-dress/400/300',
     listPrice: 520,
     tiers: [
       { qty: 10, price: 468 },
@@ -57,7 +61,7 @@ const products = ref([
   {
     id: 4,
     name: '團購針織外套',
-    imageUrl: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=400&auto=format&fit=crop',
+    imageUrl: 'https://picsum.photos/seed/clo-knit-jacket/400/300',
     listPrice: 700,
     tiers: [
       { qty: 10, price: 630 },
@@ -68,7 +72,7 @@ const products = ref([
   {
     id: 5,
     name: '團購百褶裙',
-    imageUrl: 'https://images.unsplash.com/photo-1583496661160-fb5886a13d77?w=400&auto=format&fit=crop',
+    imageUrl: 'https://picsum.photos/seed/clo-skirt/400/300',
     listPrice: 700,
     tiers: [
       { qty: 10, price: 630 },
@@ -79,7 +83,7 @@ const products = ref([
   {
     id: 6,
     name: '團購托特包',
-    imageUrl: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&auto=format&fit=crop',
+    imageUrl: 'https://picsum.photos/seed/clo-totebag/400/300',
     listPrice: 880,
     tiers: [
       { qty: 15, price: 792 },
@@ -90,7 +94,7 @@ const products = ref([
   {
     id: 7,
     name: '團購後背包',
-    imageUrl: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&auto=format&fit=crop',
+    imageUrl: 'https://picsum.photos/seed/clo-backpack/400/300',
     listPrice: 1060,
     tiers: [
       { qty: 10, price: 954 },
@@ -101,7 +105,7 @@ const products = ref([
   {
     id: 8,
     name: '團購遮陽帽',
-    imageUrl: 'https://images.unsplash.com/photo-1521369909029-2afed882baee?w=400&auto=format&fit=crop',
+    imageUrl: 'https://picsum.photos/seed/clo-sunhat/400/300',
     listPrice: 1060,
     tiers: [
       { qty: 10, price: 954 },
@@ -112,7 +116,7 @@ const products = ref([
   {
     id: 9,
     name: '團購針織帽',
-    imageUrl: 'https://images.unsplash.com/photo-1576871337622-98d48d1cf531?w=400&auto=format&fit=crop',
+    imageUrl: 'https://picsum.photos/seed/clo-beanie/400/300',
     listPrice: 1150,
     tiers: [
       { qty: 10, price: 1035 },
@@ -122,11 +126,25 @@ const products = ref([
   }
 ])
 
+// 讀取購物車裡此商品目前的數量（與商品詳情頁「加入此團購」共用同一份 localStorage）
+const cartQtyOf = (id) => {
+  try {
+    const saved = JSON.parse(localStorage.getItem('cloCart') || '[]')
+    const item = Array.isArray(saved) ? saved.find(i => i.id === id) : null
+    return item ? item.qty : 0
+  } catch {
+    return 0
+  }
+}
+
+// 目前已訂購件數 = 基礎件數 + 購物車裡實際加入的數量
+const orderedQtyOf = (p) => p.currentCount + cartQtyOf(p.id)
+
 // 目前已解鎖的階層（尚未達第一階層則回傳 null）
 const currentTierOf = (p) => {
   let tier = null
   for (const t of p.tiers) {
-    if (p.currentCount >= t.qty) tier = t
+    if (orderedQtyOf(p) >= t.qty) tier = t
   }
   return tier
 }
@@ -134,10 +152,10 @@ const currentTierOf = (p) => {
 // 目前可享團購價（尚未解鎖任何階層則顯示原價）
 const currentPriceOf = (p) => currentTierOf(p)?.price ?? p.listPrice
 
-// 最終階層（滿最多人數的那個階層）
+// 最終階層（滿最多件數的那個階層）
 const finalTierOf = (p) => p.tiers[p.tiers.length - 1]
 
-const isCompleted = (p) => p.currentCount >= finalTierOf(p).qty
+const isCompleted = (p) => orderedQtyOf(p) >= finalTierOf(p).qty
 
 const completedProducts = computed(() => products.value.filter(p => isCompleted(p)))
 const ongoingProducts = computed(() => products.value.filter(p => !isCompleted(p)))
@@ -148,11 +166,6 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
 <template>
   <div class="clo-shell">
     <header class="clo-header">
-      <router-link to="/GroupShop" class="clo-brand">
-        <span class="brand-main">CLO</span>
-        <span class="brand-sub">CLO.things</span>
-      </router-link>
-
       <div class="clo-search">
         <input v-model="searchKeyword" type="text" placeholder="搜尋項目" />
         <button class="search-btn" type="button" aria-label="搜尋">🔍</button>
@@ -161,7 +174,13 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
       <div class="clo-user">
         <span class="user-greet">你好，{{ memberName }}</span>
         <router-link to="/GroupShop/checkout" class="cart-link">
-          <span class="cart-icon">🛒</span>
+          <span class="cart-icon">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="9" cy="21" r="1"></circle>
+              <circle cx="20" cy="21" r="1"></circle>
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+            </svg>
+          </span>
           <span class="cart-badge">{{ cartCount }}</span>
         </router-link>
       </div>
@@ -207,8 +226,8 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
           <div class="card-info">
             <h6 class="fw-bold mb-1">{{ p.name }}</h6>
             <div class="d-flex justify-content-between small text-muted">
-              <span>已有 {{ p.currentCount }} 人參加</span>
-              <span class="text-success fw-bold">滿{{ finalTierOf(p).qty }}人已成團</span>
+              <span>已訂購 {{ orderedQtyOf(p) }} 件</span>
+              <span class="text-success fw-bold">滿{{ finalTierOf(p).qty }}件已成團</span>
             </div>
             <div class="d-flex justify-content-between align-items-center mt-2">
               <span class="fw-bold">團購價 ${{ formatCurrency(currentPriceOf(p)) }}</span>
@@ -231,8 +250,8 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
           <div class="card-info">
             <h6 class="fw-bold mb-1">{{ p.name }}</h6>
             <div class="d-flex justify-content-between small text-muted">
-              <span>已有 {{ p.currentCount }} 人參加</span>
-              <span class="text-accent fw-bold">滿{{ finalTierOf(p).qty }}人享最低團購價</span>
+              <span>已訂購 {{ orderedQtyOf(p) }} 件</span>
+              <span class="text-accent fw-bold">滿{{ finalTierOf(p).qty }}件享最低團購價</span>
             </div>
             <div class="d-flex justify-content-between align-items-center mt-2">
               <span class="fw-bold">團購價 ${{ formatCurrency(currentPriceOf(p)) }}</span>
@@ -342,24 +361,6 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
   border-bottom: 1px solid #e6dccf;
 }
 
-.clo-brand {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.1;
-  text-decoration: none;
-  color: #4a3e3d;
-  flex-shrink: 0;
-}
-.brand-main {
-  font-size: 1.6rem;
-  font-weight: 800;
-  letter-spacing: 2px;
-}
-.brand-sub {
-  font-size: 0.65rem;
-  letter-spacing: 1px;
-  color: #b87352;
-}
 
 .clo-search {
   flex: 1;
@@ -406,9 +407,9 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
 .cart-link {
   position: relative;
   display: inline-flex;
+  align-items: center;
   color: #4a3e3d;
   text-decoration: none;
-  font-size: 1.3rem;
 }
 .cart-badge {
   position: absolute;

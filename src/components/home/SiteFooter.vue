@@ -1,30 +1,6 @@
-<script setup>
-import IconFacebook from '@/components/icons/IconFacebook.vue'
-import IconInstagram from '@/components/icons/IconInstagram.vue'
-import IconLine from '@/components/icons/IconLine.vue'
-import IconYoutube from '@/components/icons/IconYoutube.vue'
+<script setup></script>
 
-const links = ['客服中心', '常見問題（FAQ）', '公司資訊', '隱私政策', '電子報訂閱']
-</script>
-
-<template>
-  <footer class="site-footer">
-    <div class="footer-inner">
-      <nav class="footer-links">
-        <a v-for="l in links" :key="l" href="#">{{ l }}</a>
-      </nav>
-
-      <div class="social-icons">
-        <a href="#" aria-label="Facebook"><IconFacebook /></a>
-        <a href="#" aria-label="Instagram"><IconInstagram /></a>
-        <a href="#" aria-label="LINE"><IconLine /></a>
-        <a href="#" aria-label="YouTube"><IconYoutube /></a>
-      </div>
-
-      <p class="copyright">© 2026 CLOthings. All rights reserved.</p>
-    </div>
-  </footer>
-</template>
+<template></template>
 
 <style scoped>
 .site-footer {
