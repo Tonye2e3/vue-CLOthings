@@ -112,10 +112,11 @@ const readOrders = () => {
   ]
 }
 
-// 把 Date 物件格式化
+// 把 Date 物件格式化成「YYYY/MM/DD」字串
 const formatDate = (date) => {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0') // padStart(2,'0')：不足兩位數前面補 0
+  const d = String(date.getDate()).padStart(2, '0')      // 修好的地方：補回這一行，取出「日」的部分
   return `${y}/${m}/${d}`
 }
 
@@ -324,22 +325,40 @@ const handleSubmit = () => {
     </div>
   </div>
 </template>
-
 <style scoped>
 /* 以下都是外觀樣式（顏色、間距、排版），跟商品邏輯無關，可以先不用管 */
-.text-accent { color: #b87352; }
+
+/* 把重複用到的顏色集中定義成變數，之後要改主題色只要改這裡，不用每個地方都找一次 */
+.clo-shell {
+  --color-text: #4a3e3d;       /* 主要文字色（深咖啡） */
+  --color-text-muted: #6e5f5c; /* 次要文字色（淺咖啡） */
+  --color-accent: #b87352;     /* 強調色（按鈕、標籤） */
+  --color-bg-page: #f8f5f0;    /* 頁面底色 */
+  --color-border: #e6dccf;     /* 淺邊框線 */
+  --color-border-input: #d8c3b5; /* 輸入框邊框 */
+  --color-hover-bg: #f1e7de;   /* 滑鼠移過去的底色 */
+  --color-active-bg: #ebdcd0;  /* 選單被選中的底色 */
+  --color-dark: #3d3332;       /* 深色底（結帳摘要標題列） */
+  --color-dark-hover: #362d2c; /* 深色按鈕的 hover 狀態 */
+
+  min-height: 100vh;
+  background-color: var(--color-bg-page);
+  color: var(--color-text);
+}
+
+.text-accent { color: var(--color-accent); }
 
 .back-link {
   display: inline-block;
   font-size: 0.88rem;
-  color: #6e5f5c;
+  color: var(--color-text-muted);
   background: none;
   border: none;
   padding: 0;
   cursor: pointer;
 }
 .back-link:hover {
-  color: #4a3e3d;
+  color: var(--color-text);
   text-decoration: underline;
 }
 
@@ -350,7 +369,7 @@ const handleSubmit = () => {
   box-shadow: 0 1px 4px rgba(74, 62, 61, 0.08);
 }
 .form-section-title {
-  border-bottom: 0.5px solid #e6dccf;
+  border-bottom: 0.5px solid var(--color-border);
   padding-bottom: 8px;
   margin-bottom: 14px;
 }
@@ -364,7 +383,7 @@ const handleSubmit = () => {
 .form-select {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #d8c3b5;
+  border: 1px solid var(--color-border-input);
   border-radius: 6px;
   background-color: #fff;
   font-size: 0.9rem;
@@ -379,21 +398,21 @@ const handleSubmit = () => {
   top: 20px;
 }
 .summary-title {
-  background-color: #3d3332;
+  background-color: var(--color-dark);
   color: #fff;
   margin: 0;
   padding: 14px 20px;
 }
 .summary-body {
   padding: 18px 20px;
-  color: #4a3e3d;
+  color: var(--color-text);
 }
 .summary-line {
-  color: #6e5f5c;
+  color: var(--color-text-muted);
 }
 
 .btn-main {
-  background-color: #4a3e3d;
+  background-color: var(--color-text);
   color: #fff;
   border: none;
   padding: 12px 14px;
@@ -402,22 +421,16 @@ const handleSubmit = () => {
   width: 100%;
 }
 .btn-main:hover {
-  background-color: #362d2c;
+  background-color: var(--color-dark-hover);
   color: #fff;
 }
 .btn-main:disabled {
-  background-color: #d8c3b5;
+  background-color: var(--color-border-input);
   color: #fff;
   cursor: not-allowed;
 }
 .btn-main:disabled:hover {
-  background-color: #d8c3b5;
-}
-
-.clo-shell {
-  min-height: 100vh;
-  background-color: #f8f5f0;
-  color: #4a3e3d;
+  background-color: var(--color-border-input);
 }
 
 .clo-header {
@@ -426,7 +439,7 @@ const handleSubmit = () => {
   gap: 24px;
   padding: 14px 28px;
   background-color: #fff;
-  border-bottom: 1px solid #e6dccf;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .clo-user {
@@ -444,14 +457,14 @@ const handleSubmit = () => {
   position: relative;
   display: inline-flex;
   align-items: center;
-  color: #4a3e3d;
+  color: var(--color-text);
   text-decoration: none;
 }
 .cart-badge {
   position: absolute;
   top: -6px;
   right: -10px;
-  background-color: #b87352;
+  background-color: var(--color-accent);
   color: #fff;
   font-size: 0.65rem;
   font-weight: 700;
@@ -473,8 +486,8 @@ const handleSubmit = () => {
   width: 220px;
   flex-shrink: 0;
   min-height: calc(100vh - 65px);
-  background-color: #f8f5f0;
-  border-right: 1px solid #e6dccf;
+  background-color: var(--color-bg-page);
+  border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -491,20 +504,20 @@ const handleSubmit = () => {
   align-items: center;
   gap: 12px;
   padding: 12px 24px;
-  color: #6e5f5c;
+  color: var(--color-text-muted);
   text-decoration: none;
   font-size: 0.92rem;
   border-left: 3px solid transparent;
   cursor: pointer;
 }
 .nav-item:hover {
-  background-color: #f1e7de;
+  background-color: var(--color-hover-bg);
 }
 .nav-item.active {
-  color: #4a3e3d;
+  color: var(--color-text);
   font-weight: 700;
-  background-color: #ebdcd0;
-  border-left-color: #b87352;
+  background-color: var(--color-active-bg);
+  border-left-color: var(--color-accent);
 }
 .nav-icon {
   display: inline-flex;
