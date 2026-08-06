@@ -30,7 +30,7 @@ const post = ref({
   isFollowing: false,
   // 指向剛才 import 的本地圖片變數
   imageUrl: postImage,
-  content: '今天走簡約韓系風格 🤍 這套針織上衣與打褶寬褲質感超好，版型顯瘦又舒服，很適合秋天約會或上班～ 全身都可以直接再下方點擊購買！',
+  content: '今天走簡約韓系風格，這套針織上衣與打褶寬褲質感超好，版型顯瘦又舒服，很適合秋天約會或上班～ 全身都可以直接在下方點擊購買！',
   commentsCount: 86,
   isLiked: false, // 「我」有沒有按讚
   // 這裡本來有個 isSaved 存「我」有沒有收藏，現在改成從共用的收藏清單
@@ -106,7 +106,7 @@ const similarPosts = ref([
 // 留言列表：一開始先放兩筆假留言當範例
 const comments = ref([
   { id: 1, user: '小美', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=May', text: '這套超好看！請問褲子是什麼顏色？' },
-  { id: 2, user: '阿哲', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jerry', text: '已收藏~等發薪就下單 !!!' }
+  { id: 2, user: '阿圓', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jerry', text: '已收藏~等發薪就下單 !!!' }
 ])
 
 // newComment：跟留言輸入框做雙向綁定，存使用者「正在打字、還沒送出」的留言內容

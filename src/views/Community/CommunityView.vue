@@ -51,7 +51,7 @@ export const posts = reactive([
     user: { name: 'Amy_穿搭日記', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Amy' },
     title: '秋季奶茶色系穿搭，寬褲+針織的溫柔搭配',
     desc: '用奶茶色打底，寬褲修飾比例，針織外套增加層次，走在街上也很有電影感。',
-    imageUrl: 'https://loremflickr.com/900/720/knitwear,sweater,fashion',
+    imageUrl: 'https://i.pinimg.com/736x/b6/6d/92/b66d92d99efca8c6886e751fe7734d05.jpg',
     publishedAt: daysAgo(2), // 呼叫剛剛定義的函式，代表「2 天前發布的」
     likesCount: '1.2k',
     commentsCount: 89,
@@ -62,7 +62,7 @@ export const posts = reactive([
     user: { name: 'Kevin.style', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Kevin' },
     title: '極簡工裝風 | 大地色機能外套通勤也好看',
     desc: '極簡工裝風，大地色機能外套通勤也好看，口袋設計實用又有型。',
-    imageUrl: 'https://loremflickr.com/700/560/jacket,menswear,fashion',
+    imageUrl: 'https://i.pinimg.com/1200x/a4/65/bf/a465bf1d175351db32b787f60f697b68.jpg',
     publishedAt: daysAgo(4),
     likesCount: '856',
     commentsCount: 42,
@@ -73,7 +73,7 @@ export const posts = reactive([
     user: { name: '小雨 rainy', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Rainy' },
     title: '約會小心機 | 法式碎花洋裝配藤編包 🌸',
     desc: '約會小心機，法式碎花洋裝配藤編包，甜而不膩剛剛好。',
-    imageUrl: 'https://loremflickr.com/700/560/dress,floral,fashion',
+    imageUrl: 'https://i.pinimg.com/736x/77/06/5b/77065b64440d69cefa7da53cd9b7949c.jpg',
     publishedAt: daysAgo(1),
     likesCount: '2.4k',
     commentsCount: 158,
@@ -84,11 +84,22 @@ export const posts = reactive([
     user: { name: 'Leo_urban', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Leo' },
     title: '街頭機能風 | 背心＋工裝褲率性感',
     desc: '機能背心＋工裝褲，街頭感十足，鞋款選厚底增加率性。',
-    imageUrl: 'https://loremflickr.com/700/560/streetwear,outfit,fashion',
+    imageUrl: 'https://i.pinimg.com/736x/f5/ad/94/f5ad945ea71f85aa3f57038caf8c4670.jpg',
     publishedAt: daysAgo(5),
     likesCount: '631',
     commentsCount: 27,
     taggedProducts: [{ id: 4, name: '修身牛仔褲' }]
+  },
+  {
+    postId: 5,
+    user: { name: 'Mia.wardrobe', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mia' },
+    title: '極簡膠囊衣櫥 | 五件單品排列組合穿一週',
+    desc: '挑五件百搭基本款互相搭配，減法生活從衣櫃開始，出門前不再猶豫要穿什麼。',
+    imageUrl: 'https://i.pinimg.com/736x/ae/8b/0f/ae8b0f68257334eb59caf2517e6c8278.jpg',
+    publishedAt: daysAgo(3),
+    likesCount: '1.1k',
+    commentsCount: 54,
+    taggedProducts: [{ id: 5, name: '百褶及膝裙' }]
   }
 ])
 
