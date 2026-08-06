@@ -1,12 +1,4 @@
 <script setup>
-// ====================================================================
-// 這是「購物車頁」：顯示使用者已加入的團購商品、可調整數量、
-// 計算小計與運費，並可以前往「結帳頁」。
-//
-// 【這一版的改動】購物車資料改成從 Pinia store（groupCart）拿，
-// 不再自己用 localStorage 讀寫、也不用 watch 監看變化再存檔——
-// 這些事情 store 都幫我們處理好了，元件只需要「用」資料就好。
-// ====================================================================
 
 import { reactive, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -24,21 +16,19 @@ const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : rout
 const memberName = ref(localStorage.getItem('memberName') || '會員')
 const router = useRouter()
 
-// 呼叫 useGroupCartStore() 拿到購物車 store 的實體，
-// 之後畫面上就用 cartStore.items、cartStore.removeItem(...) 這樣去讀寫
+// 呼叫 useGroupCartStore() 
 const cartStore = useGroupCartStore()
 
-// 團購加購專區（可為空陣列，無加購商品時不顯示此區塊）
+// 團購加購專區
 // 目前程式裡沒有塞資料進去，所以畫面上這區塊預設不會出現
 const addonItems = reactive([])
 
-// 從購物車中移除某個商品，直接呼叫 store 裡定義好的 removeItem 方法
+// 從購物車中移除某個商品
 const removeItem = (id) => {
   cartStore.removeItem(id)
 }
 
 // 取得某個購物車項目目前應該用的單價：有解鎖團購價就用團購價，沒有就用原價
-// 這個計算方式跟 store 裡的 unitPriceOf 是一樣的，這裡直接呼叫 store 的版本，避免同樣的邏輯寫兩次
 const unitPriceOf = (item) => cartStore.unitPriceOf(item)
 
 // 把「購物車商品」和「加購商品」合併成同一個陣列，方便一起計算總金額
@@ -150,10 +140,6 @@ const handleCheckout = () => {
               <h6 class="fw-bold mb-1">{{ item.name }}</h6>
               <div class="d-flex align-items-center gap-2 mb-1">
                 <label class="small text-muted mb-0">數量</label>
-                <!-- v-model.number：把輸入框內容自動同步到 item.qty，並轉成數字型別。
-                     注意：item 是從 cartStore.items 拿出來的，這裡等於直接修改 store 裡的資料，
-                     Pinia 允許這樣做，但比較嚴謹的寫法會是呼叫 store 裡另外寫一個 updateQty(id, qty) 的
-                     action 來改，之後如果想練習，可以試著加這個 action -->
                 <input type="number" min="1" v-model.number="item.qty" class="qty-input" />
               </div>
               <p class="small text-muted mb-0">
@@ -175,7 +161,7 @@ const handleCheckout = () => {
           </div>
         </div>
 
-        <!-- 只有加購商品陣列不是空的時候才顯示這個區塊 -->
+        <!-- 當加購商品陣列不是空的時候才顯示這個區塊 -->
         <div v-if="addonItems.length > 0" class="addon-card">
           <div class="addon-header">團購加購專區</div>
           <div v-for="item in addonItems" :key="item.id" class="addon-row">
@@ -226,7 +212,7 @@ const handleCheckout = () => {
             </div>
 
             <button class="btn btn-outline w-100 mb-2" @click="continueShopping">繼續購物</button>
-            <!-- :disabled 是動態綁定：購物車完全空的時候，按鈕會被禁用，避免結帳空訂單 -->
+            <!-- 購物車完全空的時候，按鈕會被禁用，避免結帳空訂單 -->
             <button
               class="btn btn-main w-100"
               :disabled="allItems.length === 0"

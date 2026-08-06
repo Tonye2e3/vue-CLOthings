@@ -1,15 +1,11 @@
 <script setup>
-// ====================================================================
-// 這是「我的團購訂單」頁：列出使用者過去下的所有訂單，
-// 可以查看進度、用 Modal 編輯收件人姓名與商品數量，或取消訂單。
-// ====================================================================
 
 import { ref, reactive, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
-// 團購購物車 store：這一頁只需要拿購物車數量顯示在 header，不會修改購物車內容
+//這一頁拿購物車數量顯示在 header
 import { useGroupCartStore } from '@/stores/groupCart'
-// 已成立訂單累計件數 store：取消訂單、編輯數量時都要跟這裡同步調整
+//調整累積數量及編輯數量、取消訂單
 import { useGroupCommittedStore } from '@/stores/groupCommitted'
 
 const route = useRoute()
@@ -24,7 +20,7 @@ const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : rout
 
 // 會員名稱：優先帶入登入後存下的會員資料，尚未登入則顯示預設值
 const memberName = ref(localStorage.getItem('memberName') || '會員')
-// 購物車商品數量：直接從 store 拿，跨頁面即時反映實際品項數
+// 購物車商品數量
 const cartCount = computed(() => cartStore.items.length)
 
 // 商品目錄：編輯訂單、調整數量時要對照商品名稱與團購階層價格，需與其他頁面資料一致
@@ -49,7 +45,7 @@ const ORDERS_KEY = 'cloOrders'
 const defaultOrders = [
   {
     id: 'GO2026052001',
-    productName: '時尚休閒連帽衛衣 (米白色 / 早鳥專案)',
+    productName: '時尚休閒連帽衛衣 (米白色)',
     status: '進行中 (組團中)',
     totalPrice: 1200,
     orderDate: '2026/05/20',
@@ -57,7 +53,7 @@ const defaultOrders = [
   },
   {
     id: 'GO2026041208',
-    productName: '復古格紋闊寬褲 (咖啡色 / 經典專案)',
+    productName: '復古格紋闊寬褲 (咖啡色)',
     status: '已成團 (備貨中)',
     totalPrice: 1485,
     orderDate: '2026/04/12',
@@ -65,7 +61,7 @@ const defaultOrders = [
   },
   {
     id: 'GO2026030103',
-    productName: '有機棉連帽衛衣 (墨綠 / 經典專案)',
+    productName: '有機棉連帽衛衣 (墨綠)',
     status: '已完成',
     totalPrice: 1280,
     orderDate: '2026/03/01',
@@ -85,7 +81,7 @@ const readOrders = () => {
   return defaultOrders
 }
 
-// 用 reactive 讓訂單清單變成響應式資料，這樣「編輯」「取消」後畫面才會即時更新
+// 用 reactive 讓訂單清單變成響應式資料
 const myOrders = reactive(readOrders())
 
 // 任何訂單狀態變更（取消／編輯）都同步寫回 localStorage
@@ -111,7 +107,6 @@ const cancelOrder = (id) => {
   order.status = '已取消'
 
   // 把這筆訂單當初累計進去的件數扣回來，商品頁的「已訂購件數」與團購價才會同步復原
-  // 直接呼叫 store 的 subtract 方法，裡面已經處理好「不會扣成負數」跟存回 localStorage
   if (Array.isArray(order.items) && order.items.length) {
     committedStore.subtract(order.items)
   }
@@ -119,11 +114,10 @@ const cancelOrder = (id) => {
 
 // ---- 以下是「編輯訂單」Modal 相關的狀態與方法 ----
 
-const showEditModal = ref(false)  // 控制編輯 Modal 是否顯示
+const showEditModal = ref(false)  
 const editingOrderId = ref('')    // 記錄目前正在編輯的是哪一筆訂單
 
 // 編輯表單的資料：收件人姓名 + 每個品項的數量
-// items 裡多存一個 name，只是方便畫面顯示，實際存回訂單時只會用到 id、qty
 const editForm = reactive({
   shipName: '',
   items: []
@@ -164,8 +158,7 @@ const saveEdit = () => {
     return
   }
 
-  // 先算出每個品項「新數量 - 舊數量」的差，套用到已成立件數 store，
-  // 這樣接下來算團購價時，store 裡的數字就已經是「改完之後」最新的總數
+  // 算出每個品項「新數量 - 舊數量」的差，套用到已成立件數 store，
   editForm.items.forEach(newItem => {
     const oldItem = (order.items || []).find(i => i.id === newItem.id)
     const oldQty = oldItem ? oldItem.qty : 0

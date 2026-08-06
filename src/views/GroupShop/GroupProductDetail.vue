@@ -1,33 +1,17 @@
 <script setup>
-// ====================================================================
-// 這是「商品詳情頁」：顯示單一團購商品的詳細資訊、目前累積訂購件數、
-// 團購價格階層，以及「加入此團購」的按鈕。
-// ====================================================================
 
-// 從 vue 套件匯入兩個常用工具：
-// ref      -> 用來建立「會變動的資料」（響應式資料），資料一變畫面就跟著更新
-// computed -> 用來建立「根據其他資料自動算出來的值」，來源資料一變它就自動重算
 import { ref, computed } from 'vue'
-
-// vue-router 提供的工具：
-// useRoute  -> 可以讀到目前網址的資訊（例如網址列的 :id 參數）
-// useRouter -> 可以用程式的方式切換頁面（例如按下按鈕後跳轉到別的網址）
 import { useRoute, useRouter } from 'vue-router'
-
-// 團購購物車 store：之前分散在各頁面自己讀寫 localStorage 的購物車邏輯，
-// 現在統一由這個 store 管理，這裡只要「用」它提供的資料跟方法就好
 import { useGroupCartStore } from '@/stores/groupCart'
 // 已成立訂單累計件數 store：讓「已訂購件數」把已送出的訂單也算進去
 import { useGroupCommittedStore } from '@/stores/groupCommitted'
 
-const route = useRoute()   // 目前這一頁的路由資訊（網址、參數等）
-const router = useRouter() // 用來做「跳轉頁面」的工具
-const cartStore = useGroupCartStore() // 購物車 store 的實體
-const committedStore = useGroupCommittedStore() // 已成立訂單累計件數 store 的實體
+const route = useRoute()  
+const router = useRouter() 
+const cartStore = useGroupCartStore() 
+const committedStore = useGroupCommittedStore() 
 
-// 搜尋欄位輸入的文字，透過 v-model 跟畫面上的 <input> 綁在一起
-
-// 左側選單要顯示的項目清單（純資料，不是響應式也沒關係，因為內容不會變動）
+// 左側選單要顯示的項目清單
 const navItems = [
   { label: '專案瀏覽', icon: 'user', to: '/GroupShop' },
   { label: '團購紀錄', icon: 'history', to: '/GroupShop/orders' }
@@ -37,7 +21,6 @@ const navItems = [
 const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : route.path.startsWith(to))
 
 // 會員名稱：優先帶入登入後存下的會員資料，尚未登入則顯示預設值
-// localStorage 是瀏覽器提供的「本機儲存空間」，資料存在使用者的電腦裡，重新整理網頁也不會消失
 const memberName = ref(localStorage.getItem('memberName') || '會員')
 
 // 購物車商品數量：直接從 store 拿，購物車頁、詳情頁看到的都是同一份資料，
@@ -45,7 +28,7 @@ const memberName = ref(localStorage.getItem('memberName') || '會員')
 const cartCount = computed(() => cartStore.items.length)
 
 // 商品目錄：原價 + 兩階層團購價（滿N件即可享該階層價格），需與商品列表頁資料一致
-// 這裡先用寫死的假資料模擬「後端資料庫」，之後接真正的 API 時可以整段替換掉
+// 這裡先用寫死的假資料模擬「後端資料庫」
 const catalog = ref([
   {
     id: 1,
@@ -158,24 +141,21 @@ const catalog = ref([
 ])
 
 // 依網址上的商品 id 取得對應商品，找不到則預設第一筆
-// 例如網址是 /GroupShop/product/3，route.params.id 拿到的就是字串 "3"
 const product = computed(() => {
   const id = Number(route.params.id) // 網址參數是文字，要轉成數字才能跟 catalog 裡的 id 比對
   return catalog.value.find(p => p.id === id) || catalog.value[0]
 })
 
-// 讀取購物車裡此商品目前的數量：直接從 store 裡的 items 陣列找
+// 讀取購物車裡此商品目前的數量
 const cartQtyOf = (id) => {
   const item = cartStore.items.find(i => i.id === id)
   return item ? item.qty : 0
 }
 
 // 目前已訂購件數 = 基礎件數 + 已成立訂單累計件數 + 購物車裡實際加入的數量
-// 這樣使用者把商品加進購物車、或送出訂單後，畫面上的「已訂購件數」跟「解鎖階層」才能正確反映
 const orderedQty = computed(() => product.value.currentCount + committedStore.committedQtyOf(product.value.id) + cartQtyOf(product.value.id))
 
 // 目前已解鎖的階層（尚未達第一階層則回傳 null）
-// 做法：把每個階層都檢查一次，只要件數有達到，就把 tier 更新成該階層（陣列後面的階層件數較多，所以會覆蓋成最新解鎖的那個）
 const currentTier = computed(() => {
   let tier = null
   for (const t of product.value.tiers) {
@@ -187,10 +167,10 @@ const currentTier = computed(() => {
 // 目前應該顯示的單價：有解鎖階層就用階層價，否則用原價
 const currentUnitPrice = computed(() => currentTier.value ? currentTier.value.price : product.value.listPrice)
 
-// 最終階層（陣列最後一個，也就是件數門檻最高、價格最低的那個階層）
+// 第二階層
 const finalTier = computed(() => product.value.tiers[product.value.tiers.length - 1])
 
-// 尚未解鎖的下一階層（找第一個「件數門檻」比目前已訂購件數還高的階層）
+// 第一階層
 const nextTier = computed(() =>
   product.value.tiers.find(t => t.qty > orderedQty.value)
 )
@@ -200,7 +180,7 @@ const progressPercent = computed(() =>
   Math.min(100, Math.round((orderedQty.value / finalTier.value.qty) * 100))
 )
 
-// 判斷某個階層是否已經解鎖（用來在畫面上顯示打勾或鎖頭的 SVG 圖示）
+// 判斷某個階層是否已經解鎖
 const isTierUnlocked = (tier) => orderedQty.value >= tier.qty
 
 // 把數字格式化成「千分位」顯示，例如 1234 會變成 1,234，方便閱讀價格
@@ -208,8 +188,7 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
 
 // 按下「加入此團購」時執行的動作
 const handleJoin = () => {
-  // 把「目前是否已解鎖團購價」的計算結果，跟商品基本資料一起交給 store，
-  // 至於「購物車裡有沒有這個商品、要新增還是把數量+1」，store 的 addItem 裡都處理好了
+  // 把「目前是否已解鎖團購價」的計算結果，購物車裡有沒有這個商品、要新增還是把數量+1
   cartStore.addItem({
     id: product.value.id,
     name: product.value.name,
@@ -217,7 +196,7 @@ const handleJoin = () => {
     listPrice: product.value.listPrice,
     unlockedPrice: currentTier.value ? currentUnitPrice.value : null
   })
-  router.push('/GroupShop/checkout') // 加入後直接跳轉到購物車頁面
+  router.push('/GroupShop/checkout') // 加入後直接到購物車頁面
 }
 </script>
 
@@ -227,7 +206,7 @@ const handleJoin = () => {
     <header class="clo-header">
       <div class="clo-user">
         <span class="user-greet">你好，{{ memberName }}</span>
-        <!-- router-link 是 vue-router 提供的「頁面內連結」，點下去不會整頁重新整理，只切換內容 -->
+        
         <router-link to="/GroupShop/checkout" class="cart-link">
           <span class="cart-icon">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -236,7 +215,7 @@ const handleJoin = () => {
               <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
             </svg>
           </span>
-          <!-- 購物車數量小紅點，數字來自上面的 cartCount -->
+          <!-- 購物車數量 -->
           <span class="cart-badge">{{ cartCount }}</span>
         </router-link>
       </div>
@@ -270,7 +249,7 @@ const handleJoin = () => {
             </router-link>
             <div v-else class="nav-item">
               <span class="nav-icon">
-                <!-- 依 item.icon 的值，顯示對應的嵌入式 SVG 圖示（v-if / v-else-if 只會顯示符合條件的那一個） -->
+                <!-- 顯示對應的嵌入式 SVG 圖示 -->
                 <svg v-if="item.icon === 'user'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                   <circle cx="12" cy="7" r="4"></circle>
@@ -303,7 +282,7 @@ const handleJoin = () => {
               <span>已訂購 {{ orderedQty }} 件</span>
               <span>
                 <span class="fw-bold text-accent">$ {{ formatCurrency(currentUnitPrice) }}</span>
-                <!-- v-if：只有已經解鎖團購價的時候，才會顯示「已解鎖」標籤 -->
+                <!-- 已經解鎖團購價的時候，才會顯示「已解鎖」-->
                 <span v-if="currentTier" class="unlocked-tag">已解鎖</span>
               </span>
             </div>

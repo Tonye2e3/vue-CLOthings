@@ -1,16 +1,9 @@
 <script setup>
-// ====================================================================
-// 這是「結帳頁」：填寫收件人資訊、選擇取貨與付款方式，
-// 確認金額後送出訂單，並把訂單存進「我的團購訂單」清單。
-// ====================================================================
 
 import { reactive, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-
-// 團購購物車 store：這裡不會修改購物車內容（結帳頁只負責顯示 + 送出），
-// 但送出訂單成功後要呼叫 cartStore.clear() 把購物車清空
 import { useGroupCartStore } from '@/stores/groupCart'
-// 已成立訂單累計件數 store：算團購價、以及訂單送出後要累加件數，都改跟這裡拿/改
+// 已成立訂單累計件數 store：算團購價、以及訂單送出後要累加件數
 import { useGroupCommittedStore } from '@/stores/groupCommitted'
 
 const route = useRoute()
@@ -27,7 +20,7 @@ const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : rout
 // 會員名稱：優先帶入登入後存下的會員資料，尚未登入則顯示預設值
 const memberName = ref(localStorage.getItem('memberName') || '會員')
 
-// 商品目錄：需與商品列表頁、商品詳情頁、購物車頁資料一致，用來對照當下總訂購件數算出正確團購價
+// 商品目錄
 const catalog = [
   { id: 1, name: '團購短T', imageUrl: 'https://picsum.photos/seed/clo-shortT/400/300', listPrice: 340, tiers: [{ qty: 5, price: 306 }, { qty: 10, price: 221 }], currentCount: 12 },
   { id: 2, name: '團購牛仔褲', imageUrl: 'https://picsum.photos/seed/clo-jeans/400/300', listPrice: 430, tiers: [{ qty: 10, price: 387 }, { qty: 20, price: 310 }], currentCount: 22 },
@@ -42,13 +35,10 @@ const catalog = [
 // 依商品 id 從目錄中找出對應的商品資料
 const productOf = (id) => catalog.find(p => p.id === id)
 
-// 購物車內容直接從 store 拿。這裡用 computed 包一層，template 裡照樣可以用
-// cartItems 這個名字（computed 在 template 裡會自動解包，不用寫 .value），
-// 但在下面的 <script> 邏輯裡如果要拿裡面的值，要記得加 .value（例如 cartItems.value.length）
 const cartItems = computed(() => cartStore.items)
 const cartCount = computed(() => cartItems.value.length)
 
-// 依「基礎件數 + 已成立訂單件數 + 這筆購物車的件數」統一算出整批適用的團購價
+// 「基礎件數 + 已成立訂單件數 + 這筆購物車的件數」統一算出整批適用的團購價
 // 這裡跟其他頁面計算方式的差別：多加了 committedStore.committedQtyOf，確保之前已經送出的訂單件數也算進去
 const unitPriceOf = (item) => {
   const product = productOf(item.id)
@@ -70,7 +60,7 @@ const subtotal = computed(() =>
 const freight = computed(() => (subtotal.value >= 1000 ? 0 : 60))
 const grandTotal = computed(() => subtotal.value + freight.value)
 
-// 收件人資訊：用 reactive 建立一個表單物件，讓 <input>/<select> 用 v-model 綁定各個欄位
+// 收件人資訊
 const orderInfo = reactive({
   shipName: '',
   shipPhone: '',
@@ -93,11 +83,11 @@ const readOrders = () => {
   } catch {
     // 讀取失敗則回退到示範假資料
   }
-  // 與「我的團購訂單」頁的示範假資料保持一致
+  // 與「我的團購訂單」頁的示範假資料
   return [
     {
       id: 'GO2026052001',
-      productName: '時尚休閒連帽衛衣 (米白色 / 早鳥專案)',
+      productName: '時尚休閒連帽衛衣 (米白色)',
       status: '進行中 (組團中)',
       totalPrice: 1200,
       orderDate: '2026/05/20',
@@ -105,7 +95,7 @@ const readOrders = () => {
     },
     {
       id: 'GO2026041208',
-      productName: '復古格紋闊寬褲 (咖啡色 / 經典專案)',
+      productName: '復古格紋闊寬褲 (咖啡色)',
       status: '已成團 (備貨中)',
       totalPrice: 1485,
       orderDate: '2026/04/12',
@@ -113,7 +103,7 @@ const readOrders = () => {
     },
     {
       id: 'GO2026030103',
-      productName: '有機棉連帽衛衣 (墨綠 / 經典專案)',
+      productName: '有機棉連帽衛衣 (墨綠)',
       status: '已完成',
       totalPrice: 1280,
       orderDate: '2026/03/01',
@@ -122,11 +112,10 @@ const readOrders = () => {
   ]
 }
 
-// 把 Date 物件格式化成「YYYY/MM/DD」字串
+// 把 Date 物件格式化
 const formatDate = (date) => {
   const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0') // padStart(2,'0')：不足兩位數前面補 0，例如 5 -> "05"
-  const d = String(date.getDate()).padStart(2, '0')
+  const m = String(date.getMonth() + 1).padStart(2, '0') // padStart(2,'0')：不足兩位數前面補 0
   return `${y}/${m}/${d}`
 }
 
@@ -166,7 +155,6 @@ const handleSubmit = () => {
   localStorage.setItem(ORDERS_KEY, JSON.stringify(orders))
 
   // 訂單成立後，這筆數量要永久累計進該商品的團購件數，即使購物車被清空也不會歸零
-  // 直接呼叫 store 的 add 方法，裡面已經處理好累加跟存回 localStorage 這兩件事
   committedStore.add(cartItems.value.map(i => ({ id: i.id, qty: i.qty })))
 
   alert('訂單已送出！即將轉至訂單列表頁面。')
@@ -206,7 +194,7 @@ const handleSubmit = () => {
               :class="{ active: isActive(item.to) }"
             >
               <span class="nav-icon">
-                <!-- 依 item.icon 的值，顯示對應的嵌入式 SVG 圖示（v-if / v-else-if 只會顯示符合條件的那一個） -->
+                <!-- 顯示對應的嵌入式 SVG 圖示-->
                 <svg v-if="item.icon === 'user'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                   <circle cx="12" cy="7" r="4"></circle>
@@ -220,7 +208,7 @@ const handleSubmit = () => {
             </router-link>
             <div v-else class="nav-item">
               <span class="nav-icon">
-                <!-- 依 item.icon 的值，顯示對應的嵌入式 SVG 圖示（v-if / v-else-if 只會顯示符合條件的那一個） -->
+                <!-- 顯示對應的嵌入式 SVG 圖示 -->
                 <svg v-if="item.icon === 'user'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                   <circle cx="12" cy="7" r="4"></circle>

@@ -1,7 +1,4 @@
 <script setup>
-// ====================================================================
-// 這是「團購商品列表頁」：顯示所有團購專案，並依照「已成團」/「進行中」分成兩區塊。
-// ====================================================================
 
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
@@ -15,8 +12,6 @@ const route = useRoute()
 const cartStore = useGroupCartStore()
 const committedStore = useGroupCommittedStore()
 
-// 搜尋欄位輸入的文字，跟 header 的 <input v-model="searchKeyword"> 綁在一起，
-// 打字會直接反映在這個變數上，下面的 filteredProducts 會拿它去篩商品
 const searchKeyword = ref('')
 
 // 左側選單項目
@@ -143,7 +138,6 @@ const cartQtyOf = (id) => {
 }
 
 // 目前已訂購件數 = 基礎件數 + 已成立訂單累計件數 + 購物車裡實際加入的數量
-// 注意：這裡是一般函式 (p) => ...，不是 computed，所以每次呼叫都會重新計算一次
 const orderedQtyOf = (p) => p.currentCount + committedStore.committedQtyOf(p.id) + cartQtyOf(p.id)
 
 // 目前已解鎖的階層（尚未達第一階層則回傳 null）
@@ -156,10 +150,9 @@ const currentTierOf = (p) => {
 }
 
 // 目前可享團購價（尚未解鎖任何階層則顯示原價）
-// ?? 是「空值合併運算子」：左邊是 null 或 undefined 時，才會使用右邊的值
 const currentPriceOf = (p) => currentTierOf(p)?.price ?? p.listPrice
 
-// 最終階層（陣列最後一個，也就是件數門檻最高、價格最低的那個階層）
+// 第二階層（陣列最後一個，也就是件數門檻最高、價格最低的那個階層）
 const finalTierOf = (p) => p.tiers[p.tiers.length - 1]
 
 // 判斷這個商品是否已經達到最終階層（也就是「已成團」）
@@ -167,7 +160,6 @@ const isCompleted = (p) => orderedQtyOf(p) >= finalTierOf(p).qty
 
 // 依搜尋關鍵字篩選商品：如果搜尋框是空的，全部商品都算符合（!searchKeyword.value 為 true）；
 // 有輸入文字的話，就比對商品名稱裡有沒有包含這段文字（跟課堂 ShopView.vue 的寫法一致）
-// toLowerCase() 把兩邊都轉成小寫再比對，這樣輸入大小寫不同也還是找得到（雖然中文沒差，但英文商品名會用到）
 const filteredProducts = computed(() =>
   products.value.filter(p =>
     !searchKeyword.value || p.name.toLowerCase().includes(searchKeyword.value.toLowerCase())
@@ -224,7 +216,7 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
               :class="{ active: isActive(item.to) }"
             >
               <span class="nav-icon">
-                <!-- 依 item.icon 的值，顯示對應的嵌入式 SVG 圖示（v-if / v-else-if 只會顯示符合條件的那一個） -->
+                <!--顯示對應的嵌入式 SVG 圖示-->
                 <svg v-if="item.icon === 'user'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                   <circle cx="12" cy="7" r="4"></circle>
@@ -238,7 +230,7 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
             </router-link>
             <div v-else class="nav-item">
               <span class="nav-icon">
-                <!-- 依 item.icon 的值，顯示對應的嵌入式 SVG 圖示（v-if / v-else-if 只會顯示符合條件的那一個） -->
+                <!--顯示對應的嵌入式 SVG 圖示-->
                 <svg v-if="item.icon === 'user'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                   <circle cx="12" cy="7" r="4"></circle>
