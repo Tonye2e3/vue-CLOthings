@@ -302,18 +302,6 @@ const toggleFollow = () => {
         </div>
       </div>
 
-      <!--
-        其它頁籤（同款商品 / 關於我）未開啟時的預設狀態
-        這裡的 v-else 是接在最上面 works 那個 v-if、跟剛剛 saved 那個 v-else-if 後面，
-        意思是「works 不是、saved 也不是」，才會走到這裡。
-      -->
-      <div v-else class="empty-state">
-        <div class="empty-icon">
-          <i class="fa-solid fa-folder" style="color: rgb(122, 75, 84);"></i>
-        </div>
-        <p class="empty-note">「這裡的故事，還在整理中。」</p>
-      </div>
-
     </div>
   </div>
 </template>
