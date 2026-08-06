@@ -1,25 +1,22 @@
-// 帳號：只能英數字，4～12 字元
 export function isValidAccount(str) {
-  const isValid = /^[a-zA-Z0-9]{4,12}$/.test(str)
-  if (!isValid) return '帳號格式錯誤，只能英數字，4～12 字元'
+  const isValid = /^[a-zA-Z0-9]{4,50}$/.test(str)
+  return isValid ? '' : '帳號格式錯誤，只能英數字，4～50 字元'
 }
 
-// 密碼：只能英數字，至少 6 字元
 export function isValidPassword(str) {
-  const isValid = /^[a-zA-Z0-9]{6,}$/.test(str)
-  if (!isValid) return '密碼格式錯誤，只能英數字，至少 6 字元'
+  // 至少一個大寫、一個小寫，僅限英數字，長度 ≥ 6
+  const isValid = /^(?=.*[A-Z])(?=.*[a-z])[A-Za-z0-9]{6,}$/.test(str)
+  return isValid ? '' : '密碼格式錯誤，需包含至少一個大寫與一個小寫字母，只能英數字，至少 6 字元'
 }
 
-// 電話：只能數字，10 字元
 export function isValidPhone(str) {
-  // 先檢查是否都是數字
-  if (!/^\d+$/.test(str)) {
-    return '電話格式錯誤，只能輸入數字'
-  }
-  // 再檢查長度
-  if (str.length !== 10) {
-    return '電話長度必須是 10 位數'
-  }
+  // 必須 09 開頭，後面再接 8 個數字，共 10 碼
+  const isValid = /^09\d{8}$/.test(str)
+  return isValid ? '' : '請填入正確的手機格式（需 09 開頭，共 10 碼）'
+}
 
-  return true
+// 郵件：必須符合 Email 格式
+export function isValidEmail(str) {
+  const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(str)
+  return isValid ? '' : 'Email 格式錯誤，請輸入有效的郵件地址'
 }

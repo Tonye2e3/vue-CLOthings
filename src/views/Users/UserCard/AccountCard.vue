@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { initialUserData } from '../../../services/userFakeData'
-import { isValidAccount, isValidPassword, isValidPhone } from '@/utils/userValidator'
+import { isValidAccount, isValidPassword, isValidPhone, isValidEmail } from '@/utils/userValidator'
 
 const userData = reactive({ ...initialUserData })
 const backupData = reactive({}) // 用來暫存原始資料
@@ -21,7 +21,15 @@ const cancel = () => {
 
 const save = () => {
   // 直接使用雙向繫結的 userData，不需要再複製
-  userData.account = backupData.account
+  const passwordError = isValidPassword(userData.password)
+  const phoneError = isValidPhone(userData.phone)
+  const emailError = isValidEmail(userData.email)
+
+  if (passwordError || phoneError || emailError) {
+    alert('請修正錯誤後再儲存')
+    return
+  }
+
   isEditing.value = false
 }
 </script>
@@ -35,7 +43,7 @@ const save = () => {
 
     <div v-if="!isEditing">
       <p><strong>帳號：</strong>{{ userData.account }}</p>
-      <p><strong>暱稱：</strong>{{ userData.nickname }}</p>
+      <p><strong>暱稱：</strong>{{ userData.username }}</p>
       <p><strong>密碼：</strong>{{ userData.password ? '••••••' : '未設定' }}</p>
       <p><strong>郵件：</strong>{{ userData.email }}</p>
       <p><strong>電話：</strong>{{ userData.phone }}</p>
@@ -43,15 +51,26 @@ const save = () => {
 
     <div v-else>
       <input v-model="userData.account" class="form-control mb-2" placeholder="帳號" readonly />
-      <input v-model="userData.nickname" class="form-control mb-2" placeholder="暱稱" />
+      <input v-model="userData.username" class="form-control mb-2" placeholder="暱稱" />
       <input
         v-model="userData.password"
         type="password"
         class="form-control mb-2"
         placeholder="密碼"
       />
+      <span v-if="isValidPassword(userData.password)" class="form text text-danger">
+        {{ isValidPassword(userData.password) }}
+      </span>
       <input v-model="userData.email" type="email" class="form-control mb-2" placeholder="郵件" />
-      <input v-model="userData.phone" class="form-control mb-2" placeholder="電話" />
+      <span class="form text text-danger">{{ isValidEmail(userData.email) }}</span>
+      <input
+        v-model="userData.phone"
+        type="text"
+        maxlength="10"
+        class="form-control mb-2"
+        placeholder="電話"
+      />
+      <span class="form text text-danger">{{ isValidPhone(userData.phone) }}</span>
       <div class="d-flex gap-2 mt-3">
         <button @click="cancel" class="btn btn-secondary flex-grow-1">取消</button>
         <button @click="save" class="btn btn-primary flex-grow-1">確定</button>

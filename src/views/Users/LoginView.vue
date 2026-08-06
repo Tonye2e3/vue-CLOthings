@@ -1,4 +1,5 @@
 <script setup>
+import { isValidAccount, isValidPassword } from '@/utils/userValidator'
 import { ref } from 'vue'
 
 const account = ref('')
@@ -47,10 +48,12 @@ async function login() {
     <div class="mb-3">
       <label class="form-label">帳號</label>
       <input type="text" class="form-control" v-model="account" />
+      <span class="form-text text-danger">{{ isValidAccount(account) }}</span>
     </div>
     <div class="mb-3">
       <label class="form-label">密碼</label>
       <input type="password" class="form-control" v-model="password" />
+      <span class="form-text text-danger">{{ isValidAccount(password) }}</span>
     </div>
 
     <button class="btn btn-primary w-100 py-2" type="button" @click="login">登入</button>
