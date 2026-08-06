@@ -1,7 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-// 引入暫時導覽列組件
-// import TempNavbar from '@/components/TempNavbar.vue'
+
 
 // 使用 import 引入本地 src/assets 下的圖片
 import postImage from '@/assets/Postimage/post2.jpg'
@@ -23,9 +22,9 @@ const post = ref({
   isLiked: false,
   isSaved: false,
   taggedProducts: [
-    { id: 101, name: '針織上衣', x: '75%', y: '35%' },
-    { id: 102, name: '高腰寬褲', x: '60%', y: '70%' },
-    { id: 103, name: '托特包', x: '35%', y: '80%' }
+    { id: 101, name: '針織上衣', x: '45%', y: '35%' },
+    { id: 102, name: '高腰寬褲', x: '50%', y: '70%' },
+    { id: 103, name: '托特包', x: '30%', y: '90%' }
   ]
 })
 
@@ -80,10 +79,7 @@ const addComment = () => {
 </script>
 
 <template>
-  <component is="style">
-    @import "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css";
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&amp;family=Noto+Sans+TC:wght@400;500;600;700&amp;display=swap');
-  </component>
+  
 
   <div class="community-page min-vh-100 w-100">
     <!-- 暫時導覽列 -->
@@ -465,5 +461,16 @@ const addComment = () => {
 @media (max-width: 767px){
   .post-image{ height:380px; }
   .post-main-card{ padding:1.1rem; }
+}
+</style>
+
+<!--
+  這個區塊「不加 scoped」：scoped 樣式只會作用在這個元件模板裡面的元素上，
+  body 不在模板裡，寫在 scoped 區塊不會生效。不加 scoped 的話，
+  這段 CSS 編譯出來就是全域樣式，不用改共用的 App.vue 也能讓 body 變成統一背景色。
+-->
+<style>
+body {
+  background-color: #F9F4F0 !important;
 }
 </style>

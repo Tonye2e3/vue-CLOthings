@@ -9,6 +9,11 @@ export const currentUser = {
   avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily'
 }
 
+// 假資料的發布時間改成「相對現在往前推 N 天」，而不是寫死未來日期。
+// 這樣不管使用者電腦當下實際日期是哪一天，假資料永遠會比「剛剛發布」的新貼文舊，
+// 「最新」分頁排序時，新發的貼文才會保證排在最上面。
+const daysAgo = (n) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString()
+
 export const posts = reactive([
   {
     postId: 1,
@@ -16,7 +21,7 @@ export const posts = reactive([
     title: '秋季奶茶色系穿搭，寬褲+針織的溫柔搭配',
     desc: '用奶茶色打底，寬褲修飾比例，針織外套增加層次，走在街上也很有電影感。',
     imageUrl: 'https://loremflickr.com/900/720/knitwear,sweater,fashion',
-    publishedAt: '2026-08-04T09:00:00',
+    publishedAt: daysAgo(2),
     likesCount: '1.2k',
     commentsCount: 89,
     taggedProducts: [{ id: 3, name: '羊毛混紡針織外套' }]
@@ -27,7 +32,7 @@ export const posts = reactive([
     title: '極簡工裝風 | 大地色機能外套通勤也好看',
     desc: '極簡工裝風，大地色機能外套通勤也好看，口袋設計實用又有型。',
     imageUrl: 'https://loremflickr.com/700/560/jacket,menswear,fashion',
-    publishedAt: '2026-08-02T15:30:00',
+    publishedAt: daysAgo(4),
     likesCount: '856',
     commentsCount: 42,
     taggedProducts: [{ id: 1, name: '經典圓領短T' }]
@@ -38,7 +43,7 @@ export const posts = reactive([
     title: '約會小心機 | 法式碎花洋裝配藤編包 🌸',
     desc: '約會小心機，法式碎花洋裝配藤編包，甜而不膩剛剛好。',
     imageUrl: 'https://loremflickr.com/700/560/dress,floral,fashion',
-    publishedAt: '2026-08-05T08:10:00',
+    publishedAt: daysAgo(1),
     likesCount: '2.4k',
     commentsCount: 158,
     taggedProducts: [{ id: 2, name: '法式碎花洋裝' }]
@@ -49,7 +54,7 @@ export const posts = reactive([
     title: '街頭機能風 | 背心＋工裝褲率性感',
     desc: '機能背心＋工裝褲，街頭感十足，鞋款選厚底增加率性。',
     imageUrl: 'https://loremflickr.com/700/560/streetwear,outfit,fashion',
-    publishedAt: '2026-08-01T11:00:00',
+    publishedAt: daysAgo(5),
     likesCount: '631',
     commentsCount: 27,
     taggedProducts: [{ id: 4, name: '修身牛仔褲' }]
@@ -64,8 +69,7 @@ export const addPost = (post) => {
 
 <script setup>
 import { ref, computed } from 'vue'
-// 1. 暫時導覽列元件（共用導覽列尚未合併，先註解掉，避免報錯）
-// import TempNavbar from '@/components/TempNavbar.vue'
+
 
 // posts 已經在上面的 <script> 區塊宣告並 export，這裡同一個檔案內可以直接使用，不用再 import
 
@@ -88,7 +92,7 @@ const creators = ref([
   { id: 3, name: '小雨 rainy', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Rainy', meta: '3.4萬追蹤', isFollowing: true }
 ])
 
-// 頁籤文案（每個頁籤對應的封面卡標籤與副標）
+// 頁籤文案（每個頁籤對應的封面卡標籤與副標、沒有內容時顯示的提示文字）
 const tabCopy = {
   hot:    { ribbon: '封面故事', role: '本週封面 · 秋季選品', empty: '目前沒有符合的熱門穿搭。' },
   new:    { ribbon: '最新發布', role: '剛剛發布的穿搭',      empty: '目前還沒有最新的穿搭貼文。' },
@@ -155,12 +159,6 @@ const toggleFollow = (creator) => {
 </script>
 
 <template>
-  <!-- 引入 Bootstrap CSS + 字體 -->
-  <component is="style">
-    @import "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css";
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&amp;family=Noto+Sans+TC:wght@400;500;600;700&amp;display=swap');
-  </component>
-
   <div class="community-page min-vh-100 w-100">
 
     <!-- 導覽列：共用導覽列尚未合併，先註解掉 -->
@@ -170,7 +168,7 @@ const toggleFollow = (creator) => {
 
       <!-- 頁首：眉題 + 手繪底線標題 -->
       <div class="page-head">
-        <div class="eyebrow">Style Journal</div>
+        <div class="eyebrow">Style Journal · 第 42 期</div>
         <h1 class="page-title">
           穿搭社群
           <svg viewBox="0 0 260 14" preserveAspectRatio="none">
@@ -189,7 +187,7 @@ const toggleFollow = (creator) => {
             type="text"
             v-model="searchQuery"
             class="search-input"
-            placeholder="搜尋、單品或用戶..."
+            placeholder="搜尋穿搭、單品或用戶..."
           />
           <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''" aria-label="清除搜尋">✕</button>
         </div>
@@ -341,6 +339,8 @@ const toggleFollow = (creator) => {
 </template>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
+
 .community-page {
   width: 100%;
   min-height: 100vh;
@@ -575,5 +575,16 @@ const toggleFollow = (creator) => {
   .post-grid{ grid-template-columns:1fr; }
   .section-row{ flex-direction:column; align-items:flex-start; }
   .search-bar{ max-width:100%; }
+}
+</style>
+
+<!--
+  這個區塊「不加 scoped」：scoped 樣式只會作用在這個元件模板裡面的元素上，
+  body 不在模板裡，寫在 scoped 區塊不會生效。不加 scoped 的話，
+  這段 CSS 編譯出來就是全域樣式，不用改共用的 App.vue 也能讓 body 變成統一背景色。
+-->
+<style>
+body {
+  background-color: #F9F4F0 !important;
 }
 </style>

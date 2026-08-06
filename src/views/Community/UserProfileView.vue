@@ -1,7 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-// 引入暫時導覽列組件
-// import TempNavbar from '@/components/TempNavbar.vue'
+
 
 // 使用者個人資料
 const userProfile = ref({
@@ -69,10 +68,7 @@ const toggleFollow = () => {
 </script>
 
 <template>
-  <component is="style">
-    @import "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css";
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&amp;family=Noto+Sans+TC:wght@400;500;600;700&amp;display=swap');
-  </component>
+  
 
   <div class="community-page min-vh-100 w-100">
     <!-- 暫時導覽列 -->
@@ -388,5 +384,16 @@ const toggleFollow = () => {
   .profile-top{ flex-direction:column; align-items:flex-start; }
   .profile-meta{ width:100%; justify-content:space-between; }
   .post-grid{ grid-template-columns:1fr; }
+}
+</style>
+
+<!--
+  這個區塊「不加 scoped」：scoped 樣式只會作用在這個元件模板裡面的元素上，
+  body 不在模板裡，寫在 scoped 區塊不會生效。不加 scoped 的話，
+  這段 CSS 編譯出來就是全域樣式，不用改共用的 App.vue 也能讓 body 變成統一背景色。
+-->
+<style>
+body {
+  background-color: #F9F4F0 !important;
 }
 </style>

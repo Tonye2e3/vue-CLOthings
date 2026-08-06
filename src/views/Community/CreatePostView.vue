@@ -1,8 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-// // 引入共用的暫時導覽列
-// import TempNavbar from '@/components/TempNavbar.vue'
+
 
 // 全站共用的貼文清單（跟 CommunityView.vue 共用同一份資料，直接 import 那個檔案）
 import { addPost, currentUser } from '@/views/Community/CommunityView.vue'
@@ -93,11 +92,7 @@ const handleSubmit = () => {
 </script>
 
 <template>
-  <!-- 引入 Bootstrap CSS + 字體 -->
-  <component is="style">
-    @import "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css";
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&amp;family=Noto+Sans+TC:wght@400;500;600;700&amp;display=swap');
-  </component>
+  
 
   <div class="create-post-page min-vh-100 w-100">
     <!-- 頂部導覽列
@@ -535,5 +530,16 @@ const handleSubmit = () => {
   .compose-media{ padding:1.2rem; }
   .dropzone, .dropzone-preview{ min-height:280px; }
   .compose-body{ padding:1.6rem; }
+}
+</style>
+
+<!--
+  這個區塊「不加 scoped」：scoped 樣式只會作用在這個元件模板裡面的元素上，
+  body 不在模板裡，寫在 scoped 區塊不會生效。不加 scoped 的話，
+  這段 CSS 編譯出來就是全域樣式，不用改共用的 App.vue 也能讓 body 變成統一背景色。
+-->
+<style>
+body {
+  background-color: #F9F4F0 !important;
 }
 </style>
