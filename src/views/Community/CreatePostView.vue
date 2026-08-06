@@ -131,7 +131,9 @@ const handleSubmit = () => {
                 />
 
                 <div v-if="imageFiles.length === 0" class="dropzone-empty">
-                  <span class="dz-icon">📷</span>
+                  <span class="dz-icon">
+                    <i class="fa-regular fa-image" style="color: rgb(122, 75, 84);"></i>
+                  </span>
                   <span class="dz-title">點擊上傳穿搭照片</span>
                   <span class="dz-sub">可一次選取多張，建議直式構圖，光線自然最好看</span>
                 </div>

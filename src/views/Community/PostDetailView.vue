@@ -1,11 +1,24 @@
 <script setup>
 import { ref, computed } from 'vue'
 
+// 收藏功能共用資料（跟 UserProfileView.vue 共用同一份收藏清單，直接 import 那個檔案）
+// savedPosts：目前所有收藏的貼文清單（雖然這裡沒有直接用到它本身，
+// 但 isPostSaved 內部會去讀它，所以還是要 import 進來）
+// isPostSaved：檢查某篇貼文有沒有被收藏
+// toggleSavePost：切換某篇貼文的收藏狀態（收藏／取消收藏）
+import { isPostSaved, toggleSavePost } from '@/views/Community/CommunityView.vue'
+
 
 // 使用 import 引入本地 src/assets 下的圖片
+// 這種寫法叫做「靜態資源引入」：因為圖片放在專案的 src 資料夾裡面，
+// 不是一個網路上的網址，要用 import 讓建置工具（Vite）知道
+// 「這個檔案要打包進網站裡」，import 進來的 postImage 變數，
+// 最後會變成一個瀏覽器看得懂的圖片網址，可以直接給 <img :src="..."> 用。
 import postImage from '@/assets/Postimage/post2.jpg'
 
 // 貼文詳細資料
+// 這是一個很大的物件，裡面用「巢狀」的方式（物件裡面還有物件、陣列）
+// 裝著這篇貼文需要的所有資訊。
 const post = ref({
   id: 8842,
   user: {
@@ -19,8 +32,14 @@ const post = ref({
   imageUrl: postImage,
   content: '今天走簡約韓系風格 🤍 這套針織上衣與打褶寬褲質感超好，版型顯瘦又舒服，很適合秋天約會或上班～ 全身都可以直接點連結購買！',
   commentsCount: 86,
-  isLiked: false,
-  isSaved: false,
+  isLiked: false, // 「我」有沒有按讚
+  // 這裡本來有個 isSaved 存「我」有沒有收藏，現在改成從共用的收藏清單
+  // （savedPosts，在 CommunityView.vue 裡）即時判斷，不用自己在這裡另外存一份，
+  // 這樣才不會發生「這裡顯示已收藏，但 UserProfileView 收藏頁籤卻沒有」這種兩邊資料兜不起來的情況。
+  // taggedProducts：這篇貼文照片上標記的商品定位點，
+  // x、y 是這個標記點在照片上的位置，用「百分比」表示
+  // （例如 x: '65%' 代表「從照片左邊算起，65% 的地方」），
+  // 這樣不管照片實際顯示的大小是多少，標記點都會固定跟著照片的相對位置走。
   taggedProducts: [
     { id: 101, name: '針織上衣', x: '65%', y: '35%' },
     { id: 102, name: '高腰寬褲', x: '55%', y: '70%' },
@@ -29,15 +48,45 @@ const post = ref({
 })
 
 // 按讚數改用數字追蹤，方便按讚時 +1、取消時 -1；畫面顯示再轉成千分位字串
+// likesNumber：存「真正的數字」，方便計算加減。
 const likesNumber = ref(1248) // 對應原本的 '1,248'
+// likesDisplay：一個 computed，把 likesNumber 這個純數字，
+// 轉換成「1,248」這種每三位數加一個逗號的格式，給畫面顯示用。
+// .toLocaleString()：JavaScript 數字內建的方法，會依照使用者瀏覽器的地區設定，
+// 自動幫數字加上千分位逗號。
 const likesDisplay = computed(() => likesNumber.value.toLocaleString())
 
+// toggleLike：按下愛心按鈕時執行。
 const toggleLike = () => {
-  post.value.isLiked = !post.value.isLiked
+  post.value.isLiked = !post.value.isLiked // 先把「有沒有按讚」的狀態反過來
+  // 如果現在是「已按讚」狀態，就 +1；如果是「取消讚」，就 -1
+  // 條件 ? A : B 這種寫法叫三元運算子：條件成立回傳 A，不成立回傳 B。
   likesNumber.value += post.value.isLiked ? 1 : -1
 }
 
-// 這套穿搭的商品清單
+// isSaved：這篇貼文現在有沒有被收藏。
+// 用 computed 從共用的收藏清單即時判斷（呼叫 CommunityView.vue 提供的 isPostSaved），
+// 而不是自己在這裡存一份 true/false，這樣不管使用者是從哪個頁面把貼文收藏／取消收藏，
+// 這裡都會自動顯示正確的狀態。
+const isSaved = computed(() => isPostSaved(post.value.id))
+
+// toggleSave：按下收藏按鈕時執行。
+const toggleSave = () => {
+  // 把這篇貼文整理成 UserProfileView.vue 收藏牆看得懂的格式
+  // （欄位名稱要對得上：id、title、image、likes、comments、tags），
+  // 再呼叫 toggleSavePost 去新增或移除。
+  toggleSavePost({
+    id: post.value.id,
+    title: post.value.content,
+    image: post.value.imageUrl,
+    likes: likesDisplay.value,
+    comments: post.value.commentsCount,
+    // .map(...)：把 taggedProducts 陣列裡每個標記物件，轉換成 "#商品名" 這種字串格式
+    tags: post.value.taggedProducts.map(t => `#${t.name}`)
+  })
+}
+
+// 這套穿搭的商品清單（右側欄要顯示的可購買商品）
 const products = ref([
   { id: 101, name: '奶油白V領針織上衣', price: '690', image: 'https://i.pinimg.com/1200x/dc/94/75/dc9475c6d350370bcf6c471e3ee6d6fb.jpg' },
   { id: 102, name: '高腰垂墜寬褲 (卡其)', price: '890', image: 'https://i.pinimg.com/1200x/f3/dd/f4/f3ddf4c34ff005240958bddb9a8080d0.jpg' },
@@ -54,27 +103,33 @@ const similarPosts = ref([
   { id: 3, image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=300&auto=format&fit=crop&q=80' }
 ])
 
-// 留言列表
+// 留言列表：一開始先放兩筆假留言當範例
 const comments = ref([
   { id: 1, user: '小美', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=May', text: '這套超好看！請問褲子是什麼顏色？' },
   { id: 2, user: '阿哲', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jerry', text: '已收藏~等發薪就下單 !!!' }
 ])
 
+// newComment：跟留言輸入框做雙向綁定，存使用者「正在打字、還沒送出」的留言內容
 const newComment = ref('')
 
 const toggleFollow = () => {
   post.value.isFollowing = !post.value.isFollowing
 }
 
+// addComment：按下「送出」按鈕或在輸入框按 Enter 時執行。
 const addComment = () => {
+  // .trim()：去掉文字前後的空白。如果去掉空白後是空字串，代表使用者其實沒打字，
+  // 直接 return（提早結束函式），不新增這則空白留言。
   if (!newComment.value.trim()) return
+  // .push(...)：把一筆新留言加到 comments 陣列的「最後面」
+  // （跟 CommunityView.vue 那邊用的 .unshift() 加到「最前面」不一樣，這裡是加到最後）。
   comments.value.push({
-    id: Date.now(),
-    user: '我',
+    id: Date.now(), // 用目前時間當作這則留言的唯一編號
+    user: '我', // 這裡先寫死成「我」，之後接上真正的登入系統可以換成真實使用者名稱
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Me',
     text: newComment.value
   })
-  newComment.value = ''
+  newComment.value = '' // 送出後把輸入框清空，方便使用者繼續打下一則留言
 }
 </script>
 
@@ -114,7 +169,17 @@ const addComment = () => {
               <span class="tag-label" v-if="post.taggedProducts[0]">封面故事</span>
               <img :src="post.imageUrl" class="post-image" alt="post image" />
 
-              <!-- 商品定位標籤：改為圓點 + 展開標籤的穿搭釘選樣式 -->
+              <!--
+                商品定位標籤：改為圓點 + 展開標籤的穿搭釘選樣式
+                v-for="tag in post.taggedProducts"：把每個標記點都畫成一個小圓點+標籤。
+                :style="{ top: tag.y, left: tag.x }"：
+                這是「動態綁定 style」的寫法，跟 :class 類似，
+                差別是這裡直接綁定一個 CSS 樣式物件。意思是：
+                「這個元素的 top（離頂端多遠）用 tag.y 的值、
+                left（離左邊多遠）用 tag.x 的值」，
+                因為 tag.y、tag.x 是像 '65%' 這樣的百分比字串，
+                每個標記點就會依照資料裡設定的位置，出現在照片對應的地方。
+              -->
               <span
                 v-for="tag in post.taggedProducts"
                 :key="tag.id"
@@ -129,6 +194,11 @@ const addComment = () => {
             <!-- 按讚/分享/收藏 動作列 -->
             <div class="action-bar">
               <div class="action-left">
+                <!--
+                  :class="{ liked: post.isLiked }"：
+                  如果 isLiked 是 true，就加上 liked 這個 class（讓按鈕變成紅色強調的樣子）。
+                  @click="toggleLike"：點下去執行上面 script 定義的 toggleLike 函式。
+                -->
                 <button class="action-btn" :class="{ liked: post.isLiked }" @click="toggleLike">
                   ♥ {{ likesDisplay }}
                 </button>
@@ -139,9 +209,22 @@ const addComment = () => {
                   ↗ 分享
                 </button>
               </div>
-              <button class="action-btn" :class="{ saved: post.isSaved }" @click="post.isSaved = !post.isSaved">
-                <i :class="['fa-bookmark', post.isSaved ? 'fa-solid' : 'fa-regular']"></i>
-                {{ post.isSaved ? '已收藏' : '收藏' }}
+              <!--
+                收藏按鈕：
+                @click="toggleSave"：呼叫上面 script 定義的 toggleSave 函式，
+                這個函式會去更新「共用的收藏清單」，而不是只改這個頁面自己的一個變數，
+                這樣 UserProfileView.vue 的收藏頁籤才看得到剛剛收藏的貼文。
+                :class="{ saved: isSaved }" 跟 <i> 裡的 isSaved，
+                都是讀上面那個 computed，會自動反映「這篇貼文現在是不是在收藏清單裡」。
+                <i :class="['fa-bookmark', isSaved ? 'fa-solid' : 'fa-regular']">：
+                這裡的 :class 綁定的是一個「陣列」，陣列裡每一項都會變成一個 class。
+                'fa-bookmark' 固定會加上；第二項用三元運算子決定，
+                如果已收藏，用實心的 fa-solid 樣式圖示；還沒收藏，用空心的 fa-regular 樣式圖示，
+                點一下就能明顯看到書籤圖示「被收起來」的視覺變化。
+              -->
+              <button class="action-btn" :class="{ saved: isSaved }" @click="toggleSave">
+                <i :class="['fa-bookmark', isSaved ? 'fa-solid' : 'fa-regular']"></i>
+                {{ isSaved ? '已收藏' : '收藏' }}
               </button>
             </div>
 
@@ -166,6 +249,12 @@ const addComment = () => {
 
               <!-- 輸入留言 -->
               <div class="comment-input-row">
+                <!--
+                  @keyup.enter="addComment"：
+                  監聽「鍵盤按鍵放開」這個事件，.enter 是修飾符，
+                  代表「只有放開的是 Enter 鍵才觸發」，
+                  這樣使用者打完留言按 Enter 就能直接送出，不用一定要滑鼠點送出按鈕。
+                -->
                 <input
                   type="text"
                   v-model="newComment"
@@ -340,6 +429,7 @@ const addComment = () => {
   background:none; border:none; padding:0;
   font-size:.88rem; color:var(--ink-soft);
   transition:color .18s ease;
+  display:inline-flex; align-items:center; gap:.4rem;
 }
 .action-btn:hover{ color:var(--ink); }
 .action-btn.liked{ color:#B4453A; font-weight:600; }

@@ -8,6 +8,11 @@
 // 會自動跟著重新顯示，不用自己手動去更新 HTML。
 import { ref } from 'vue'
 
+// 收藏功能共用資料（跟 PostDetailView.vue 共用同一份收藏清單，直接 import 那個檔案）
+// savedPosts：使用者收藏的所有貼文，格式是 { id, title, image, likes, comments, tags }，
+// PostDetailView.vue 按收藏的時候會把貼文加進這份清單，這裡直接讀出來顯示。
+import { savedPosts } from '@/views/Community/CommunityView.vue'
+
 
 // 使用者個人資料
 // 這是一個「物件」（用 { } 包起來、裡面很多 key: value 的資料），
@@ -76,9 +81,7 @@ const userPosts = ref([
 // 只有純顯示用途，所以不需要讓 Vue 特別去「追蹤」它的變化。
 const tabs = [
   { key: 'works', label: '穿搭作品' },
-  { key: 'saved', label: '收藏' },
-  { key: 'products', label: '同款商品' },
-  { key: 'about', label: '關於我' }
+  { key: 'saved', label: '收藏' }
 ]
 
 // 這是一個「函式」（function，可以想成一個按鈕按下去要執行的一段動作）。
@@ -257,14 +260,55 @@ const toggleFollow = () => {
       </div>
 
       <!--
-        其它頁籤未開啟時的預設狀態
-        v-else：搭配上面的 v-if 一起看，意思是「如果上面 v-if 的條件不成立，
-        就換成顯示這一塊」。所以邏輯是：
-        activeTab 是 'works' → 顯示作品牆；
-        activeTab 是其他任何值（saved / products / about）→ 顯示這個「還在整理中」的空狀態畫面。
+        收藏牆
+        v-else-if="activeTab === 'saved'"：接在上面 v-if 後面的「再一個條件」，
+        意思是「如果上面 works 那個條件不成立，再檢查看看是不是 'saved'，
+        是的話就換畫這一塊」。
+        裡面又分兩種情況：
+        savedPosts.length（收藏清單裡有東西，長度大於 0）→ 顯示收藏牆（卡片排版跟上面作品牆幾乎一樣）；
+        沒有收藏任何貼文 → 顯示一個「還沒收藏」的提示畫面。
+      -->
+      <div v-else-if="activeTab === 'saved'">
+        <div v-if="savedPosts.length" class="post-grid">
+          <!-- 這裡的卡片排版跟上面「穿搭作品牆」幾乎一模一樣，差別只是資料來源換成 savedPosts -->
+          <div v-for="post in savedPosts" :key="post.id" class="post-card">
+            <router-link :to="`/community/post/${post.id}`" class="post-media d-block text-decoration-none">
+              <span class="tag-label" v-if="post.tags[0]">{{ post.tags[0].replace('#', '') }}</span>
+              <img :src="post.image" :alt="post.title" />
+            </router-link>
+
+            <div class="post-body">
+              <router-link :to="`/community/post/${post.id}`" class="text-decoration-none">
+                <h6 class="post-title">{{ post.title }}</h6>
+              </router-link>
+
+              <div class="post-stats">
+                <span>♥ {{ post.likes }}</span>
+                <span>💬 {{ post.comments }}</span>
+                <router-link :to="`/community/post/${post.id}`" class="ms-auto">查看同款</router-link>
+              </div>
+
+              <div class="tag-cloud">
+                <span v-for="tag in post.tags" :key="tag" class="tag-chip">{{ tag }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- v-else（搭配上面裡層的 v-if）：收藏清單是空的時候，顯示這個提示，而不是一片空白 -->
+        <div v-else class="empty-state">
+          <div class="empty-icon">📁</div>
+          <p class="empty-note">「還沒有收藏任何穿搭，去社群逛逛按個收藏吧。」</p>
+        </div>
+      </div>
+
+      <!--
+        其它頁籤（同款商品 / 關於我）未開啟時的預設狀態
+        這裡的 v-else 是接在最上面 works 那個 v-if、跟剛剛 saved 那個 v-else-if 後面，
+        意思是「works 不是、saved 也不是」，才會走到這裡。
       -->
       <div v-else class="empty-state">
-        <div class="empty-icon"><i class="fa-solid fa-folder" style="color: rgb(122, 75, 84);"></i></div>
+        <div class="empty-icon">📁</div>
         <p class="empty-note">「這裡的故事，還在整理中。」</p>
       </div>
 
@@ -281,8 +325,6 @@ const toggleFollow = () => {
   然後把下面每一條 CSS 規則也自動加上同樣的屬性選擇器，
   這樣瀏覽器比對的時候就只會匹配到「這個檔案畫出來的元素」。
 */
-/* 在最上方引入 Font Awesome CDN */
-@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
 .community-page {
   width: 100%;
   min-height: 100vh;
