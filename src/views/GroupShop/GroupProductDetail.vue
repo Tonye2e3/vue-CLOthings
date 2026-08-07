@@ -347,8 +347,29 @@ const handleJoin = () => {
 
 <style scoped>
 /* 以下都是外觀樣式（顏色、間距、排版），跟商品邏輯無關，可以先不用管 */
-.text-main { color: #4a3e3d; }
-.text-accent { color: #b87352; }
+
+/* 把重複用到的顏色集中定義成變數，之後要改主題色只要改這裡，不用每個地方都找一次 */
+.clo-shell {
+  --color-text: #4a3e3d;         /* 主要文字色（深咖啡） */
+  --color-text-muted: #6e5f5c;   /* 次要文字色（淺咖啡） */
+  --color-muted: #a9998e;        /* 更淡的灰咖啡（未解鎖階層） */
+  --color-accent: #b87352;       /* 強調色（按鈕、進度條、標籤） */
+  --color-success: #4a7c59;      /* 成功色（已解鎖標籤） */
+  --color-bg-page: #f8f5f0;      /* 頁面底色 */
+  --color-border: #e6dccf;       /* 淺邊框線 */
+  --color-hover-bg: #f1e7de;     /* 滑鼠移過去的底色（也用在深色卡片文字） */
+  --color-active-bg: #ebdcd0;    /* 選單被選中的底色（也用在進度條底色） */
+  --color-dark: #3d3332;         /* 深色卡片底（團購專案詳情） */
+  --color-dark-hover: #362d2c;   /* 深色按鈕的 hover 狀態 */
+  --color-desc-text: #cbb9ac;    /* 深色卡片裡的說明文字 */
+
+  min-height: 100vh;
+  background-color: var(--color-bg-page);
+  color: var(--color-text);
+}
+
+.text-main { color: var(--color-text); }
+.text-accent { color: var(--color-accent); }
 
 .hero-card {
   background-color: #fff;
@@ -367,7 +388,7 @@ const handleJoin = () => {
 }
 .unlocked-tag {
   font-size: 0.7rem;
-  color: #4a7c59;
+  color: var(--color-success);
   margin-left: 4px;
 }
 
@@ -380,13 +401,13 @@ const handleJoin = () => {
 
 .progress-track {
   height: 10px;
-  background-color: #ebdcd0;
+  background-color: var(--color-active-bg);
   border-radius: 999px;
   overflow: hidden;
 }
 .progress-fill {
   height: 100%;
-  background-color: #b87352;
+  background-color: var(--color-accent);
 }
 
 .tier-list {
@@ -397,12 +418,12 @@ const handleJoin = () => {
 .tier-list li {
   padding: 6px 0;
   font-size: 0.88rem;
-  color: #4a3e3d;
-  border-bottom: 1px dashed #e6dccf;
+  color: var(--color-text);
+  border-bottom: 1px dashed var(--color-border);
 }
 .tier-list li:last-child { border-bottom: none; }
 .tier-list li.locked {
-  color: #a9998e;
+  color: var(--color-muted);
 }
 .tier-icon {
   display: inline-flex;
@@ -419,44 +440,38 @@ const handleJoin = () => {
 }
 
 .dark-card {
-  background-color: #3d3332;
-  color: #f1e7de;
+  background-color: var(--color-dark);
+  color: var(--color-hover-bg);
 }
 .label-title {
   font-weight: 700;
   color: #fff;
 }
 .desc-text {
-  color: #cbb9ac;
+  color: var(--color-desc-text);
 }
 
 .back-link {
   display: inline-block;
   font-size: 0.88rem;
-  color: #6e5f5c;
+  color: var(--color-text-muted);
   text-decoration: none;
 }
 .back-link:hover {
-  color: #4a3e3d;
+  color: var(--color-text);
   text-decoration: underline;
 }
 
 .btn-main {
-  background-color: #4a3e3d;
+  background-color: var(--color-text);
   color: #fff;
   border: none;
   padding: 10px 14px;
   border-radius: 6px;
 }
 .btn-main:hover {
-  background-color: #362d2c;
+  background-color: var(--color-dark-hover);
   color: #fff;
-}
-
-.clo-shell {
-  min-height: 100vh;
-  background-color: #f8f5f0;
-  color: #4a3e3d;
 }
 
 .clo-header {
@@ -465,9 +480,8 @@ const handleJoin = () => {
   gap: 24px;
   padding: 14px 28px;
   background-color: #fff;
-  border-bottom: 1px solid #e6dccf;
+  border-bottom: 1px solid var(--color-border);
 }
-
 
 .clo-user {
   display: flex;
@@ -484,14 +498,14 @@ const handleJoin = () => {
   position: relative;
   display: inline-flex;
   align-items: center;
-  color: #4a3e3d;
+  color: var(--color-text);
   text-decoration: none;
 }
 .cart-badge {
   position: absolute;
   top: -6px;
   right: -10px;
-  background-color: #b87352;
+  background-color: var(--color-accent);
   color: #fff;
   font-size: 0.65rem;
   font-weight: 700;
@@ -513,8 +527,8 @@ const handleJoin = () => {
   width: 220px;
   flex-shrink: 0;
   min-height: calc(100vh - 65px);
-  background-color: #f8f5f0;
-  border-right: 1px solid #e6dccf;
+  background-color: var(--color-bg-page);
+  border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -531,20 +545,20 @@ const handleJoin = () => {
   align-items: center;
   gap: 12px;
   padding: 12px 24px;
-  color: #6e5f5c;
+  color: var(--color-text-muted);
   text-decoration: none;
   font-size: 0.92rem;
   border-left: 3px solid transparent;
   cursor: pointer;
 }
 .nav-item:hover {
-  background-color: #f1e7de;
+  background-color: var(--color-hover-bg);
 }
 .nav-item.active {
-  color: #4a3e3d;
+  color: var(--color-text);
   font-weight: 700;
-  background-color: #ebdcd0;
-  border-left-color: #b87352;
+  background-color: var(--color-active-bg);
+  border-left-color: var(--color-accent);
 }
 .nav-icon {
   display: inline-flex;
@@ -552,7 +566,6 @@ const handleJoin = () => {
   justify-content: center;
   width: 18px;
 }
-
 
 .clo-main {
   flex: 1;

@@ -328,14 +328,36 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
 
 <style scoped>
 /* 以下都是外觀樣式（顏色、間距、排版），跟商品邏輯無關，可以先不用管 */
-.page-header h2 { color: #4a3e3d; }
+
+/* 把重複用到的顏色集中定義成變數，之後要改主題色只要改這裡，不用每個地方都找一次 */
+.clo-shell {
+  --color-text: #4a3e3d;         /* 主要文字色（深咖啡） */
+  --color-text-muted: #6e5f5c;   /* 次要文字色（淺咖啡） */
+  --color-muted: #a9998e;        /* 更淡的灰咖啡（搜尋提示、找不到商品） */
+  --color-accent: #b87352;       /* 強調色（按鈕、標籤） */
+  --color-success: #4a7c59;      /* 成功色（已成團標籤） */
+  --color-success-bg: #e4efe8;   /* 成功色淺底（已成團徽章） */
+  --color-danger: #b8524f;       /* 警示色（進行中標籤底色） */
+  --color-bg-page: #f8f5f0;      /* 頁面底色 */
+  --color-border: #e6dccf;       /* 淺邊框線 */
+  --color-hover-bg: #f1e7de;     /* 滑鼠移過去的底色 */
+  --color-active-bg: #ebdcd0;    /* 選單被選中的底色 */
+  --color-dark: #3d3332;         /* 深色按鈕文字色的基準（跟其他頁一致保留） */
+  --color-dark-hover: #362d2c;   /* 深色按鈕的 hover 狀態 */
+
+  min-height: 100vh;
+  background-color: var(--color-bg-page);
+  color: var(--color-text);
+}
+
+.page-header h2 { color: var(--color-text); }
 
 .empty-hint {
   padding: 16px 18px;
   margin-bottom: 20px;
   background-color: #fff;
   border-radius: 8px;
-  color: #a9998e;
+  color: var(--color-muted);
   font-size: 0.9rem;
   box-shadow: 0 1px 4px rgba(74, 62, 61, 0.08);
 }
@@ -350,8 +372,8 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
   border-radius: 8px;
   margin-bottom: 16px;
 }
-.bg-done { background-color: #4a7c59; }
-.bg-ongoing { background-color: #b8524f; }
+.bg-done { background-color: var(--color-success); }
+.bg-ongoing { background-color: var(--color-danger); }
 .section-icon {
   display: inline-flex;
   align-items: center;
@@ -385,14 +407,14 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
 
 .card-info {
   padding: 12px 14px 14px;
-  color: #4a3e3d;
+  color: var(--color-text);
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
 }
 
-.text-accent { color: #b87352; }
+.text-accent { color: var(--color-accent); }
 
 .badge-status {
   font-size: 0.72rem;
@@ -401,12 +423,12 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
   border-radius: 999px;
 }
 .badge-done {
-  background-color: #e4efe8;
-  color: #4a7c59;
+  background-color: var(--color-success-bg);
+  color: var(--color-success);
 }
 
 .btn-main {
-  background-color: #4a3e3d;
+  background-color: var(--color-text);
   color: #fff;
   border: none;
   padding: 6px 14px;
@@ -415,14 +437,8 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
   font-size: 0.8rem;
 }
 .btn-main:hover {
-  background-color: #362d2c;
+  background-color: var(--color-dark-hover);
   color: #fff;
-}
-
-.clo-shell {
-  min-height: 100vh;
-  background-color: #f8f5f0;
-  color: #4a3e3d;
 }
 
 .clo-header {
@@ -431,16 +447,15 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
   gap: 24px;
   padding: 14px 28px;
   background-color: #fff;
-  border-bottom: 1px solid #e6dccf;
+  border-bottom: 1px solid var(--color-border);
 }
-
 
 .clo-search {
   flex: 1;
   max-width: 480px;
   display: flex;
   align-items: center;
-  background-color: #f1e7de;
+  background-color: var(--color-hover-bg);
   border-radius: 999px;
   padding: 6px 8px 6px 18px;
 }
@@ -450,17 +465,17 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
   background: transparent;
   outline: none;
   font-size: 0.9rem;
-  color: #4a3e3d;
+  color: var(--color-text);
 }
 .clo-search input::placeholder {
-  color: #a9998e;
+  color: var(--color-muted);
 }
 .search-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
-  background-color: #4a3e3d;
+  background-color: var(--color-text);
   color: #fff;
   width: 34px;
   height: 34px;
@@ -484,14 +499,14 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
   position: relative;
   display: inline-flex;
   align-items: center;
-  color: #4a3e3d;
+  color: var(--color-text);
   text-decoration: none;
 }
 .cart-badge {
   position: absolute;
   top: -6px;
   right: -10px;
-  background-color: #b87352;
+  background-color: var(--color-accent);
   color: #fff;
   font-size: 0.65rem;
   font-weight: 700;
@@ -513,8 +528,8 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
   width: 220px;
   flex-shrink: 0;
   min-height: calc(100vh - 65px);
-  background-color: #f8f5f0;
-  border-right: 1px solid #e6dccf;
+  background-color: var(--color-bg-page);
+  border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -531,20 +546,20 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
   align-items: center;
   gap: 12px;
   padding: 12px 24px;
-  color: #6e5f5c;
+  color: var(--color-text-muted);
   text-decoration: none;
   font-size: 0.92rem;
   border-left: 3px solid transparent;
   cursor: pointer;
 }
 .nav-item:hover {
-  background-color: #f1e7de;
+  background-color: var(--color-hover-bg);
 }
 .nav-item.active {
-  color: #4a3e3d;
+  color: var(--color-text);
   font-weight: 700;
-  background-color: #ebdcd0;
-  border-left-color: #b87352;
+  background-color: var(--color-active-bg);
+  border-left-color: var(--color-accent);
 }
 .nav-icon {
   display: inline-flex;
@@ -552,7 +567,6 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
   justify-content: center;
   width: 18px;
 }
-
 
 .clo-main {
   flex: 1;

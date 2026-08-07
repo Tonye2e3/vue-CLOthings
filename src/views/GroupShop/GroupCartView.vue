@@ -231,7 +231,28 @@ const handleCheckout = () => {
 
 <style scoped>
 /* 以下都是外觀樣式（顏色、間距、排版），跟商品邏輯無關，可以先不用管 */
-.text-accent { color: #b87352; }
+
+/* 把重複用到的顏色集中定義成變數，之後要改主題色只要改這裡，不用每個地方都找一次 */
+.clo-shell {
+  --color-text: #4a3e3d;         /* 主要文字色（深咖啡） */
+  --color-text-muted: #6e5f5c;   /* 次要文字色（淺咖啡） */
+  --color-muted: #a9998e;        /* 更淡的灰咖啡（移除按鈕、空購物車提示） */
+  --color-accent: #b87352;       /* 強調色（按鈕、標籤） */
+  --color-danger: #b8524f;       /* 警示色（移除按鈕 hover） */
+  --color-bg-page: #f8f5f0;      /* 頁面底色 */
+  --color-border: #e6dccf;       /* 淺邊框線 */
+  --color-border-input: #d8c3b5; /* 輸入框邊框 */
+  --color-hover-bg: #f1e7de;     /* 滑鼠移過去的底色 */
+  --color-active-bg: #ebdcd0;    /* 選單被選中的底色 */
+  --color-dark: #3d3332;         /* 深色底（購物車摘要標題列） */
+  --color-dark-hover: #362d2c;   /* 深色按鈕的 hover 狀態 */
+
+  min-height: 100vh;
+  background-color: var(--color-bg-page);
+  color: var(--color-text);
+}
+
+.text-accent { color: var(--color-accent); }
 
 .cart-list-card {
   background-color: #fff;
@@ -245,7 +266,7 @@ const handleCheckout = () => {
   align-items: center;
   gap: 16px;
   padding: 16px 20px;
-  border-bottom: 1px solid #f1e7de;
+  border-bottom: 1px solid var(--color-hover-bg);
 }
 .cart-row:last-child { border-bottom: none; }
 
@@ -262,11 +283,10 @@ const handleCheckout = () => {
 .qty-input {
   width: 56px;
   padding: 2px 6px;
-  border: 1px solid #d8c3b5;
+  border: 1px solid var(--color-border-input);
   border-radius: 6px;
   text-align: center;
 }
-
 
 .cart-item-price {
   text-align: right;
@@ -282,12 +302,12 @@ const handleCheckout = () => {
   gap: 4px;
   border: none;
   background: none;
-  color: #a9998e;
+  color: var(--color-muted);
   font-size: 0.78rem;
   cursor: pointer;
   padding: 0;
 }
-.remove-btn:hover { color: #b8524f; }
+.remove-btn:hover { color: var(--color-danger); }
 
 .addon-card {
   background-color: #fff;
@@ -296,7 +316,7 @@ const handleCheckout = () => {
   box-shadow: 0 1px 4px rgba(74, 62, 61, 0.08);
 }
 .addon-header {
-  background-color: #3d3332;
+  background-color: var(--color-dark);
   color: #fff;
   font-weight: 700;
   padding: 10px 20px;
@@ -317,14 +337,14 @@ const handleCheckout = () => {
   top: 20px;
 }
 .summary-title {
-  background-color: #3d3332;
+  background-color: var(--color-dark);
   color: #fff;
   margin: 0;
   padding: 14px 20px;
 }
 .summary-body {
   padding: 18px 20px;
-  color: #4a3e3d;
+  color: var(--color-text);
 }
 
 .shipping-hint {
@@ -334,12 +354,12 @@ const handleCheckout = () => {
 .empty-cart {
   padding: 40px 20px;
   text-align: center;
-  color: #a9998e;
+  color: var(--color-muted);
   font-size: 0.9rem;
 }
 
 .btn-main {
-  background-color: #4a3e3d;
+  background-color: var(--color-text);
   color: #fff;
   border: none;
   padding: 12px 14px;
@@ -347,33 +367,27 @@ const handleCheckout = () => {
   font-weight: 700;
 }
 .btn-main:hover {
-  background-color: #362d2c;
+  background-color: var(--color-dark-hover);
   color: #fff;
 }
 .btn-main:disabled {
-  background-color: #d8c3b5;
+  background-color: var(--color-border-input);
   color: #fff;
   cursor: not-allowed;
 }
 .btn-main:disabled:hover {
-  background-color: #d8c3b5;
+  background-color: var(--color-border-input);
 }
 .btn-outline {
   background-color: #fff;
-  color: #4a3e3d;
-  border: 1px solid #d8c3b5;
+  color: var(--color-text);
+  border: 1px solid var(--color-border-input);
   padding: 12px 14px;
   border-radius: 6px;
   font-weight: 700;
 }
 .btn-outline:hover {
-  background-color: #f1e7de;
-}
-
-.clo-shell {
-  min-height: 100vh;
-  background-color: #f8f5f0;
-  color: #4a3e3d;
+  background-color: var(--color-hover-bg);
 }
 
 .clo-header {
@@ -382,9 +396,8 @@ const handleCheckout = () => {
   gap: 24px;
   padding: 14px 28px;
   background-color: #fff;
-  border-bottom: 1px solid #e6dccf;
+  border-bottom: 1px solid var(--color-border);
 }
-
 
 .clo-user {
   display: flex;
@@ -401,14 +414,14 @@ const handleCheckout = () => {
   position: relative;
   display: inline-flex;
   align-items: center;
-  color: #4a3e3d;
+  color: var(--color-text);
   text-decoration: none;
 }
 .cart-badge {
   position: absolute;
   top: -6px;
   right: -10px;
-  background-color: #b87352;
+  background-color: var(--color-accent);
   color: #fff;
   font-size: 0.65rem;
   font-weight: 700;
@@ -430,8 +443,8 @@ const handleCheckout = () => {
   width: 220px;
   flex-shrink: 0;
   min-height: calc(100vh - 65px);
-  background-color: #f8f5f0;
-  border-right: 1px solid #e6dccf;
+  background-color: var(--color-bg-page);
+  border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -448,20 +461,20 @@ const handleCheckout = () => {
   align-items: center;
   gap: 12px;
   padding: 12px 24px;
-  color: #6e5f5c;
+  color: var(--color-text-muted);
   text-decoration: none;
   font-size: 0.92rem;
   border-left: 3px solid transparent;
   cursor: pointer;
 }
 .nav-item:hover {
-  background-color: #f1e7de;
+  background-color: var(--color-hover-bg);
 }
 .nav-item.active {
-  color: #4a3e3d;
+  color: var(--color-text);
   font-weight: 700;
-  background-color: #ebdcd0;
-  border-left-color: #b87352;
+  background-color: var(--color-active-bg);
+  border-left-color: var(--color-accent);
 }
 .nav-icon {
   display: inline-flex;
@@ -469,7 +482,6 @@ const handleCheckout = () => {
   justify-content: center;
   width: 18px;
 }
-
 
 .clo-main {
   flex: 1;
