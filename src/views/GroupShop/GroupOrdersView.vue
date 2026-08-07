@@ -365,12 +365,32 @@ const formatCurrency = (amount) => new Intl.NumberFormat('zh-TW').format(amount)
 
 <style scoped>
 /* 以下都是外觀樣式（顏色、間距、排版），跟訂單邏輯無關，可以先不用管 */
-.text-main { color: #4a3e3d; }
-.text-accent { color: #b87352; }
+
+/* 把重複用到的顏色集中定義成變數，之後要改主題色只要改這裡，不用每個地方都找一次 */
+.clo-shell {
+  --color-text: #4a3e3d;         /* 主要文字色（深咖啡） */
+  --color-text-muted: #6e5f5c;   /* 次要文字色（淺咖啡） */
+  --color-accent: #b87352;       /* 強調色（按鈕、標籤） */
+  --color-danger: #b8524f;       /* 警示色文字（取消按鈕） */
+  --color-danger-border: #d8887f; /* 警示色邊框（取消按鈕） */
+  --color-danger-bg: #fbeceb;    /* 警示色底（取消按鈕 hover） */
+  --color-bg-page: #f8f5f0;      /* 頁面底色 */
+  --color-border: #e6dccf;       /* 淺邊框線 */
+  --color-border-input: #d8c3b5; /* 輸入框邊框 */
+  --color-hover-bg: #f1e7de;     /* 滑鼠移過去的底色 */
+  --color-active-bg: #ebdcd0;    /* 選單被選中的底色 */
+
+  min-height: 100vh;
+  background-color: var(--color-bg-page);
+  color: var(--color-text);
+}
+
+.text-main { color: var(--color-text); }
+.text-accent { color: var(--color-accent); }
 
 table thead {
-  background-color: #ebdcd0;
-  color: #4a3e3d;
+  background-color: var(--color-active-bg);
+  color: var(--color-text);
 }
 table thead th {
   padding: 14px 16px;
@@ -387,9 +407,9 @@ table tbody td {
 }
 
 .cancel-btn {
-  border: 1px solid #d8887f;
+  border: 1px solid var(--color-danger-border);
   background-color: #fff;
-  color: #b8524f;
+  color: var(--color-danger);
   font-size: 0.8rem;
   font-weight: 600;
   padding: 5px 12px;
@@ -397,13 +417,13 @@ table tbody td {
   cursor: pointer;
 }
 .cancel-btn:hover {
-  background-color: #fbeceb;
+  background-color: var(--color-danger-bg);
 }
 
 .edit-btn {
-  border: 1px solid #d8c3b5;
+  border: 1px solid var(--color-border-input);
   background-color: #fff;
-  color: #4a3e3d;
+  color: var(--color-text);
   font-size: 0.8rem;
   font-weight: 600;
   padding: 5px 12px;
@@ -411,7 +431,7 @@ table tbody td {
   cursor: pointer;
 }
 .edit-btn:hover {
-  background-color: #f1e7de;
+  background-color: var(--color-hover-bg);
 }
 .edit-btn:disabled,
 .cancel-btn:disabled {
@@ -428,7 +448,7 @@ table tbody td {
 /* 編輯訂單 Modal 內，每個商品品項一列 */
 .edit-item-row {
   padding: 8px 0;
-  border-bottom: 1px solid #f1e7de;
+  border-bottom: 1px solid var(--color-hover-bg);
 }
 .edit-item-row:last-child {
   border-bottom: none;
@@ -438,21 +458,14 @@ table tbody td {
   text-align: center;
 }
 
-.clo-shell {
-  min-height: 100vh;
-  background-color: #f8f5f0;
-  color: #4a3e3d;
-}
-
 .clo-header {
   display: flex;
   align-items: center;
   gap: 24px;
   padding: 14px 28px;
   background-color: #fff;
-  border-bottom: 1px solid #e6dccf;
+  border-bottom: 1px solid var(--color-border);
 }
-
 
 .clo-user {
   display: flex;
@@ -469,14 +482,14 @@ table tbody td {
   position: relative;
   display: inline-flex;
   align-items: center;
-  color: #4a3e3d;
+  color: var(--color-text);
   text-decoration: none;
 }
 .cart-badge {
   position: absolute;
   top: -6px;
   right: -10px;
-  background-color: #b87352;
+  background-color: var(--color-accent);
   color: #fff;
   font-size: 0.65rem;
   font-weight: 700;
@@ -498,8 +511,8 @@ table tbody td {
   width: 220px;
   flex-shrink: 0;
   min-height: calc(100vh - 65px);
-  background-color: #f8f5f0;
-  border-right: 1px solid #e6dccf;
+  background-color: var(--color-bg-page);
+  border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -516,20 +529,20 @@ table tbody td {
   align-items: center;
   gap: 12px;
   padding: 12px 24px;
-  color: #6e5f5c;
+  color: var(--color-text-muted);
   text-decoration: none;
   font-size: 0.92rem;
   border-left: 3px solid transparent;
   cursor: pointer;
 }
 .nav-item:hover {
-  background-color: #f1e7de;
+  background-color: var(--color-hover-bg);
 }
 .nav-item.active {
-  color: #4a3e3d;
+  color: var(--color-text);
   font-weight: 700;
-  background-color: #ebdcd0;
-  border-left-color: #b87352;
+  background-color: var(--color-active-bg);
+  border-left-color: var(--color-accent);
 }
 .nav-icon {
   display: inline-flex;
@@ -537,7 +550,6 @@ table tbody td {
   justify-content: center;
   width: 18px;
 }
-
 
 .clo-main {
   flex: 1;
