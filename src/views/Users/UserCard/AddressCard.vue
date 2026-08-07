@@ -72,7 +72,7 @@ const remove = (index) => {
   <div class="card p-4 shadow mb-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h3 class="fw-bold mb-0">收件資料</h3>
-      <button v-if="!isEditing" @click="toggleEdit(null)" class="btn btn-outline-primary">
+      <button v-if="!isEditing" @click="toggleEdit(null)" class="btn btn-outline-dark">
         新增收件資料
       </button>
     </div>

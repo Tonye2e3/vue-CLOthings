@@ -38,7 +38,6 @@ const save = () => {
   <div class="card p-4 shadow mb-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h3 class="fw-bold mb-0">帳戶資料</h3>
-      <button v-if="!isEditing" @click="toggleEdit" class="btn btn-outline-primary">編輯</button>
     </div>
 
     <div v-if="!isEditing">
@@ -47,6 +46,14 @@ const save = () => {
       <p><strong>密碼：</strong>{{ userData.password ? '••••••' : '未設定' }}</p>
       <p><strong>郵件：</strong>{{ userData.email }}</p>
       <p><strong>電話：</strong>{{ userData.phone }}</p>
+      <button
+        v-if="!isEditing"
+        @click="toggleEdit"
+        class="btn btn-outline-dark"
+        style="border-radius: 0%"
+      >
+        編輯
+      </button>
     </div>
 
     <div v-else>
