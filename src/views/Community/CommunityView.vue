@@ -4,12 +4,6 @@
 // 這一個沒有寫 setup（就是普通的 <script>），
 // 下面還有一個 <script setup>。
 //
-// 為什麼要拆成兩個？
-// 因為這裡面的 posts（貼文清單）資料，不只這個頁面自己要用，
-// 「發文頁」(CreatePostView.vue) 發表新文章的時候，
-// 也需要把新文章加進「同一份」posts 清單裡，這樣使用者發文後，
-// 回到這個頁面才看得到自己剛剛發的文章。
-//
 // 一般 <script setup> 裡面宣告的變數，是「private 私有」的，
 // 外面的檔案沒辦法直接拿到；但如果用普通 <script> + export 關鍵字，
 // 就可以把這些變數「開放」給別的檔案 import 進去用，
@@ -21,19 +15,13 @@ import { reactive } from 'vue'
 // 資料一改畫面就自動更新。差別是 reactive() 通常用在「物件」或「陣列」上，
 // 而且在 <script> 裡面使用它包起來的資料時，不用加 .value（這點跟 ref 不一樣）。
 
-// export const：export 代表「把這個變數開放給其他檔案使用」，
-// 其他檔案只要寫 import { currentUser } from '這個檔案路徑'，就能拿到它。
-// 這裡先寫死一個「目前登入的使用者」資料，之後如果接上真正的登入系統，
-// 只要把這裡換成登入後拿到的真實使用者資料即可。
 export const currentUser = {
   name: 'Emily 艾米莉',
   avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily'
 }
 
 // 假資料的發布時間改成「相對現在往前推 N 天」，而不是寫死未來日期。
-// 這樣不管使用者電腦當下實際日期是哪一天，假資料永遠會比「剛剛發布」的新貼文舊，
-// 「最新」分頁排序時，新發的貼文才會保證排在最上面。
-//
+
 // 這一行是「箭頭函式」的寫法：(n) => { ... } 的意思是
 // 「定義一個函式，它需要一個叫做 n 的輸入值，然後回傳後面算出來的結果」。
 // Date.now()：拿到「現在」的時間（用電腦看得懂的數字格式）。
@@ -196,10 +184,7 @@ const currentTabCopy = computed(() => tabCopy[currentTab.value] || tabCopy.hot)
 const tabPosts = computed(() => {
   if (currentTab.value === 'new') {
     // 最新：依發布時間新到舊排序
-    // [...posts]：這個寫法叫做「展開運算子」，作用是「複製一份新的陣列」，
-    // 不直接對原本的 posts 排序，是為了避免不小心把原始資料的順序也永久打亂。
-    // .sort((a, b) => ...)：sort 是陣列排序方法，a、b 代表「拿來互相比較的兩筆資料」。
-    // new Date(b.publishedAt) - new Date(a.publishedAt)：
+    
     // 把日期文字轉換成「時間」再相減，結果是正數還是負數，決定了 a、b 誰排前面，
     // 這樣寫的效果就是「時間新的排前面、時間舊的排後面」。
     return [...posts].sort(
