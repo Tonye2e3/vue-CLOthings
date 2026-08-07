@@ -1,5 +1,5 @@
 <script setup>
-import { isValidAccount, isValidPassword, isValidPhone, isValidEmail } from '@/utils/userValidator'
+import { isValidAccount, isValidPassword, isValidPhone, isValidEmail } from '@/utils/UserValidator'
 import { ref, reactive } from 'vue'
 const title = ref('會員註冊')
 const agree = ref(false)
