@@ -29,6 +29,7 @@ const userProfile = ref({
   postsCount: '1,284',    // 貼文數（純文字顯示用，不是拿來計算的數字）
   followersCount: '58.6K',
   followingCount: '342',
+  email: 'emily.style@example.com', // 訊息按鈕要用的信箱，先用假信箱佔位，之後接真的使用者資料再換掉
   isFollowing: false // 「我」有沒有追蹤這個人，true/false 這種只有兩種狀態的值叫做布林值
 })
 
@@ -157,7 +158,15 @@ const toggleFollow = () => {
                   -->
                   {{ userProfile.isFollowing ? '已追蹤' : '＋ 追蹤' }}
                 </button>
-                <button class="btn-message">✉ 訊息</button>
+                 <!--
+                  改用 mailto 連結：href 前面加上 "mailto:"，瀏覽器看到這個開頭
+                  就知道不是要跳到一般網頁，而是要打開使用者電腦裡設定好的
+                  預設郵件軟體（例如 Outlook、Gmail 桌面版），
+                  自動幫忙帶入收件人信箱，就不用自己另外做一個站內聊天室頁面。
+                  class="btn-message" 還是套用原本的按鈕樣式，
+                  外觀不會變，只是從 <button> 換成 <a> 標籤。
+                -->
+                <a :href="`mailto:${userProfile.email}`" class="btn-message">✉ 訊息</a>
               </div>
             </div>
           </div>
@@ -406,6 +415,7 @@ const toggleFollow = () => {
 .btn-follow-main.following:hover{ background:var(--hairline); transform:none; }
 
 .btn-message{
+  display:inline-block; text-decoration:none;
   background:transparent; color:var(--ink);
   border:1px solid var(--ink); border-radius:4px;
   padding:.6rem 1.4rem; font-size:.88rem; font-weight:500;
