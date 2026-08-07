@@ -36,14 +36,16 @@ const post = ref({
   // 這裡本來有個 isSaved 存「我」有沒有收藏，現在改成從共用的收藏清單
   // （savedPosts，在 CommunityView.vue 裡）即時判斷，不用自己在這裡另外存一份，
   // 這樣才不會發生「這裡顯示已收藏，但 UserProfileView 收藏頁籤卻沒有」這種兩邊資料兜不起來的情況。
-  // taggedProducts：這篇貼文照片上標記的商品定位點，
-  // x、y 是這個標記點在照片上的位置，用「百分比」表示
-  // （例如 x: '65%' 代表「從照片左邊算起，65% 的地方」），
-  // 這樣不管照片實際顯示的大小是多少，標記點都會固定跟著照片的相對位置走。
+  //
+  // taggedProducts：這篇貼文標記的商品。原本這裡還有 x、y 兩個欄位，
+  // 是拿來把標籤定位在照片上的百分比座標，但資料庫其實沒有存這兩個欄位
+  // （資料庫存的是 productRoute，商品連結），所以拿掉 x/y，
+  // 改成把標記商品顯示在貼文文字下方的一排標籤，而不是浮在照片上。
+  // 這裡的 id 會跟下面 products 清單裡的 id 對應，用來找出對應商品的連結。
   taggedProducts: [
-    { id: 101, name: '針織上衣', x: '65%', y: '35%' },
-    { id: 102, name: '高腰寬褲', x: '55%', y: '70%' },
-    { id: 103, name: '托特包', x: '41%', y: '90%' }
+    { id: 101, name: '針織上衣' },
+    { id: 102, name: '高腰寬褲' },
+    { id: 103, name: '托特包' }
   ]
 })
 
@@ -87,14 +89,38 @@ const toggleSave = () => {
 }
 
 // 這套穿搭的商品清單（右側欄要顯示的可購買商品）
+// productRoute：對應資料庫裡的商品連結欄位，點商品圖片／名稱會導去這個網址。
 const products = ref([
-  { id: 101, name: '奶油白V領針織上衣', price: '690', image: 'https://i.pinimg.com/1200x/dc/94/75/dc9475c6d350370bcf6c471e3ee6d6fb.jpg' },
-  { id: 102, name: '高腰垂墜寬褲 (卡其)', price: '890', image: 'https://i.pinimg.com/1200x/f3/dd/f4/f3ddf4c34ff005240958bddb9a8080d0.jpg' },
-  { id: 103, 
-  name: '復古麻編單肩托特包', 
-  price: '680', 
-  image: 'https://i.pinimg.com/736x/f2/cf/7b/f2cf7b273ca7445dce8800f855051f93.jpg' }
+  {
+    id: 101,
+    name: '奶油白V領針織上衣',
+    price: '690',
+    image: 'https://i.pinimg.com/1200x/dc/94/75/dc9475c6d350370bcf6c471e3ee6d6fb.jpg',
+    productRoute: '/shop/product/101'
+  },
+  {
+    id: 102,
+    name: '高腰垂墜寬褲 (卡其)',
+    price: '890',
+    image: 'https://i.pinimg.com/1200x/f3/dd/f4/f3ddf4c34ff005240958bddb9a8080d0.jpg',
+    productRoute: '/shop/product/102'
+  },
+  {
+    id: 103,
+    name: '復古麻編單肩托特包',
+    price: '680',
+    image: 'https://i.pinimg.com/736x/f2/cf/7b/f2cf7b273ca7445dce8800f855051f93.jpg',
+    productRoute: '/shop/product/103'
+  }
 ])
+
+// findProductRoute：拿貼文標記商品的 id，去 products 清單裡找同一個 id 的商品，
+// 回傳它的 productRoute。找不到（例如標記了一個已下架的商品）就回傳 '#'，
+// 這樣連結還是有東西可以點，不會整個報錯。
+const findProductRoute = (productId) => {
+  const matched = products.value.find(p => p.id === productId)
+  return matched ? matched.productRoute : '#'
+}
 
 // 相似穿搭推薦
 const similarPosts = ref([
@@ -141,6 +167,14 @@ const addComment = () => {
     
 
     <div class="container-fluid container-lg pb-5 pt-4">
+
+      <!--
+        返回社群按鈕：跟 CreatePostView.vue 的 back-pill 是同一顆按鈕、同一套樣式，
+        統一放在頁面內容最上面，讓使用者不管是從「發文頁」還是「貼文詳細頁」，
+        都能用同樣的方式一鍵回到社群列表，不用一直靠瀏覽器的上一頁。
+      -->
+      <router-link to="/community" class="back-pill">← 返回社群</router-link>
+
       <div class="row g-4">
 
         <!-- 左側：貼文主體區 (大圖、內文、互動、留言) -->
@@ -172,31 +206,10 @@ const addComment = () => {
               </button>
             </div>
 
-            <!-- 主圖 (附帶商品標籤) -->
+            <!-- 主圖（拿掉了浮在照片上的定位標籤，因為資料庫沒有存座標） -->
             <div class="post-media">
               <span class="tag-label" v-if="post.taggedProducts[0]">封面故事</span>
               <img :src="post.imageUrl" class="post-image" alt="post image" />
-
-              <!--
-                商品定位標籤：改為圓點 + 展開標籤的穿搭釘選樣式
-                v-for="tag in post.taggedProducts"：把每個標記點都畫成一個小圓點+標籤。
-                :style="{ top: tag.y, left: tag.x }"：
-                這是「動態綁定 style」的寫法，跟 :class 類似，
-                差別是這裡直接綁定一個 CSS 樣式物件。意思是：
-                「這個元素的 top（離頂端多遠）用 tag.y 的值、
-                left（離左邊多遠）用 tag.x 的值」，
-                因為 tag.y、tag.x 是像 '65%' 這樣的百分比字串，
-                每個標記點就會依照資料裡設定的位置，出現在照片對應的地方。
-              -->
-              <span
-                v-for="tag in post.taggedProducts"
-                :key="tag.id"
-                class="pin-tag"
-                :style="{ top: tag.y, left: tag.x }"
-              >
-                <span class="pin-dot"></span>
-                <span class="pin-label">{{ tag.name }}</span>
-              </span>
             </div>
 
             <!-- 按讚/分享/收藏 動作列 -->
@@ -238,6 +251,27 @@ const addComment = () => {
 
             <!-- 貼文文字描述 -->
             <p class="post-content">{{ post.content }}</p>
+
+            <!--
+              標記商品：原本是浮在照片上的定位標籤，現在改成貼文下方的一排標籤。
+              v-if="post.taggedProducts.length"：陣列裡有東西才顯示這一整塊。
+              這裡先用 <span> 不用 <a>：因為現在是要給老師看前台畫面，
+              productRoute 目前只是假的路徑（例如 /shop/product/101），
+              真的點下去會導到不存在的頁面，demo 階段先不要讓它跳轉，
+              只保留視覺樣式（看起來像標籤）。之後商城的商品頁做好、
+              productRoute 是真的網址時，把 <span> 換回 <a :href="findProductRoute(tag.id)">
+              就可以了，findProductRoute 這個函式邏輯已經寫好、留著沒動。
+            -->
+            <div class="tagged-products" v-if="post.taggedProducts.length">
+              <span class="tagged-label">標記商品</span>
+              <div class="tag-cloud">
+                <span
+                  v-for="tag in post.taggedProducts"
+                  :key="tag.id"
+                  class="tag-chip"
+                >#{{ tag.name }}</span>
+              </div>
+            </div>
 
             <!-- 留言區塊 -->
             <div class="comment-block">
@@ -286,10 +320,18 @@ const addComment = () => {
 
             <div class="product-list">
               <div v-for="item in products" :key="item.id" class="product-row">
-                <img :src="item.image" class="product-thumb" alt="product" />
-                <div class="product-info">
-                  <p class="product-name">{{ item.name }}</p>
-                  <p class="product-price">NT$ {{ item.price }}</p>
+                <!--
+                  product-link：把圖片＋商品資訊包成一個區塊，之後接上真的
+                  商品頁時可以換回 <a :href="item.productRoute">，
+                  現在先用 <div> 不會跳轉，只是給老師看畫面用，
+                  跟旁邊「加入購物車」按鈕分開（按鈕還是純粹的按鈕）。
+                -->
+                <div class="product-link">
+                  <img :src="item.image" class="product-thumb" alt="product" />
+                  <div class="product-info">
+                    <p class="product-name">{{ item.name }}</p>
+                    <p class="product-price">NT$ {{ item.price }}</p>
+                  </div>
                 </div>
                 <button class="btn-cart">加入購物車</button>
               </div>
@@ -335,6 +377,16 @@ const addComment = () => {
   color: var(--ink);
   font-family: 'Noto Sans TC', sans-serif;
 }
+
+/* ---------- 返回社群按鈕 ---------- */
+.back-pill{
+  display:inline-flex; align-items:center; gap:.3rem;
+  border:1px solid var(--ink); border-radius:999px;
+  padding:.35rem 1rem; font-size:.82rem; color:var(--ink);
+  text-decoration:none; margin-bottom:1.2rem;
+  transition:all .18s ease;
+}
+.back-pill:hover{ background:var(--ink); color:var(--cream); }
 
 /* ---------- 主卡片 ---------- */
 .post-main-card{
@@ -396,34 +448,6 @@ const addComment = () => {
   border-color:transparent var(--plum-deep) transparent transparent;
 }
 
-.pin-tag{
-  position:absolute; transform:translate(-50%, -50%);
-  display:flex; align-items:center; gap:.4rem;
-  cursor:pointer;
-}
-.pin-dot{
-  width:12px; height:12px; border-radius:50%;
-  background:var(--ochre);
-  box-shadow:0 0 0 4px rgba(184,134,46,.28);
-  flex-shrink:0;
-  animation:pulse 2.2s ease-in-out infinite;
-}
-@keyframes pulse{
-  0%, 100%{ box-shadow:0 0 0 4px rgba(184,134,46,.28); }
-  50%{ box-shadow:0 0 0 7px rgba(184,134,46,.14); }
-}
-.pin-label{
-  background:var(--ink);
-  color:#fff;
-  font-size:.72rem; font-weight:600;
-  padding:.28rem .7rem;
-  border-radius:4px;
-  white-space:nowrap;
-  opacity:.94;
-  transition:background .18s ease;
-}
-.pin-tag:hover .pin-label{ background:var(--plum); }
-
 /* ---------- 互動列 ---------- */
 .action-bar{
   display:flex; align-items:center; justify-content:space-between;
@@ -446,8 +470,25 @@ const addComment = () => {
 /* ---------- 內文 ---------- */
 .post-content{
   font-size:.94rem; line-height:1.8; color:var(--ink);
+  margin-bottom:1.2rem;
+}
+
+/* ---------- 標記商品（貼文下方） ---------- */
+.tagged-products{
+  display:flex; align-items:center; flex-wrap:wrap; gap:.7rem;
   margin-bottom:1.6rem;
 }
+.tagged-label{
+  font-size:.8rem; color:var(--ink-soft); font-weight:600; flex-shrink:0;
+}
+.tagged-products .tag-cloud{ display:flex; flex-wrap:wrap; gap:.5rem; }
+.tagged-products .tag-chip{
+  font-size:.78rem; padding:.32rem .8rem; border-radius:999px;
+  background:var(--cream); border:1px solid var(--hairline); color:var(--plum);
+  text-decoration:none; font-weight:600;
+  transition:all .18s ease;
+}
+.tagged-products .tag-chip:hover{ border-color:var(--plum); background:var(--paper); }
 
 /* ---------- 留言區 ---------- */
 .comment-block{
@@ -520,6 +561,16 @@ const addComment = () => {
   border-radius:8px;
   padding:.55rem;
 }
+/*
+  product-link 把圖片跟文字包在一起排成一列（目前是 <div>，不是連結，
+  這幾行 color/text-decoration 先留著，之後如果換回 <a> 標籤，
+  樣式不用再調）；flex:1 讓它撐滿按鈕以外的空間，min-width:0 避免文字太長把版面撐壞。
+*/
+.product-link{
+  display:flex; align-items:center; gap:.7rem;
+  flex:1; min-width:0;
+  color:inherit; text-decoration:none;
+}
 .product-thumb{ width:56px; height:56px; border-radius:6px; object-fit:cover; flex-shrink:0; }
 .product-info{ flex:1; min-width:0; }
 .product-name{
@@ -533,6 +584,7 @@ const addComment = () => {
   border:1px solid var(--ink); border-radius:4px;
   padding:.35rem .8rem; font-size:.74rem; white-space:nowrap;
   transition:all .18s ease;
+  flex-shrink:0;
 }
 .btn-cart:hover{ background:var(--ink); color:var(--paper); }
 

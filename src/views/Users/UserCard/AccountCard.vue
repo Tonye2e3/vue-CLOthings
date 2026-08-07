@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { initialUserData } from '../../../services/userFakeData'
-import { isValidAccount, isValidPassword, isValidPhone, isValidEmail } from '@/utils/userValidator'
+import { isValidAccount, isValidPassword, isValidPhone, isValidEmail } from '@/utils/UserValidator'
 
 const userData = reactive({ ...initialUserData })
 const backupData = reactive({}) // 用來暫存原始資料
