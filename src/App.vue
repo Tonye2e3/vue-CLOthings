@@ -1,6 +1,7 @@
 <script setup>
+import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 //======== SiteHeader.vue 開始==========
 import { RouterLink } from 'vue-router'
 import IconSearch from '@/components/icons/IconSearch.vue'
@@ -16,6 +17,7 @@ import IconYoutube from '@/components/icons/IconYoutube.vue'
 //======== Sitefooter.vue 結束==========
 
 const authStore = useAuthStore()
+const route = useRoute()
 const router = useRouter()
 
 //======== SiteHeader.vue 開始==========
@@ -25,6 +27,10 @@ const navItems = [
   { label: 'Community', to: { name: 'Community' } },
   { label: 'Group Buying', to: { name: 'GroupProducts' } },
 ]
+
+// 判斷目前是不是在「團購 Group」相關頁面：在這些頁面時，導覽列自己的購物車圖示要隱藏
+// （團購頁面有自己的購物車機制，避免使用者混淆是哪一個購物車）
+const isGroupSection = computed(() => route.path.startsWith('/GroupShop'))
 //======== SiteHeader.vue 結束==========
 //======== Sitefooter.vue 開始==========
 const links = ['客服中心', '常見問題（FAQ）', '公司資訊', '隱私政策', '電子報訂閱']
@@ -51,7 +57,7 @@ function logout() {
         <RouterLink :to="{ name: 'user' }" class="icon-btn" aria-label="帳號"
           ><IconUser
         /></RouterLink>
-        <button class="icon-btn" type="button" aria-label="購物車"><IconCart /></button>
+        <button v-if="!isGroupSection" class="icon-btn" type="button" aria-label="購物車"><IconCart /></button>
       </div>
     </div>
   </header>

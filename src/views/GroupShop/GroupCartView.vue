@@ -61,23 +61,6 @@ const handleCheckout = () => {
 
 <template>
   <div class="clo-shell">
-    <!-- ============ 頁面最上方：會員名稱 + 購物車圖示 ============ -->
-    <header class="clo-header">
-      <div class="clo-user">
-        <span class="user-greet">你好，{{ memberName }}</span>
-        <router-link to="/GroupShop/checkout" class="cart-link">
-          <span class="cart-icon">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="9" cy="21" r="1"></circle>
-              <circle cx="20" cy="21" r="1"></circle>
-              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-            </svg>
-          </span>
-          <span class="cart-badge">{{ allItems.length }}</span>
-        </router-link>
-      </div>
-    </header>
-
     <div class="clo-body">
       <!-- ============ 左側選單 ============ -->
       <aside class="clo-sidebar">
@@ -388,50 +371,6 @@ const handleCheckout = () => {
 }
 .btn-outline:hover {
   background-color: var(--color-hover-bg);
-}
-
-.clo-header {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 14px 28px;
-  background-color: #fff;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.clo-user {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-.user-greet {
-  font-size: 0.9rem;
-  white-space: nowrap;
-}
-.cart-link {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  color: var(--color-text);
-  text-decoration: none;
-}
-.cart-badge {
-  position: absolute;
-  top: -6px;
-  right: -10px;
-  background-color: var(--color-accent);
-  color: #fff;
-  font-size: 0.65rem;
-  font-weight: 700;
-  min-width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 4px;
 }
 
 .clo-body {

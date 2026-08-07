@@ -27,7 +27,7 @@ const memberName = ref(localStorage.getItem('memberName') || '會員')
 // 只要 store 裡的內容一變，這裡就會自動跟著更新，不用再自己解析 localStorage
 const cartCount = computed(() => cartStore.items.length)
 
-// 商品目錄：原價 + 兩階層團購價（滿N件即可享該階層價格），需與商品列表頁資料一致
+// 商品目錄：原價 + 兩階層團購折扣（滿N件即可享該階層折扣，實際團購價 = 原價 × 折扣），需與商品列表頁資料一致
 // 這裡先用寫死的假資料模擬「後端資料庫」
 const catalog = ref([
   {
@@ -35,9 +35,9 @@ const catalog = ref([
     name: '團購短T',
     imageUrl: 'https://picsum.photos/seed/clo-shortT/900/500',
     listPrice: 340,        // 原價（沒有達到任何團購階層時的價格）
-    tiers: [                // 團購階層：件數(qty) 達標後，單價就變成 price
-      { qty: 5, price: 306 },
-      { qty: 10, price: 221 }
+    tiers: [                // 團購階層：件數(qty) 達標後，單價 = listPrice × discount
+      { qty: 5, discount: 0.9 },
+      { qty: 10, discount: 0.65 }
     ],
     currentCount: 12,       // 目前系統紀錄「已經有多少人訂購」的基礎件數
     intro: '團購短T選用親膚純棉布料，透氣不悶熱，簡約百搭款式適合日常穿搭。訂購件數越多，單價越低，滿額即可解鎖團購價。'
@@ -48,8 +48,8 @@ const catalog = ref([
     imageUrl: 'https://picsum.photos/seed/clo-jeans/900/500',
     listPrice: 430,
     tiers: [
-      { qty: 10, price: 387 },
-      { qty: 20, price: 310 }
+      { qty: 10, discount: 0.9 },
+      { qty: 20, discount: 0.72 }
     ],
     currentCount: 22,
     intro: '合身直筒版型，耐磨丹寧布料，百搭日常單品，訂購件數越多單價越低。'
@@ -60,8 +60,8 @@ const catalog = ref([
     imageUrl: 'https://picsum.photos/seed/clo-dress/900/500',
     listPrice: 520,
     tiers: [
-      { qty: 10, price: 468 },
-      { qty: 15, price: 374 }
+      { qty: 10, discount: 0.9 },
+      { qty: 15, discount: 0.72 }
     ],
     currentCount: 15,
     intro: '輕柔垂墜布料，修飾版型好穿易搭，適合上班或約會多種場合。'
@@ -72,8 +72,8 @@ const catalog = ref([
     imageUrl: 'https://picsum.photos/seed/clo-knit-jacket/900/500',
     listPrice: 700,
     tiers: [
-      { qty: 10, price: 630 },
-      { qty: 15, price: 610 }
+      { qty: 10, discount: 0.9 },
+      { qty: 15, discount: 0.87 }
     ],
     currentCount: 8,
     intro: '柔軟針織布料，保暖不厚重，簡約百搭適合四季疊穿。'
@@ -84,8 +84,8 @@ const catalog = ref([
     imageUrl: 'https://picsum.photos/seed/clo-skirt/900/500',
     listPrice: 700,
     tiers: [
-      { qty: 10, price: 630 },
-      { qty: 15, price: 467 }
+      { qty: 10, discount: 0.9 },
+      { qty: 15, discount: 0.67 }
     ],
     currentCount: 12,
     intro: '細緻百褶剪裁，走動間自然垂墜，甜美與正式感兼具。'
@@ -96,8 +96,8 @@ const catalog = ref([
     imageUrl: 'https://picsum.photos/seed/clo-totebag/900/500',
     listPrice: 880,
     tiers: [
-      { qty: 15, price: 792 },
-      { qty: 25, price: 711 }
+      { qty: 15, discount: 0.9 },
+      { qty: 25, discount: 0.81 }
     ],
     currentCount: 25,
     intro: '大容量托特包，耐用帆布材質，通勤上課都好用。'
@@ -108,8 +108,8 @@ const catalog = ref([
     imageUrl: 'https://picsum.photos/seed/clo-backpack/900/500',
     listPrice: 1060,
     tiers: [
-      { qty: 10, price: 954 },
-      { qty: 20, price: 727 }
+      { qty: 10, discount: 0.9 },
+      { qty: 20, discount: 0.69 }
     ],
     currentCount: 5,
     intro: '多夾層設計，減壓背帶，通勤旅行都好背。'
@@ -120,8 +120,8 @@ const catalog = ref([
     imageUrl: 'https://picsum.photos/seed/clo-sunhat/900/500',
     listPrice: 1060,
     tiers: [
-      { qty: 10, price: 954 },
-      { qty: 20, price: 727 }
+      { qty: 10, discount: 0.9 },
+      { qty: 20, discount: 0.69 }
     ],
     currentCount: 14,
     intro: '寬帽緣有效遮陽，透氣布料久戴不悶熱。'
@@ -132,8 +132,8 @@ const catalog = ref([
     imageUrl: 'https://picsum.photos/seed/clo-beanie/900/500',
     listPrice: 1150,
     tiers: [
-      { qty: 10, price: 1035 },
-      { qty: 30, price: 909 }
+      { qty: 10, discount: 0.9 },
+      { qty: 30, discount: 0.79 }
     ],
     currentCount: 9,
     intro: '柔軟針織毛帽，保暖百搭，秋冬穿搭必備單品。'
@@ -164,8 +164,11 @@ const currentTier = computed(() => {
   return tier
 })
 
+// 依「原價 × 折扣」算出該階層的團購價（四捨五入到整數元）
+const tierPriceOf = (tier) => Math.round(product.value.listPrice * tier.discount)
+
 // 目前應該顯示的單價：有解鎖階層就用階層價，否則用原價
-const currentUnitPrice = computed(() => currentTier.value ? currentTier.value.price : product.value.listPrice)
+const currentUnitPrice = computed(() => currentTier.value ? tierPriceOf(currentTier.value) : product.value.listPrice)
 
 // 第二階層
 const finalTier = computed(() => product.value.tiers[product.value.tiers.length - 1])
@@ -179,6 +182,11 @@ const nextTier = computed(() =>
 const progressPercent = computed(() =>
   Math.min(100, Math.round((orderedQty.value / finalTier.value.qty) * 100))
 )
+
+// 圓形進度條的幾何參數：半徑固定，周長依半徑算出，再依百分比算出要留白的長度
+const ringRadius = 46
+const ringCircumference = 2 * Math.PI * ringRadius
+const ringDashOffset = computed(() => ringCircumference * (1 - progressPercent.value / 100))
 
 // 判斷某個階層是否已經解鎖
 const isTierUnlocked = (tier) => orderedQty.value >= tier.qty
@@ -202,25 +210,7 @@ const handleJoin = () => {
 
 <template>
   <div class="clo-shell">
-    <!-- ============ 頁面最上方：會員名稱 + 購物車圖示 ============ -->
-    <header class="clo-header">
-      <div class="clo-user">
-        <span class="user-greet">你好，{{ memberName }}</span>
-        
-        <router-link to="/GroupShop/checkout" class="cart-link">
-          <span class="cart-icon">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="9" cy="21" r="1"></circle>
-              <circle cx="20" cy="21" r="1"></circle>
-              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-            </svg>
-          </span>
-          <!-- 購物車數量 -->
-          <span class="cart-badge">{{ cartCount }}</span>
-        </router-link>
-      </div>
-    </header>
-
+    <!-- 購物車圖示改為右下角浮動按鈕，見頁面最下方 -->
     <div class="clo-body">
       <!-- ============ 左側選單 ============ -->
       <aside class="clo-sidebar">
@@ -289,7 +279,7 @@ const handleJoin = () => {
             <!-- 還有下一階層可以解鎖時，顯示「還差幾件」的提示 -->
             <div v-if="nextTier" class="d-flex justify-content-between small text-muted">
               <span>滿 {{ nextTier.qty }} 件可享團購價</span>
-              <span>還差 {{ nextTier.qty - orderedQty }} 件，下階至 $ {{ formatCurrency(nextTier.price) }}</span>
+              <span>還差 {{ nextTier.qty - orderedQty }} 件，下階至 $ {{ formatCurrency(tierPriceOf(nextTier)) }}</span>
             </div>
             <!-- 已經到最高階層（沒有 nextTier）時，顯示已達最低團購價 -->
             <div v-else class="d-flex justify-content-between small text-muted">
@@ -322,7 +312,7 @@ const handleJoin = () => {
                   <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                 </svg>
               </span>
-              滿 {{ t.qty }} 件：團購價 ${{ formatCurrency(t.price) }}
+              滿 {{ t.qty }} 件：團購價 ${{ formatCurrency(tierPriceOf(t)) }}
             </li>
           </ul>
         </div>
@@ -331,6 +321,24 @@ const handleJoin = () => {
       <!-- 右側：專案詳情 -->
       <div class="col-lg-4">
         <div class="side-card dark-card p-3">
+          <!-- 圓圈進度條：顯示目前募資進度百分比 -->
+          <div class="ring-wrap">
+            <svg viewBox="0 0 120 120" class="progress-ring" width="120" height="120">
+              <circle class="ring-track" cx="60" cy="60" r="46" fill="none" stroke-width="10" />
+              <circle
+                class="ring-fill"
+                cx="60"
+                cy="60"
+                r="46"
+                fill="none"
+                stroke-width="10"
+                :stroke-dasharray="ringCircumference"
+                :stroke-dashoffset="ringDashOffset"
+              />
+            </svg>
+            <span class="ring-label">{{ progressPercent }}%</span>
+          </div>
+
           <h6 class="fw-bold mb-2">團購專案詳情 (募資中)</h6>
           <p class="small mb-2 label-title">商品介紹</p>
           <p class="small mb-3 desc-text">{{ product.intro }}</p>
@@ -342,6 +350,16 @@ const handleJoin = () => {
     </div>
       </main>
     </div>
+
+    <!-- ============ 浮動購物車按鈕（右下角，點擊直接跳到購物車畫面） ============ -->
+    <router-link to="/GroupShop/checkout" class="floating-cart" aria-label="前往購物車">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="9" cy="21" r="1"></circle>
+        <circle cx="20" cy="21" r="1"></circle>
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+      </svg>
+      <span v-if="cartCount > 0" class="cart-badge">{{ cartCount }}</span>
+    </router-link>
   </div>
 </template>
 
@@ -451,6 +469,34 @@ const handleJoin = () => {
   color: var(--color-desc-text);
 }
 
+.ring-wrap {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 4px auto 16px;
+}
+.progress-ring {
+  transform: rotate(-90deg);
+}
+.ring-track {
+  stroke: rgba(255, 255, 255, 0.18);
+}
+.ring-fill {
+  stroke: var(--color-success);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.4s ease;
+}
+.ring-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #fff;
+}
+
 .back-link {
   display: inline-block;
   font-size: 0.88rem;
@@ -474,37 +520,29 @@ const handleJoin = () => {
   color: #fff;
 }
 
-.clo-header {
+.floating-cart {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background-color: var(--color-text);
+  color: #fff;
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding: 14px 28px;
-  background-color: #fff;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.clo-user {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-.user-greet {
-  font-size: 0.9rem;
-  white-space: nowrap;
-}
-.cart-link {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  color: var(--color-text);
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(74, 62, 61, 0.3);
   text-decoration: none;
+  z-index: 100;
+}
+.floating-cart:hover {
+  background-color: var(--color-dark-hover);
 }
 .cart-badge {
   position: absolute;
-  top: -6px;
-  right: -10px;
+  top: -4px;
+  right: -6px;
   background-color: var(--color-accent);
   color: #fff;
   font-size: 0.65rem;

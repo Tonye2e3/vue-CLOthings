@@ -27,7 +27,7 @@ const memberName = ref(localStorage.getItem('memberName') || '會員')
 // 購物車商品數量：直接從 store 拿，跨頁面即時反映實際品項數
 const cartCount = computed(() => cartStore.items.length)
 
-// 商品目錄：原價 + 兩階層團購價（滿N件即可享該階層價格）
+// 商品目錄：原價 + 兩階層團購折扣（滿N件即可享該階層折扣，實際團購價 = 原價 × 折扣）
 // 這裡是寫死的假資料，之後要接真正的後端資料庫時，可以整段改成 API 呼叫
 const products = ref([
   {
@@ -36,8 +36,8 @@ const products = ref([
     imageUrl: 'https://picsum.photos/seed/clo-shortT/400/300',
     listPrice: 340,
     tiers: [
-      { qty: 5, price: 306 },
-      { qty: 10, price: 221 }
+      { qty: 5, discount: 0.9 },
+      { qty: 10, discount: 0.65 }
     ],
     currentCount: 12
   },
@@ -47,8 +47,8 @@ const products = ref([
     imageUrl: 'https://picsum.photos/seed/clo-jeans/400/300',
     listPrice: 430,
     tiers: [
-      { qty: 10, price: 387 },
-      { qty: 20, price: 310 }
+      { qty: 10, discount: 0.9 },
+      { qty: 20, discount: 0.72 }
     ],
     currentCount: 22
   },
@@ -58,8 +58,8 @@ const products = ref([
     imageUrl: 'https://picsum.photos/seed/clo-dress/400/300',
     listPrice: 520,
     tiers: [
-      { qty: 10, price: 468 },
-      { qty: 15, price: 374 }
+      { qty: 10, discount: 0.9 },
+      { qty: 15, discount: 0.72 }
     ],
     currentCount: 15
   },
@@ -69,8 +69,8 @@ const products = ref([
     imageUrl: 'https://picsum.photos/seed/clo-knit-jacket/400/300',
     listPrice: 700,
     tiers: [
-      { qty: 10, price: 630 },
-      { qty: 15, price: 610 }
+      { qty: 10, discount: 0.9 },
+      { qty: 15, discount: 0.87 }
     ],
     currentCount: 8
   },
@@ -80,8 +80,8 @@ const products = ref([
     imageUrl: 'https://picsum.photos/seed/clo-skirt/400/300',
     listPrice: 700,
     tiers: [
-      { qty: 10, price: 630 },
-      { qty: 15, price: 467 }
+      { qty: 10, discount: 0.9 },
+      { qty: 15, discount: 0.67 }
     ],
     currentCount: 12
   },
@@ -91,8 +91,8 @@ const products = ref([
     imageUrl: 'https://picsum.photos/seed/clo-totebag/400/300',
     listPrice: 880,
     tiers: [
-      { qty: 15, price: 792 },
-      { qty: 25, price: 711 }
+      { qty: 15, discount: 0.9 },
+      { qty: 25, discount: 0.81 }
     ],
     currentCount: 25
   },
@@ -102,8 +102,8 @@ const products = ref([
     imageUrl: 'https://picsum.photos/seed/clo-backpack/400/300',
     listPrice: 1060,
     tiers: [
-      { qty: 10, price: 954 },
-      { qty: 20, price: 727 }
+      { qty: 10, discount: 0.9 },
+      { qty: 20, discount: 0.69 }
     ],
     currentCount: 5
   },
@@ -113,8 +113,8 @@ const products = ref([
     imageUrl: 'https://picsum.photos/seed/clo-sunhat/400/300',
     listPrice: 1060,
     tiers: [
-      { qty: 10, price: 954 },
-      { qty: 20, price: 727 }
+      { qty: 10, discount: 0.9 },
+      { qty: 20, discount: 0.69 }
     ],
     currentCount: 14
   },
@@ -124,8 +124,8 @@ const products = ref([
     imageUrl: 'https://picsum.photos/seed/clo-beanie/400/300',
     listPrice: 1150,
     tiers: [
-      { qty: 10, price: 1035 },
-      { qty: 30, price: 909 }
+      { qty: 10, discount: 0.9 },
+      { qty: 30, discount: 0.79 }
     ],
     currentCount: 9
   }
@@ -149,14 +149,23 @@ const currentTierOf = (p) => {
   return tier
 }
 
+// 依「原價 × 折扣」算出該階層的團購價（四捨五入到整數元）
+const tierPriceOf = (p, tier) => Math.round(p.listPrice * tier.discount)
+
 // 目前可享團購價（尚未解鎖任何階層則顯示原價）
-const currentPriceOf = (p) => currentTierOf(p)?.price ?? p.listPrice
+const currentPriceOf = (p) => {
+  const tier = currentTierOf(p)
+  return tier ? tierPriceOf(p, tier) : p.listPrice
+}
 
 // 第二階層（陣列最後一個，也就是件數門檻最高、價格最低的那個階層）
 const finalTierOf = (p) => p.tiers[p.tiers.length - 1]
 
 // 判斷這個商品是否已經達到最終階層（也就是「已成團」）
 const isCompleted = (p) => orderedQtyOf(p) >= finalTierOf(p).qty
+
+// 團購進度百分比：目前件數 / 最終階層件數，最多顯示到 100%
+const progressPercentOf = (p) => Math.min(100, Math.round((orderedQtyOf(p) / finalTierOf(p).qty) * 100))
 
 // 依搜尋關鍵字篩選商品：如果搜尋框是空的，全部商品都算符合（!searchKeyword.value 為 true）；
 // 有輸入文字的話，就比對商品名稱裡有沒有包含這段文字（跟課堂 ShopView.vue 的寫法一致）
@@ -336,6 +345,9 @@ const nextSlide = () => {
               <span>已訂購 {{ orderedQtyOf(p) }} 件</span>
               <span class="text-accent fw-bold">滿{{ finalTierOf(p).qty }}件享最低團購價</span>
             </div>
+            <div class="card-progress-track">
+              <div class="card-progress-fill bg-ongoing" :style="{ width: progressPercentOf(p) + '%' }"></div>
+            </div>
             <div class="d-flex justify-content-between align-items-center mt-2">
               <span class="fw-bold">團購價 ${{ formatCurrency(currentPriceOf(p)) }}</span>
               <router-link :to="`/GroupShop/product/${p.id}`" class="btn btn-main btn-sm">
@@ -368,6 +380,9 @@ const nextSlide = () => {
             <div class="d-flex justify-content-between small text-muted">
               <span>已訂購 {{ orderedQtyOf(p) }} 件</span>
               <span class="text-success fw-bold">滿{{ finalTierOf(p).qty }}件已成團</span>
+            </div>
+            <div class="card-progress-track">
+              <div class="card-progress-fill bg-done" :style="{ width: progressPercentOf(p) + '%' }"></div>
             </div>
             <div class="d-flex justify-content-between align-items-center mt-2">
               <span class="fw-bold">團購價 ${{ formatCurrency(currentPriceOf(p)) }}</span>
@@ -478,6 +493,20 @@ const nextSlide = () => {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+}
+
+.card-progress-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background-color: var(--color-border);
+  overflow: hidden;
+  margin-top: 8px;
+}
+.card-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
 }
 
 .text-accent { color: var(--color-accent); }
