@@ -173,37 +173,44 @@ const ongoingProducts = computed(() => filteredProducts.value.filter(p => !isCom
 
 // 把數字格式化成千分位顯示（例如 1234 -> 1,234）
 const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
+
+// ============ 首頁輪播區塊 ============
+// 輪播圖資料：之後要接後端管理的活動 Banner，可以整段改成 API 呼叫
+const banners = ref([
+  {
+    image: 'https://picsum.photos/seed/clo-banner1/1400/500',
+    badge: '限時優惠至 8/6',
+    title: '輕便抗UV連帽外套',
+    subtitle: '一件抵擋整個夏天的紫外線',
+    price: 1290
+  },
+  {
+    image: 'https://picsum.photos/seed/clo-banner2/1400/500',
+    badge: '團購進行中',
+    title: '團購托特包 熱銷中',
+    subtitle: '滿25件即可享最低團購價',
+    price: 711
+  },
+  {
+    image: 'https://picsum.photos/seed/clo-banner3/1400/500',
+    badge: '新品上市',
+    title: '團購針織外套',
+    subtitle: '滿15件享最低團購價',
+    price: 700
+  }
+])
+const currentSlide = ref(0)
+const prevSlide = () => {
+  currentSlide.value = (currentSlide.value - 1 + banners.value.length) % banners.value.length
+}
+const nextSlide = () => {
+  currentSlide.value = (currentSlide.value + 1) % banners.value.length
+}
 </script>
 
 <template>
   <div class="clo-shell">
-    <!-- ============ 頁面最上方：搜尋欄 + 會員名稱 + 購物車圖示 ============ -->
-    <header class="clo-header">
-      <div class="clo-search">
-        <input v-model="searchKeyword" type="text" placeholder="搜尋項目" />
-        <button class="search-btn" type="button" aria-label="搜尋">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-        </button>
-      </div>
-
-      <div class="clo-user">
-        <span class="user-greet">你好，{{ memberName }}</span>
-        <router-link to="/GroupShop/checkout" class="cart-link">
-          <span class="cart-icon">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="9" cy="21" r="1"></circle>
-              <circle cx="20" cy="21" r="1"></circle>
-              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-            </svg>
-          </span>
-          <span class="cart-badge">{{ cartCount }}</span>
-        </router-link>
-      </div>
-    </header>
-
+    <!-- 搜尋欄在輪播圖下方；購物車圖示改為右下角浮動按鈕，見頁面最下方 -->
     <div class="clo-body">
       <!-- ============ 左側選單 ============ -->
       <aside class="clo-sidebar">
@@ -249,9 +256,58 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
 
       <!-- ============ 主要內容區：商品列表 ============ -->
       <main class="clo-main">
-    <div class="page-header mb-4">
-      <h2 class="fw-bold mb-1">團購專案首頁</h2>
-      <p class="text-muted small mb-0">瀏覽所有進行中與完成的團購專案</p>
+    <!-- ============ 首頁輪播圖 ============ -->
+    <section class="carousel">
+      <button class="carousel-arrow carousel-arrow-left" type="button" @click="prevSlide" aria-label="上一張">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+
+      <div class="carousel-track">
+        <div
+          v-for="(banner, idx) in banners"
+          v-show="idx === currentSlide"
+          :key="idx"
+          class="carousel-slide"
+        >
+          <img :src="banner.image" class="carousel-img" :alt="banner.title" />
+          <div class="carousel-overlay"></div>
+          <div class="carousel-content">
+            <span class="carousel-badge">{{ banner.badge }}</span>
+            <h3 class="carousel-title">{{ banner.title }}</h3>
+            <p class="carousel-subtitle">{{ banner.subtitle }}</p>
+            <p class="carousel-price">NT$&nbsp;{{ formatCurrency(banner.price) }}</p>
+          </div>
+        </div>
+      </div>
+
+      <button class="carousel-arrow carousel-arrow-right" type="button" @click="nextSlide" aria-label="下一張">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </button>
+
+      <div class="carousel-dots">
+        <span
+          v-for="(banner, idx) in banners"
+          :key="`dot-${idx}`"
+          class="carousel-dot"
+          :class="{ active: idx === currentSlide }"
+          @click="currentSlide = idx"
+        ></span>
+      </div>
+    </section>
+
+    <!-- ============ 關鍵字搜尋（放在輪播圖下方） ============ -->
+    <div class="clo-search-below mb-4">
+      <input v-model="searchKeyword" type="text" placeholder="搜尋項目" />
+      <button class="search-btn" type="button" aria-label="搜尋">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </button>
     </div>
 
     <!-- 搜尋完全找不到符合的商品時顯示提示，避免使用者以為畫面壞掉 -->
@@ -259,39 +315,8 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
       找不到符合「{{ searchKeyword }}」的商品
     </div>
 
-    <!-- 已達團購數量（完成）區塊 -->
-    <section class="mb-4">
-      <div class="section-title bg-done">
-        <span class="section-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-            <polyline points="22 4 12 14.01 9 11.01"></polyline>
-          </svg>
-        </span> 已達團購數量 (完成)
-      </div>
-      <div class="product-grid">
-        <!-- v-for 把 completedProducts 陣列裡每一筆商品，重複產生一張卡片 -->
-        <div v-for="p in completedProducts" :key="p.id" class="product-card">
-          <router-link :to="`/GroupShop/product/${p.id}`" class="card-img-wrap">
-            <img :src="p.imageUrl" class="card-img" :alt="p.name" />
-          </router-link>
-          <div class="card-info">
-            <h6 class="fw-bold mb-1">{{ p.name }}</h6>
-            <div class="d-flex justify-content-between small text-muted">
-              <span>已訂購 {{ orderedQtyOf(p) }} 件</span>
-              <span class="text-success fw-bold">滿{{ finalTierOf(p).qty }}件已成團</span>
-            </div>
-            <div class="d-flex justify-content-between align-items-center mt-2">
-              <span class="fw-bold">團購價 ${{ formatCurrency(currentPriceOf(p)) }}</span>
-              <span class="badge-status badge-done">已成團</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <!-- 未達團購數量（進行中）區塊 -->
-    <section>
+    <section class="mb-4">
       <div class="section-title bg-ongoing">
         <span class="section-icon">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -321,8 +346,49 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
         </div>
       </div>
     </section>
+
+    <!-- 已達團購數量（完成）區塊 -->
+    <section>
+      <div class="section-title bg-done">
+        <span class="section-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
+        </span> 已達團購數量 (完成)
+      </div>
+      <div class="product-grid">
+        <!-- v-for 把 completedProducts 陣列裡每一筆商品，重複產生一張卡片 -->
+        <div v-for="p in completedProducts" :key="p.id" class="product-card">
+          <router-link :to="`/GroupShop/product/${p.id}`" class="card-img-wrap">
+            <img :src="p.imageUrl" class="card-img" :alt="p.name" />
+          </router-link>
+          <div class="card-info">
+            <h6 class="fw-bold mb-1">{{ p.name }}</h6>
+            <div class="d-flex justify-content-between small text-muted">
+              <span>已訂購 {{ orderedQtyOf(p) }} 件</span>
+              <span class="text-success fw-bold">滿{{ finalTierOf(p).qty }}件已成團</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-2">
+              <span class="fw-bold">團購價 ${{ formatCurrency(currentPriceOf(p)) }}</span>
+              <span class="badge-status badge-done">已成團</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
       </main>
     </div>
+
+    <!-- ============ 浮動購物車按鈕（右下角，點擊直接跳到購物車畫面） ============ -->
+    <router-link to="/GroupShop/checkout" class="floating-cart" aria-label="前往購物車">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="9" cy="21" r="1"></circle>
+        <circle cx="20" cy="21" r="1"></circle>
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+      </svg>
+      <span v-if="cartCount > 0" class="cart-badge">{{ cartCount }}</span>
+    </router-link>
   </div>
 </template>
 
@@ -441,17 +507,8 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
   color: #fff;
 }
 
-.clo-header {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 14px 28px;
-  background-color: #fff;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.clo-search {
-  flex: 1;
+/* ============ 輪播下方的關鍵字搜尋 ============ */
+.clo-search-below {
   max-width: 480px;
   display: flex;
   align-items: center;
@@ -459,7 +516,7 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
   border-radius: 999px;
   padding: 6px 8px 6px 18px;
 }
-.clo-search input {
+.clo-search-below input {
   flex: 1;
   border: none;
   background: transparent;
@@ -467,7 +524,7 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
   font-size: 0.9rem;
   color: var(--color-text);
 }
-.clo-search input::placeholder {
+.clo-search-below input::placeholder {
   color: var(--color-muted);
 }
 .search-btn {
@@ -484,28 +541,132 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
   flex-shrink: 0;
 }
 
-.clo-user {
+/* ============ 首頁輪播圖 ============ */
+.carousel {
+  position: relative;
+  height: 360px;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  background-color: #2b2624;
+}
+.carousel-track {
+  width: 100%;
+  height: 100%;
+}
+.carousel-slide {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.carousel-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.carousel-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.65) 0%, rgba(0, 0, 0, 0.15) 45%, rgba(0, 0, 0, 0.35) 100%);
+}
+.carousel-content {
+  position: absolute;
+  left: 32px;
+  bottom: 36px;
+  max-width: 60%;
+  color: #fff;
+}
+.carousel-badge {
+  display: inline-block;
+  background-color: var(--color-danger);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+.carousel-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+.carousel-subtitle {
+  font-size: 0.9rem;
+  opacity: 0.9;
+  margin: 0 0 12px;
+}
+.carousel-price {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0;
+}
+.carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: none;
+  background-color: rgba(255, 255, 255, 0.85);
+  color: var(--color-text);
   display: flex;
   align-items: center;
-  gap: 18px;
-  margin-left: auto;
-  flex-shrink: 0;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
 }
-.user-greet {
-  font-size: 0.9rem;
-  white-space: nowrap;
+.carousel-arrow:hover {
+  background-color: #fff;
 }
-.cart-link {
-  position: relative;
-  display: inline-flex;
+.carousel-arrow-left { left: 16px; }
+.carousel-arrow-right { right: 16px; }
+.carousel-dots {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+}
+.carousel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+}
+.carousel-dot.active {
+  background-color: #fff;
+}
+
+/* ============ 右下角浮動購物車按鈕 ============ */
+.floating-cart {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background-color: var(--color-text);
+  color: #fff;
+  display: flex;
   align-items: center;
-  color: var(--color-text);
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(74, 62, 61, 0.3);
   text-decoration: none;
+  z-index: 100;
+}
+.floating-cart:hover {
+  background-color: var(--color-dark-hover);
 }
 .cart-badge {
   position: absolute;
-  top: -6px;
-  right: -10px;
+  top: -4px;
+  right: -6px;
   background-color: var(--color-accent);
   color: #fff;
   font-size: 0.65rem;
@@ -575,8 +736,10 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
 }
 
 @media (max-width: 900px) {
-  .clo-search { display: none; }
   .clo-sidebar { width: 72px; }
   .nav-item span:last-child { display: none; }
+  .carousel { height: 260px; }
+  .carousel-content { max-width: 80%; left: 20px; bottom: 24px; }
+  .carousel-title { font-size: 1.25rem; }
 }
 </style>
