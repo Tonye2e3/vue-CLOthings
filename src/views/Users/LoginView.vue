@@ -19,24 +19,34 @@ async function login() {
     account: account.value,
     password: password.value,
   }
-  // 模擬後端回傳的假資料
-  const fakeResp = {
-    data: {
-      token: 'fake-jwt-token-123',
-      user: {
-        id: 1,
-        name: '測試用戶',
-        role: 'admin',
-      },
-    },
-    status: 200,
+  try {
+    const resp = await api.post('/User/login', data)
+    console.log('登入結果', resp)
+    authStore.setAuth(resp.data)
+    alert('登入成功')
+    router.push({ name: 'home' })
+  } catch (error) {
+    console.log('登入失敗', error)
+    alert('登入失敗')
   }
 
+  // // 模擬後端回傳的假資料
+  // const fakeResp = {
+  //   data: {
+  //     token: 'fake-jwt-token-123',
+  //     user: {
+  //       id: 1,
+  //       name: '測試用戶',
+  //       role: 'admin',
+  //     },
+  //   },
+  //   status: 200,
+  // }
   // 模擬成功登入流程
-  authStore.setAuth(fakeResp.data)
-  alert('登入成功 (假資料)')
-  router.push({ name: 'home' })
-  console.log('登入結果', fakeResp)
+  // authStore.setAuth(fakeResp.data)
+  // alert('登入成功 (假資料)')
+  // router.push({ name: 'home' })
+  // console.log('登入結果', fakeResp)
 }
 </script>
 
