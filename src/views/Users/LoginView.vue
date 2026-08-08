@@ -26,8 +26,11 @@ async function login() {
     alert('登入成功')
     router.push({ name: 'home' })
   } catch (error) {
-    console.log('登入失敗', error)
-    alert('登入失敗')
+    if (error.response?.status === 401) {
+      alert('帳號或密碼錯誤')
+    } else {
+      alert('伺服器錯誤，請稍後再試')
+    }
   }
 
   // // 模擬後端回傳的假資料
