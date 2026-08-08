@@ -4,6 +4,12 @@
 // 這一個沒有寫 setup（就是普通的 <script>），
 // 下面還有一個 <script setup>。
 //
+// 為什麼要拆成兩個？
+// 因為這裡面的 posts（貼文清單）資料，不只這個頁面自己要用，
+// 「發文頁」(CreatePostView.vue) 發表新文章的時候，
+// 也需要把新文章加進「同一份」posts 清單裡，這樣使用者發文後，
+// 回到這個頁面才看得到自己剛剛發的文章。
+//
 // 一般 <script setup> 裡面宣告的變數，是「private 私有」的，
 // 外面的檔案沒辦法直接拿到；但如果用普通 <script> + export 關鍵字，
 // 就可以把這些變數「開放」給別的檔案 import 進去用，
@@ -15,13 +21,19 @@ import { reactive } from 'vue'
 // 資料一改畫面就自動更新。差別是 reactive() 通常用在「物件」或「陣列」上，
 // 而且在 <script> 裡面使用它包起來的資料時，不用加 .value（這點跟 ref 不一樣）。
 
+// export const：export 代表「把這個變數開放給其他檔案使用」，
+// 其他檔案只要寫 import { currentUser } from '這個檔案路徑'，就能拿到它。
+// 這裡先寫死一個「目前登入的使用者」資料，之後如果接上真正的登入系統，
+// 只要把這裡換成登入後拿到的真實使用者資料即可。
 export const currentUser = {
   name: 'Emily 艾米莉',
   avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily'
 }
 
 // 假資料的發布時間改成「相對現在往前推 N 天」，而不是寫死未來日期。
-
+// 這樣不管使用者電腦當下實際日期是哪一天，假資料永遠會比「剛剛發布」的新貼文舊，
+// 「最新」分頁排序時，新發的貼文才會保證排在最上面。
+//
 // 這一行是「箭頭函式」的寫法：(n) => { ... } 的意思是
 // 「定義一個函式，它需要一個叫做 n 的輸入值，然後回傳後面算出來的結果」。
 // Date.now()：拿到「現在」的時間（用電腦看得懂的數字格式）。
@@ -31,63 +43,103 @@ export const currentUser = {
 // .toISOString()：把時間轉換成一種國際通用的文字格式，方便存起來、之後比較大小。
 const daysAgo = (n) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString()
 
+// formatCount：把純數字（例如 1200）轉成「1.2k」這種縮寫格式，只給畫面顯示用。
+// 之後接上真的 API 時，後端 likesCount／commentsCount 會是用
+// SELECT COUNT(*) FROM Post_Likes WHERE post_id = ... 這種方式算出來的「純數字」，
+// 不會是字串，所以資料本身要存數字，顯示的時候才格式化成「1.2k」，
+// 這樣排序、比大小的時候才不會出錯（字串 '1.2k' 沒辦法拿來做數學運算或排序）。
+export const formatCount = (n) => {
+  if (n >= 1000) {
+    // (n / 1000).toFixed(1)：除以 1000 後取到小數點第 1 位，例如 1234 → "1.2"
+    // .replace(/\.0$/, '')：如果結果剛好是整數（像 "2.0"），把 ".0" 拿掉，變成單純的 "2"
+    return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
+  }
+  return String(n)
+}
+
 // posts：全站所有貼文的清單，這是一個陣列，每個元素都是一篇貼文的資料物件。
 // 一樣用 export 開放給 CreatePostView.vue 使用。
+//
+// 欄位對照資料庫（Community_Post + Post_Images + Post_Tagged_Products）：
+// communityPostId      對應 post_id
+// userId      對應 user_id（真正串 API 後，user 顯示資訊會是後端 join Users 表回傳的）
+// content     對應 content（資料庫只有一個欄位，所以原本拆開的 title/desc 合併成一個）
+// postDate    對應 post_date
+// status      對應 status（貼文狀態，例如 'published' 已發布）
+// images      對應 Post_Images 這張表（一篇貼文可以有多張圖，依 sortOrder 排序）
+// likesCount / commentsCount   之後會是後端算好的 COUNT(*) 數字，這裡先存純數字
+// taggedProducts   對應 Post_Tagged_Products（productId、productRoute 是資料庫真的欄位；
+//                   name 是「假設」後端會順便 join 商品名稱回傳，方便畫面直接顯示）
 export const posts = reactive([
   {
-    postId: 1,
+    communityPostId: 1,
+    userId: 1,
     user: { name: 'Amy_穿搭日記', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Amy' },
-    title: '秋季奶茶色系穿搭，寬褲+針織的溫柔搭配',
-    desc: '用奶茶色打底，寬褲修飾比例，針織外套增加層次，走在街上也很有電影感。',
-    imageUrl: 'https://i.pinimg.com/736x/b6/6d/92/b66d92d99efca8c6886e751fe7734d05.jpg',
-    publishedAt: daysAgo(2), // 呼叫剛剛定義的函式，代表「2 天前發布的」
-    likesCount: '1.2k',
+    content: '秋季奶茶色系穿搭，寬褲+針織的溫柔搭配。用奶茶色打底，寬褲修飾比例，針織外套增加層次，走在街上也很有電影感。',
+    postDate: daysAgo(2), // 呼叫剛剛定義的函式，代表「2 天前發布的」
+    status: 'published',
+    images: [
+      { postImageId: 101, imageFileName: 'outfit-cream-knit.jpg', sortOrder: 1, url: 'https://picsum.photos/seed/outfit-cream-knit/900/720' }
+    ],
+    likesCount: 1200,
     commentsCount: 89,
-    taggedProducts: [{ id: 3, name: '羊毛混紡針織外套' }]
+    taggedProducts: [{ taggedId: 1, productId: 3, productRoute: '/shop/product/3', name: '羊毛混紡針織外套' }]
   },
   {
-    postId: 2,
+    communityPostId: 2,
+    userId: 2,
     user: { name: 'Kevin.style', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Kevin' },
-    title: '極簡工裝風 | 大地色機能外套通勤也好看',
-    desc: '極簡工裝風，大地色機能外套通勤也好看，口袋設計實用又有型。',
-    imageUrl: 'https://i.pinimg.com/1200x/a4/65/bf/a465bf1d175351db32b787f60f697b68.jpg',
-    publishedAt: daysAgo(4),
-    likesCount: '856',
+    content: '極簡工裝風｜大地色機能外套通勤也好看。極簡工裝風，大地色機能外套通勤也好看，口袋設計實用又有型。',
+    postDate: daysAgo(4),
+    status: 'published',
+    images: [
+      { postImageId: 102, imageFileName: 'outfit-utility-jacket.jpg', sortOrder: 1, url: 'https://picsum.photos/seed/outfit-utility-jacket/700/560' }
+    ],
+    likesCount: 856,
     commentsCount: 42,
-    taggedProducts: [{ id: 1, name: '經典圓領短T' }]
+    taggedProducts: [{ taggedId: 2, productId: 1, productRoute: '/shop/product/1', name: '經典圓領短T' }]
   },
   {
-    postId: 3,
+    communityPostId: 3,
+    userId: 3,
     user: { name: '小雨 rainy', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Rainy' },
-    title: '約會小心機 | 法式碎花洋裝配藤編包 🌸',
-    desc: '約會小心機，法式碎花洋裝配藤編包，甜而不膩剛剛好。',
-    imageUrl: 'https://i.pinimg.com/736x/77/06/5b/77065b64440d69cefa7da53cd9b7949c.jpg',
-    publishedAt: daysAgo(1),
-    likesCount: '2.4k',
+    content: '約會小心機｜法式碎花洋裝配藤編包 🌸。約會小心機，法式碎花洋裝配藤編包，甜而不膩剛剛好。',
+    postDate: daysAgo(1),
+    status: 'published',
+    images: [
+      { postImageId: 103, imageFileName: 'outfit-floral-dress.jpg', sortOrder: 1, url: 'https://picsum.photos/seed/outfit-floral-dress/700/560' }
+    ],
+    likesCount: 2400,
     commentsCount: 158,
-    taggedProducts: [{ id: 2, name: '法式碎花洋裝' }]
+    taggedProducts: [{ taggedId: 3, productId: 2, productRoute: '/shop/product/2', name: '法式碎花洋裝' }]
   },
   {
-    postId: 4,
+    communityPostId: 4,
+    userId: 4,
     user: { name: 'Leo_urban', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Leo' },
-    title: '街頭機能風 | 背心＋工裝褲率性感',
-    desc: '機能背心＋工裝褲，街頭感十足，鞋款選厚底增加率性。',
-    imageUrl: 'https://i.pinimg.com/736x/f5/ad/94/f5ad945ea71f85aa3f57038caf8c4670.jpg',
-    publishedAt: daysAgo(5),
-    likesCount: '631',
+    content: '街頭機能風｜背心＋工裝褲率性感。機能背心＋工裝褲，街頭感十足，鞋款選厚底增加率性。',
+    postDate: daysAgo(5),
+    status: 'published',
+    images: [
+      { postImageId: 104, imageFileName: 'outfit-street-utility.jpg', sortOrder: 1, url: 'https://picsum.photos/seed/outfit-street-utility/700/560' }
+    ],
+    likesCount: 631,
     commentsCount: 27,
-    taggedProducts: [{ id: 4, name: '修身牛仔褲' }]
+    taggedProducts: [{ taggedId: 4, productId: 4, productRoute: '/shop/product/4', name: '修身牛仔褲' }]
   },
   {
-    postId: 5,
+    communityPostId: 5,
+    userId: 5,
     user: { name: 'Mia.wardrobe', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mia' },
-    title: '極簡膠囊衣櫥 | 五件單品排列組合穿一週',
-    desc: '挑五件百搭基本款互相搭配，減法生活從衣櫃開始，出門前不再猶豫要穿什麼。',
-    imageUrl: 'https://i.pinimg.com/736x/ae/8b/0f/ae8b0f68257334eb59caf2517e6c8278.jpg',
-    publishedAt: daysAgo(3),
-    likesCount: '1.1k',
+    content: '極簡膠囊衣櫥｜五件單品排列組合穿一週。挑五件百搭基本款互相搭配，減法生活從衣櫃開始，出門前不再猶豫要穿什麼。',
+    postDate: daysAgo(3),
+    status: 'published',
+    images: [
+      { postImageId: 105, imageFileName: 'outfit-capsule-wardrobe.jpg', sortOrder: 1, url: 'https://picsum.photos/seed/outfit-capsule-wardrobe/700/560' }
+    ],
+    likesCount: 1100,
     commentsCount: 54,
-    taggedProducts: [{ id: 5, name: '百褶及膝裙' }]
+    taggedProducts: [{ taggedId: 5, productId: 5, productRoute: '/shop/product/5', name: '百褶及膝裙' }]
   }
 ])
 
@@ -110,16 +162,16 @@ export const addPost = (post) => {
 // savedPosts：使用者收藏的貼文清單，一開始是空陣列（還沒收藏任何東西）。
 export const savedPosts = reactive([])
 
-// isPostSaved：檢查某篇貼文（用 id 判斷）現在是不是已經在收藏清單裡。
+// isPostSaved：檢查某篇貼文（用 communityPostId 判斷）現在是不是已經在收藏清單裡。
 // .some(...)：陣列方法，只要陣列裡「有任何一筆」符合條件，就回傳 true，否則回傳 false。
-export const isPostSaved = (postId) => savedPosts.some(p => p.id === postId)
+export const isPostSaved = (communityPostId) => savedPosts.some(p => p.communityPostId === communityPostId)
 
 // toggleSavePost：切換某篇貼文的收藏狀態。
-// post 參數是一個「整理好格式」的貼文物件（欄位名稱要跟下面 UserProfileView.vue
-// 顯示收藏牆用的格式一致：id、title、image、likes、comments、tags）。
+// post 參數是一個「整理好格式」的貼文物件，欄位名稱對照 Community_Favorite +
+// Community_Post：communityPostId、content、image、likesCount、commentsCount、tags。
 // findIndex：找出這篇貼文目前在 savedPosts 陣列裡「排第幾個」，找不到會回傳 -1。
 export const toggleSavePost = (post) => {
-  const idx = savedPosts.findIndex(p => p.id === post.id)
+  const idx = savedPosts.findIndex(p => p.communityPostId === post.communityPostId)
   if (idx === -1) {
     // 還沒收藏過 → 加到收藏清單最前面
     savedPosts.unshift(post)
@@ -137,6 +189,18 @@ export const toggleSavePost = (post) => {
 import { ref, computed } from 'vue'
 
 // posts 已經在上面的 <script> 區塊宣告並 export，這裡同一個檔案內可以直接使用，不用再 import
+
+// formatCount：跟上面那個 <script>（非 setup）區塊裡的 formatCount 是「一模一樣」的函式，
+// 這裡要重複宣告一次，是因為 Vue 的規則是：<template> 只能直接使用宣告在
+// 這個 <script setup> 區塊裡的變數／函式，宣告在旁邊那個「非 setup」<script> 裡的東西
+// （即使有 export），<template> 是抓不到的，只有「其他檔案」import 進去才抓得到。
+// 所以「給別的檔案共用」跟「給這個檔案自己的畫面用」，要各自放一份。
+const formatCount = (n) => {
+  if (n >= 1000) {
+    return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
+  }
+  return String(n)
+}
 
 // 分頁 Tab 狀態
 // 記錄使用者現在點的是「熱門」「最新」還是「追蹤中」哪一個分頁，
@@ -184,11 +248,14 @@ const currentTabCopy = computed(() => tabCopy[currentTab.value] || tabCopy.hot)
 const tabPosts = computed(() => {
   if (currentTab.value === 'new') {
     // 最新：依發布時間新到舊排序
-    
+    // [...posts]：這個寫法叫做「展開運算子」，作用是「複製一份新的陣列」，
+    // 不直接對原本的 posts 排序，是為了避免不小心把原始資料的順序也永久打亂。
+    // .sort((a, b) => ...)：sort 是陣列排序方法，a、b 代表「拿來互相比較的兩筆資料」。
+    // new Date(b.postDate) - new Date(a.postDate)：
     // 把日期文字轉換成「時間」再相減，結果是正數還是負數，決定了 a、b 誰排前面，
     // 這樣寫的效果就是「時間新的排前面、時間舊的排後面」。
     return [...posts].sort(
-      (a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)
+      (a, b) => new Date(b.postDate) - new Date(a.postDate)
     )
   }
   if (currentTab.value === 'follow') {
@@ -220,14 +287,15 @@ const filteredPosts = computed(() => {
   if (!q) return base
   return base.filter(post => {
     // .includes(q)：判斷字串裡面「有沒有包含」q 這段文字。
-    const inTitle = post.title.toLowerCase().includes(q)
+    // 原本是搜尋 post.title，因為資料庫沒有分開存 title/desc，改成搜尋 post.content。
+    const inContent = post.content.toLowerCase().includes(q)
     const inUser = post.user.name.toLowerCase().includes(q)
     // post.taggedProducts || []：如果這篇貼文沒有 taggedProducts（是 undefined），
     // 就改用一個空陣列 []，避免下面呼叫 .some() 的時候噴錯。
     // .some(...)：只要陣列裡「有任何一筆」符合條件，就回傳 true。
     const inTags = (post.taggedProducts || []).some(p => p.name.toLowerCase().includes(q))
-    // 標題、發文者名字、標籤，只要其中一個有搜尋到關鍵字，這篇貼文就會被留下來。
-    return inTitle || inUser || inTags
+    // 內文、發文者名字、標籤，只要其中一個有搜尋到關鍵字，這篇貼文就會被留下來。
+    return inContent || inUser || inTags
   })
 })
 
@@ -279,11 +347,11 @@ const toggleFollow = (creator) => {
           <div class="page-head-text">
             <div class="eyebrow">Style Journal</div>
             <h1 class="page-title">CLO Daily</h1>
-            <p class="page-sub">紀錄每一天的 OOTD</p>
+            <p class="page-sub">紀錄每一天的穿著練習</p>
           </div>
         </div>
 
-        <!-- 搜尋列：可搜尋穿搭、標籤或用戶 -->
+        <!-- 搜尋列：可搜尋穿搭標籤、單品或用戶 -->
         <div class="search-bar">
           <svg class="search-icon" viewBox="0 0 24 24" fill="none">
             <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
@@ -299,7 +367,7 @@ const toggleFollow = (creator) => {
             type="text"
             v-model="searchQuery"
             class="search-input"
-            placeholder="搜尋關鍵字、標籤或用戶..."
+            placeholder="搜尋穿搭、單品或用戶..."
           />
           <!--
             v-if="searchQuery"：只有搜尋框裡有文字的時候，才顯示這個「清除」按鈕。
@@ -354,9 +422,9 @@ const toggleFollow = (creator) => {
             這時候這整塊就不會出現，搜尋結果會全部乖乖排在下面的網格裡。
           -->
           <div class="feature-card" v-if="featurePost">
-            <router-link :to="`/community/post/${featurePost.postId}`" class="feature-media d-block text-decoration-none">
+            <router-link :to="`/community/post/${featurePost.communityPostId}`" class="feature-media d-block text-decoration-none">
               <span class="tag-label">{{ currentTabCopy.ribbon }}</span>
-              <img :src="featurePost.imageUrl" :alt="featurePost.title" />
+              <img :src="featurePost.images[0]?.url" :alt="featurePost.content" />
             </router-link>
             <div class="feature-body">
               <router-link to="/community/profile" class="author-row text-decoration-none">
@@ -366,14 +434,17 @@ const toggleFollow = (creator) => {
                   <div class="author-role">{{ currentTabCopy.role }}</div>
                 </div>
               </router-link>
-              <router-link :to="`/community/post/${featurePost.postId}`" class="text-decoration-none text-dark">
-                <h3>{{ featurePost.title }}</h3>
+              <!--
+                資料庫的 content 只有一個欄位（不像以前假資料分開存 title/desc），
+                所以這裡直接把 content 當內文顯示，不再另外拆一段標題。
+              -->
+              <router-link :to="`/community/post/${featurePost.communityPostId}`" class="text-decoration-none text-dark">
+                <h3>{{ featurePost.content }}</h3>
               </router-link>
-              <p class="desc">{{ featurePost.desc }}</p>
               <div class="stat-row">
-                <span>♥ {{ featurePost.likesCount }}</span>
-                <span>💬 {{ featurePost.commentsCount }}</span>
-               
+                <span>♥ {{ formatCount(featurePost.likesCount) }}</span>
+                <span>💬 {{ formatCount(featurePost.commentsCount) }}</span>
+                <a href="#" class="link-out">查看單品 →</a>
               </div>
             </div>
           </div>
@@ -396,13 +467,19 @@ const toggleFollow = (creator) => {
             v-for="post in gridPosts"：把 gridPosts 裡每一筆貼文都畫成一張小卡片。
           -->
           <div class="post-grid" v-if="gridPosts.length">
-            <div v-for="post in gridPosts" :key="post.postId" class="post-card">
+            <div v-for="post in gridPosts" :key="post.communityPostId" class="post-card">
 
-              <router-link :to="`/community/post/${post.postId}`" class="post-media d-block text-decoration-none">
+              <router-link :to="`/community/post/${post.communityPostId}`" class="post-media d-block text-decoration-none">
                 <span class="tag-label" v-if="post.taggedProducts && post.taggedProducts[0]">
                   {{ post.taggedProducts[0].name }}
                 </span>
-                <img :src="post.imageUrl" :alt="post.title" />
+                <!--
+                  post.images[0]?.url：images 是一個陣列（對應資料庫 Post_Images 表，
+                  一篇貼文可以有多張圖），這裡先固定拿「第一張」當卡片縮圖。
+                  ?. 叫做「可選鏈」，如果 post.images 是空陣列、抓不到第 0 張，
+                  就不會整個報錯，只會安靜地回傳 undefined。
+                -->
+                <img :src="post.images[0]?.url" :alt="post.content" />
               </router-link>
 
               <div class="post-body">
@@ -411,14 +488,19 @@ const toggleFollow = (creator) => {
                   <span>{{ post.user.name }}</span>
                 </router-link>
 
-                <router-link :to="`/community/post/${post.postId}`" class="text-decoration-none">
-                  <p class="post-desc line-clamp-2">{{ post.title }}</p>
+                <router-link :to="`/community/post/${post.communityPostId}`" class="text-decoration-none">
+                  <p class="post-desc line-clamp-2">{{ post.content }}</p>
                 </router-link>
 
                 <div class="post-foot">
-                  <span>♥ {{ post.likesCount }}</span>
-                  <span>💬 {{ post.commentsCount }}</span>
-                  
+                  <!--
+                    formatCount(...)：post.likesCount／commentsCount 現在存的是純數字
+                    （例如 1200），不是寫死的 '1.2k' 字串，畫面顯示時才呼叫 formatCount
+                    轉換成縮寫格式。這樣資料本身仍然是「可以排序、可以比大小」的數字。
+                  -->
+                  <span>♥ {{ formatCount(post.likesCount) }}</span>
+                  <span>💬 {{ formatCount(post.commentsCount) }}</span>
+                  <a href="#">單品</a>
                 </div>
               </div>
             </div>
@@ -502,8 +584,10 @@ const toggleFollow = (creator) => {
   --plum-deep:#5E3941;
   --ochre:#B8862E;
   --hairline:#E4D8CC;
+  --font-serif:'Noto Serif TC', serif;
+  --font-sans:'Noto Sans TC', sans-serif;
   color: var(--ink);
-  font-family: 'Noto Sans TC', sans-serif;
+  font-family: var(--font-sans);
 }
 
 /* ---------- 頁首：韓風簡約版（左側細直線引導） ---------- */
@@ -522,7 +606,7 @@ const toggleFollow = (creator) => {
   color:#A9A196; font-weight:600; margin-bottom:.4rem;
 }
 .page-title{
-  font-family:'Noto Serif TC', serif;
+  font-family:var(--font-serif);
   font-weight:900;
   font-size:clamp(1.7rem, 3.2vw, 2.1rem);
   line-height:1.1;
@@ -530,7 +614,7 @@ const toggleFollow = (creator) => {
   color: var(--ink);
 }
 .page-sub{
-  font-family:'Noto Serif TC', serif;
+  font-family:var(--font-serif);
   font-style:italic;
   color:#9C9086;
   font-size:.92rem;
@@ -557,7 +641,7 @@ const toggleFollow = (creator) => {
 .search-input{
   border:none; outline:none; background:transparent;
   flex:1; margin-left:.6rem;
-  font-family:'Noto Sans TC', sans-serif;
+  font-family:var(--font-sans);
   font-size:.88rem; color:var(--ink);
 }
 .search-input::placeholder{ color:var(--ink-soft); }
@@ -579,7 +663,7 @@ const toggleFollow = (creator) => {
 .tab-group{ display:flex; gap:1.8rem; }
 .tab-btn{
   background:none; border:none; padding:.7rem 0;
-  font-family:'Noto Serif TC', serif;
+  font-family:var(--font-serif);
   font-size:1.02rem; color:var(--ink-soft);
   position:relative; cursor:pointer;
 }
@@ -628,10 +712,12 @@ const toggleFollow = (creator) => {
 .author-role{ font-size:.76rem; color:var(--ink-soft); }
 
 .feature-body h3{
-  font-family:'Noto Serif TC', serif;
-  font-size:1.4rem; font-weight:700; line-height:1.35; margin-bottom:.6rem;
+  font-family:var(--font-serif);
+  font-size:1.3rem; font-weight:700; line-height:1.5; margin-bottom:.6rem;
+  flex:1;
+  /* content 現在是合併過的完整內文，比原本的短標題長很多，用 line-clamp 限制最多顯示 5 行 */
+  display:-webkit-box; -webkit-line-clamp:5; -webkit-box-orient:vertical; overflow:hidden;
 }
-.feature-body p.desc{ color:var(--ink-soft); font-size:.92rem; line-height:1.7; flex:1; }
 
 .stat-row{
   display:flex; align-items:center; gap:1.2rem;
@@ -688,7 +774,7 @@ const toggleFollow = (creator) => {
 /* ---------- 側邊欄 ---------- */
 .side-card{ background:var(--paper); border:1px solid var(--hairline); border-radius:16px; padding:1.4rem 1.3rem; margin-bottom:1.4rem; }
 .side-title{
-  font-family:'Noto Serif TC', serif; font-weight:700; font-size:1.02rem;
+  font-family:var(--font-serif); font-weight:700; font-size:1.02rem;
   margin-bottom:1.1rem; display:flex; align-items:center; gap:.5rem; color:var(--ink);
 }
 .side-title .dot{ width:6px; height:6px; border-radius:50%; background:var(--ochre); }
@@ -718,7 +804,7 @@ const toggleFollow = (creator) => {
 .tag-chip:hover{ border-color:var(--ochre); color:var(--ochre); }
 
 .side-note{
-  font-family:'Noto Serif TC', serif; font-style:italic;
+  font-family:var(--font-serif); font-style:italic;
   font-size:.84rem; color:var(--ink-soft); line-height:1.7;
   border-left:2px solid var(--plum); padding-left:.9rem; margin:0;
 }

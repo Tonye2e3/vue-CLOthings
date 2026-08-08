@@ -9,9 +9,13 @@
 import { ref } from 'vue'
 
 // 收藏功能共用資料（跟 PostDetailView.vue 共用同一份收藏清單，直接 import 那個檔案）
-// savedPosts：使用者收藏的所有貼文，格式是 { id, title, image, likes, comments, tags }，
-// PostDetailView.vue 按收藏的時候會把貼文加進這份清單，這裡直接讀出來顯示。
-import { savedPosts } from '@/views/Community/CommunityView.vue'
+// savedPosts：使用者收藏的所有貼文，格式對照 Community_Favorite + Community_Post：
+// { communityPostId, content, image, likesCount, commentsCount, tags }。
+// formatCount：把純數字（例如 1200）轉成「1.2k」這種縮寫格式，這裡是「跨檔案 import」，
+// 跟 CommunityView.vue 自己 <template> 要另外重複宣告一份不一樣——
+// 因為這裡是「別的檔案」透過 import 拿到它，並不是同一個 SFC 裡的 <script setup>／<template>
+// 那種限制，所以可以直接在這個檔案的 <template> 裡正常使用。
+import { savedPosts, formatCount } from '@/views/Community/CommunityView.vue'
 
 
 // 使用者個人資料
@@ -23,7 +27,7 @@ const userProfile = ref({
   name: 'Emily 艾米莉',
   handle: '@emily_style',
   bioTag: '韓系 | 簡約 | 日常穿搭分享',
-  bio: '喜歡分享每天的穿搭靈感，點擊看板搭配同款單品，一起變美！',
+  bio: '喜歡分享每天的穿搭靈感    點擊看板搭配同款單品，一起變美！',
   avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily', // 大頭貼圖片網址
   bannerBg: '#EFE8E1', // 暖質感奶茶底色
   postsCount: '1,284',    // 貼文數（純文字顯示用，不是拿來計算的數字）
@@ -38,40 +42,43 @@ const userProfile = ref({
 // 畫面會根據這個值，決定要顯示哪一塊內容（下面 template 會用到）。
 const activeTab = ref('works')
 
-// 穿搭作品列表 (改回帶有 # 的標籤格式)
+// 穿搭作品列表
 // 這是一個「陣列」（用 [ ] 包起來、裡面放很多筆資料），每一筆都是一篇貼文的資訊。
 // 之後畫面會用 v-for 把這個陣列「一筆一筆」畫成一張一張的卡片。
+// 欄位對照資料庫（Community_Post）：communityPostId、content（合併原本的 title）、
+// image（對應 Post_Images 第一張圖）、likesCount／commentsCount（純數字，顯示時再用
+// formatCount 轉成「1.2k」這種縮寫）、tags（對應 Post_Tagged_Products 的商品名稱）。
 const userPosts = ref([
   {
-    id: 1,
-    title: '春日約會穿搭 · 碎花洋裝',
+    communityPostId: 1,
+    content: '春日約會穿搭 · 碎花洋裝',
     image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&auto=format&fit=crop&q=80',
-    likes: '2,341',
-    comments: '128',
+    likesCount: 2341,
+    commentsCount: 128,
     tags: ['#法式碎花洋裝', '#皮革側背包'] // 這篇貼文的標籤，也是一個陣列（字串陣列）
   },
   {
-    id: 2,
-    title: '秋冬層次感 · 大衣外套',
+    communityPostId: 2,
+    content: '秋冬層次感 · 大衣外套',
     image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=600&auto=format&fit=crop&q=80',
-    likes: '1,876',
-    comments: '94',
+    likesCount: 1876,
+    commentsCount: 94,
     tags: ['#羊毛長大衣', '#親膚針織衫']
   },
   {
-    id: 3,
-    title: '休閒日常 · 針織上衣',
+    communityPostId: 3,
+    content: '休閒日常 · 針織上衣',
     image: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=600&auto=format&fit=crop&q=80',
-    likes: '3,102',
-    comments: '210',
+    likesCount: 3102,
+    commentsCount: 210,
     tags: ['#V領軟糯針織', '#高腰休閒褲']
   },
   {
-    id: 4,
-    title: '通勤 OL 風 · 配件搭配',
+    communityPostId: 4,
+    content: '通勤 OL 風 · 配件搭配',
     image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=600&auto=format&fit=crop&q=80',
-    likes: '1,542',
-    comments: '76',
+    likesCount: 1542,
+    commentsCount: 76,
     tags: ['#質感西裝外套', '#真皮皮帶']
   }
 ])
@@ -82,7 +89,9 @@ const userPosts = ref([
 // 只有純顯示用途，所以不需要讓 Vue 特別去「追蹤」它的變化。
 const tabs = [
   { key: 'works', label: '穿搭作品' },
-  { key: 'saved', label: '收藏' }
+  { key: 'saved', label: '收藏' },
+  { key: 'products', label: '同款商品' },
+  { key: 'about', label: '關於我' }
 ]
 
 // 這是一個「函式」（function，可以想成一個按鈕按下去要執行的一段動作）。
@@ -158,7 +167,7 @@ const toggleFollow = () => {
                   -->
                   {{ userProfile.isFollowing ? '已追蹤' : '＋ 追蹤' }}
                 </button>
-                 <!--
+                <!--
                   改用 mailto 連結：href 前面加上 "mailto:"，瀏覽器看到這個開頭
                   就知道不是要跳到一般網頁，而是要打開使用者電腦裡設定好的
                   預設郵件軟體（例如 Outlook、Gmail 桌面版），
@@ -226,17 +235,17 @@ const toggleFollow = () => {
       -->
       <div v-if="activeTab === 'works'" class="post-grid">
         <!-- 一樣是 v-for 迴圈，把 userPosts 陣列裡每一篇貼文都畫成一張卡片 -->
-        <div v-for="post in userPosts" :key="post.id" class="post-card">
+        <div v-for="post in userPosts" :key="post.communityPostId" class="post-card">
 
           <!--
             <router-link> 是 Vue Router（負責網址切換的套件）提供的元件，
             功能跟 HTML 原生的 <a> 連結很像，差別是點下去不會整頁重新整理，
             而是在同一個網頁內「偷偷換內容」，速度比較快。
-            :to="`/community/post/${post.id}`" 這種寫法叫做「樣板字串」，
+            :to="`/community/post/${post.communityPostId}`" 這種寫法叫做「樣板字串」，
             用反引號 ` ` 包起來，裡面的 ${...} 會被換成實際的變數值，
-            例如 post.id 是 1，網址就會變成 /community/post/1。
+            例如 post.communityPostId 是 1，網址就會變成 /community/post/1。
           -->
-          <router-link :to="`/community/post/${post.id}`" class="post-media d-block text-decoration-none">
+          <router-link :to="`/community/post/${post.communityPostId}`" class="post-media d-block text-decoration-none">
             <!--
               v-if="post.tags[0]"：如果這篇貼文的標籤陣列第一筆存在（不是空的），
               才顯示這個標籤小方塊。
@@ -245,18 +254,19 @@ const toggleFollow = () => {
               這裡顯示的時候想拿掉 #。
             -->
             <span class="tag-label" v-if="post.tags[0]">{{ post.tags[0].replace('#', '') }}</span>
-            <img :src="post.image" :alt="post.title" />
+            <img :src="post.image" :alt="post.content" />
           </router-link>
 
           <div class="post-body">
-            <router-link :to="`/community/post/${post.id}`" class="text-decoration-none">
-              <h6 class="post-title">{{ post.title }}</h6>
+            <router-link :to="`/community/post/${post.communityPostId}`" class="text-decoration-none">
+              <h6 class="post-title">{{ post.content }}</h6>
             </router-link>
 
             <div class="post-stats">
-              <span>♥ {{ post.likes }}</span>
-              <span>💬 {{ post.comments }}</span>
-              <router-link :to="`/community/post/${post.id}`" class="ms-auto">查看同款</router-link>
+              <!-- formatCount：把純數字轉成「1.2k」這種縮寫，跟 CommunityView.vue import 進來的是同一個函式 -->
+              <span>♥ {{ formatCount(post.likesCount) }}</span>
+              <span>💬 {{ formatCount(post.commentsCount) }}</span>
+              <router-link :to="`/community/post/${post.communityPostId}`" class="ms-auto">查看同款</router-link>
             </div>
 
             <div class="tag-cloud">
@@ -280,21 +290,21 @@ const toggleFollow = () => {
       <div v-else-if="activeTab === 'saved'">
         <div v-if="savedPosts.length" class="post-grid">
           <!-- 這裡的卡片排版跟上面「穿搭作品牆」幾乎一模一樣，差別只是資料來源換成 savedPosts -->
-          <div v-for="post in savedPosts" :key="post.id" class="post-card">
-            <router-link :to="`/community/post/${post.id}`" class="post-media d-block text-decoration-none">
+          <div v-for="post in savedPosts" :key="post.communityPostId" class="post-card">
+            <router-link :to="`/community/post/${post.communityPostId}`" class="post-media d-block text-decoration-none">
               <span class="tag-label" v-if="post.tags[0]">{{ post.tags[0].replace('#', '') }}</span>
-              <img :src="post.image" :alt="post.title" />
+              <img :src="post.image" :alt="post.content" />
             </router-link>
 
             <div class="post-body">
-              <router-link :to="`/community/post/${post.id}`" class="text-decoration-none">
-                <h6 class="post-title">{{ post.title }}</h6>
+              <router-link :to="`/community/post/${post.communityPostId}`" class="text-decoration-none">
+                <h6 class="post-title">{{ post.content }}</h6>
               </router-link>
 
               <div class="post-stats">
-                <span>♥ {{ post.likes }}</span>
-                <span>💬 {{ post.comments }}</span>
-                <router-link :to="`/community/post/${post.id}`" class="ms-auto">查看同款</router-link>
+                <span>♥ {{ formatCount(post.likesCount) }}</span>
+                <span>💬 {{ formatCount(post.commentsCount) }}</span>
+                <router-link :to="`/community/post/${post.communityPostId}`" class="ms-auto">查看同款</router-link>
               </div>
 
               <div class="tag-cloud">
@@ -306,9 +316,19 @@ const toggleFollow = () => {
 
         <!-- v-else（搭配上面裡層的 v-if）：收藏清單是空的時候，顯示這個提示，而不是一片空白 -->
         <div v-else class="empty-state">
-          <div class="empty-icon"></div>
+          <div class="empty-icon">📁</div>
           <p class="empty-note">「還沒有收藏任何穿搭，去社群逛逛按個收藏吧。」</p>
         </div>
+      </div>
+
+      <!--
+        其它頁籤（同款商品 / 關於我）未開啟時的預設狀態
+        這裡的 v-else 是接在最上面 works 那個 v-if、跟剛剛 saved 那個 v-else-if 後面，
+        意思是「works 不是、saved 也不是」，才會走到這裡。
+      -->
+      <div v-else class="empty-state">
+        <div class="empty-icon">📁</div>
+        <p class="empty-note">「這裡的故事，還在整理中。」</p>
       </div>
 
     </div>
@@ -324,7 +344,6 @@ const toggleFollow = () => {
   然後把下面每一條 CSS 規則也自動加上同樣的屬性選擇器，
   這樣瀏覽器比對的時候就只會匹配到「這個檔案畫出來的元素」。
 */
-@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
 .community-page {
   width: 100%;
   min-height: 100vh;

@@ -20,16 +20,22 @@ import postImage from '@/assets/Postimage/post2.jpg'
 // 這是一個很大的物件，裡面用「巢狀」的方式（物件裡面還有物件、陣列）
 // 裝著這篇貼文需要的所有資訊。
 const post = ref({
-  id: 8842,
+  communityPostId: 8842, // 對應資料庫 post_id
+  userId: 1, // 對應 user_id
   user: {
     name: 'Emily_穿搭日記',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily',
-    time: '2 小時前',
     location: '台北'
   },
   isFollowing: false,
-  // 指向剛才 import 的本地圖片變數
-  imageUrl: postImage,
+  // postDate：對應 post_date，示範資料用「2 小時前」的時間。
+  postDate: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+  status: 'published', // 對應 status
+  // images：對應 Post_Images 表，一篇貼文可以有多張圖片，這裡先放一張示範。
+  // 指向剛才 import 的本地圖片變數。
+  images: [
+    { postImageId: 201, imageFileName: 'post2.jpg', sortOrder: 1, url: postImage }
+  ],
   content: '今天走簡約韓系風格，這套針織上衣與打褶寬褲質感超好，版型顯瘦又舒服，很適合秋天約會或上班～ 全身都可以直接在下方點擊購買！',
   commentsCount: 86,
   isLiked: false, // 「我」有沒有按讚
@@ -37,16 +43,24 @@ const post = ref({
   // （savedPosts，在 CommunityView.vue 裡）即時判斷，不用自己在這裡另外存一份，
   // 這樣才不會發生「這裡顯示已收藏，但 UserProfileView 收藏頁籤卻沒有」這種兩邊資料兜不起來的情況。
   //
-  // taggedProducts：這篇貼文標記的商品。原本這裡還有 x、y 兩個欄位，
-  // 是拿來把標籤定位在照片上的百分比座標，但資料庫其實沒有存這兩個欄位
-  // （資料庫存的是 productRoute，商品連結），所以拿掉 x/y，
-  // 改成把標記商品顯示在貼文文字下方的一排標籤，而不是浮在照片上。
-  // 這裡的 id 會跟下面 products 清單裡的 id 對應，用來找出對應商品的連結。
+  // taggedProducts：這篇貼文標記的商品，對應 Post_Tagged_Products 表。
+  // productId 對應資料庫真正的欄位，用來跟下面 products 清單裡的 productId 對應，
+  // 才能找出這個標記商品實際的 productRoute（商品連結）。
   taggedProducts: [
-    { id: 101, name: '針織上衣' },
-    { id: 102, name: '高腰寬褲' },
-    { id: 103, name: '托特包' }
+    { taggedId: 1, productId: 101, name: '針織上衣' },
+    { taggedId: 2, productId: 102, name: '高腰寬褲' },
+    { taggedId: 3, productId: 103, name: '托特包' }
   ]
+})
+
+// postTimeAgo：把 post.postDate 這個正式時間，轉換成「N 小時前」這種給人看的相對時間文字。
+// 之後接上真的 API，這個計算方式不用變，只是 postDate 會是後端真正回傳的發文時間。
+const postTimeAgo = computed(() => {
+  const diffMs = Date.now() - new Date(post.value.postDate).getTime()
+  const diffHours = Math.round(diffMs / (60 * 60 * 1000))
+  if (diffHours < 1) return '剛剛'
+  if (diffHours < 24) return `${diffHours} 小時前`
+  return `${Math.round(diffHours / 24)} 天前`
 })
 
 // 按讚數改用數字追蹤，方便按讚時 +1、取消時 -1；畫面顯示再轉成千分位字串
@@ -70,43 +84,43 @@ const toggleLike = () => {
 // 用 computed 從共用的收藏清單即時判斷（呼叫 CommunityView.vue 提供的 isPostSaved），
 // 而不是自己在這裡存一份 true/false，這樣不管使用者是從哪個頁面把貼文收藏／取消收藏，
 // 這裡都會自動顯示正確的狀態。
-const isSaved = computed(() => isPostSaved(post.value.id))
+const isSaved = computed(() => isPostSaved(post.value.communityPostId))
 
 // toggleSave：按下收藏按鈕時執行。
 const toggleSave = () => {
   // 把這篇貼文整理成 UserProfileView.vue 收藏牆看得懂的格式
-  // （欄位名稱要對得上：id、title、image、likes、comments、tags），
-  // 再呼叫 toggleSavePost 去新增或移除。
+  // （欄位名稱對照 Community_Favorite + Community_Post：communityPostId、content、image、
+  // likesCount、commentsCount、tags），再呼叫 toggleSavePost 去新增或移除。
   toggleSavePost({
-    id: post.value.id,
-    title: post.value.content,
-    image: post.value.imageUrl,
-    likes: likesDisplay.value,
-    comments: post.value.commentsCount,
+    communityPostId: post.value.communityPostId,
+    content: post.value.content,
+    image: post.value.images[0]?.url,
+    likesCount: likesNumber.value,
+    commentsCount: post.value.commentsCount,
     // .map(...)：把 taggedProducts 陣列裡每個標記物件，轉換成 "#商品名" 這種字串格式
     tags: post.value.taggedProducts.map(t => `#${t.name}`)
   })
 }
 
 // 這套穿搭的商品清單（右側欄要顯示的可購買商品）
-// productRoute：對應資料庫裡的商品連結欄位，點商品圖片／名稱會導去這個網址。
+// productId／productRoute：對應資料庫 Post_Tagged_Products 真正存的欄位。
 const products = ref([
   {
-    id: 101,
+    productId: 101,
     name: '奶油白V領針織上衣',
     price: '690',
     image: 'https://i.pinimg.com/1200x/dc/94/75/dc9475c6d350370bcf6c471e3ee6d6fb.jpg',
     productRoute: '/shop/product/101'
   },
   {
-    id: 102,
+    productId: 102,
     name: '高腰垂墜寬褲 (卡其)',
     price: '890',
     image: 'https://i.pinimg.com/1200x/f3/dd/f4/f3ddf4c34ff005240958bddb9a8080d0.jpg',
     productRoute: '/shop/product/102'
   },
   {
-    id: 103,
+    productId: 103,
     name: '復古麻編單肩托特包',
     price: '680',
     image: 'https://i.pinimg.com/736x/f2/cf/7b/f2cf7b273ca7445dce8800f855051f93.jpg',
@@ -114,11 +128,11 @@ const products = ref([
   }
 ])
 
-// findProductRoute：拿貼文標記商品的 id，去 products 清單裡找同一個 id 的商品，
+// findProductRoute：拿貼文標記商品的 productId，去 products 清單裡找同一個 productId 的商品，
 // 回傳它的 productRoute。找不到（例如標記了一個已下架的商品）就回傳 '#'，
 // 這樣連結還是有東西可以點，不會整個報錯。
 const findProductRoute = (productId) => {
-  const matched = products.value.find(p => p.id === productId)
+  const matched = products.value.find(p => p.productId === productId)
   return matched ? matched.productRoute : '#'
 }
 
@@ -130,9 +144,25 @@ const similarPosts = ref([
 ])
 
 // 留言列表：一開始先放兩筆假留言當範例
+// 欄位對照 Post_Comments 表：postCommentId、parentCommentId（回覆留言用，這裡示範資料都還沒有人回覆，
+// 所以先都是 null）、commentText、commentDate。
 const comments = ref([
-  { id: 1, user: '小美', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=May', text: '這套超好看！請問褲子是什麼顏色？' },
-  { id: 2, user: '阿圓', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jerry', text: '已收藏~等發薪就下單 !!!' }
+  {
+    postCommentId: 1,
+    parentCommentId: null,
+    user: '小美',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=May',
+    commentText: '這套超好看！請問褲子是什麼顏色？',
+    commentDate: new Date(Date.now() - 60 * 60 * 1000).toISOString()
+  },
+  {
+    postCommentId: 2,
+    parentCommentId: null,
+    user: '阿圓',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jerry',
+    commentText: '已收藏~等發薪就下單 !!!',
+    commentDate: new Date(Date.now() - 30 * 60 * 1000).toISOString()
+  }
 ])
 
 // newComment：跟留言輸入框做雙向綁定，存使用者「正在打字、還沒送出」的留言內容
@@ -151,10 +181,12 @@ const addComment = () => {
   // （原本用的是 .push()，加到最後面；改成 .unshift() 之後，
   // 剛送出的留言就會排在留言列表最上方，最新的留言最先被看到）。
   comments.value.unshift({
-    id: Date.now(), // 用目前時間當作這則留言的唯一編號
+    postCommentId: Date.now(), // 用目前時間當作這則留言的唯一編號
+    parentCommentId: null, // 不是回覆別人的留言，直接留在最外層
     user: '我', // 這裡先寫死成「我」，之後接上真正的登入系統可以換成真實使用者名稱
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Me',
-    text: newComment.value
+    commentText: newComment.value,
+    commentDate: new Date().toISOString()
   })
   newComment.value = '' // 送出後把輸入框清空，方便使用者繼續打下一則留言
 }
@@ -194,7 +226,8 @@ const addComment = () => {
                 <img :src="post.user.avatar" class="author-avatar" alt="avatar" />
                 <div>
                   <h6 class="author-name">{{ post.user.name }}</h6>
-                  <small class="author-meta">{{ post.user.time }} · {{ post.user.location }}</small>
+                  <!-- postTimeAgo：上面 script 用 postDate 算出來的「N 小時前」文字 -->
+                  <small class="author-meta">{{ postTimeAgo }} · {{ post.user.location }}</small>
                 </div>
               </router-link>
               <button
@@ -209,7 +242,8 @@ const addComment = () => {
             <!-- 主圖（拿掉了浮在照片上的定位標籤，因為資料庫沒有存座標） -->
             <div class="post-media">
               <span class="tag-label" v-if="post.taggedProducts[0]">封面故事</span>
-              <img :src="post.imageUrl" class="post-image" alt="post image" />
+              <!-- images 是陣列（對應 Post_Images），這裡固定顯示第一張 -->
+              <img :src="post.images[0]?.url" class="post-image" alt="post image" />
             </div>
 
             <!-- 按讚/分享/收藏 動作列 -->
@@ -259,7 +293,7 @@ const addComment = () => {
               productRoute 目前只是假的路徑（例如 /shop/product/101），
               真的點下去會導到不存在的頁面，demo 階段先不要讓它跳轉，
               只保留視覺樣式（看起來像標籤）。之後商城的商品頁做好、
-              productRoute 是真的網址時，把 <span> 換回 <a :href="findProductRoute(tag.id)">
+              productRoute 是真的網址時，把 <span> 換回 <a :href="findProductRoute(tag.productId)">
               就可以了，findProductRoute 這個函式邏輯已經寫好、留著沒動。
             -->
             <div class="tagged-products" v-if="post.taggedProducts.length">
@@ -267,7 +301,7 @@ const addComment = () => {
               <div class="tag-cloud">
                 <span
                   v-for="tag in post.taggedProducts"
-                  :key="tag.id"
+                  :key="tag.taggedId"
                   class="tag-chip"
                 >#{{ tag.name }}</span>
               </div>
@@ -280,11 +314,11 @@ const addComment = () => {
               </div>
 
               <div class="comments-list">
-                <div v-for="c in comments" :key="c.id" class="comment-row">
+                <div v-for="c in comments" :key="c.postCommentId" class="comment-row">
                   <img :src="c.avatar" class="comment-avatar" alt="avatar" />
                   <div class="comment-bubble">
                     <span class="comment-user">{{ c.user }}</span>
-                    <span>{{ c.text }}</span>
+                    <span>{{ c.commentText }}</span>
                   </div>
                 </div>
               </div>
@@ -319,7 +353,7 @@ const addComment = () => {
             <div class="side-title"><span class="dot"></span>這套穿搭的商品</div>
 
             <div class="product-list">
-              <div v-for="item in products" :key="item.id" class="product-row">
+              <div v-for="item in products" :key="item.productId" class="product-row">
                 <!--
                   product-link：把圖片＋商品資訊包成一個區塊，之後接上真的
                   商品頁時可以換回 <a :href="item.productRoute">，
