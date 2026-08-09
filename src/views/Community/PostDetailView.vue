@@ -1,5 +1,12 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+// useRoute：Vue Router 提供的功能，讓我們可以在 <script> 裡面讀到「目前網址」的資訊，
+// 例如網址上帶的動態參數。router/index.js 裡這個頁面對應的路由是
+// path: '/community/post/:id'，所以網址上 :id 那一段的值，
+// 就是這篇貼文的 communityPostId，要用 useRoute() 才能拿到。
+import { useRoute } from 'vue-router'
+// axios：打 API 用的套件，跟 CommunityView.vue 裡用的是同一套。
+import axios from 'axios'
 
 // 收藏功能共用資料（跟 UserProfileView.vue 共用同一份收藏清單，直接 import 那個檔案）
 // savedPosts：目前所有收藏的貼文清單（雖然這裡沒有直接用到它本身，
@@ -16,42 +23,89 @@ import { isPostSaved, toggleSavePost } from '@/views/Community/CommunityView.vue
 // 最後會變成一個瀏覽器看得懂的圖片網址，可以直接給 <img :src="..."> 用。
 import postImage from '@/assets/Postimage/post2.jpg'
 
+// API_BASE：後端 API 專案的網址，跟 CommunityView.vue 裡用的是同一個。
+const API_BASE = 'https://localhost:7255'
+
+// route：呼叫 useRoute() 拿到「目前網址」的資訊物件。
+const route = useRoute()
+
 // 貼文詳細資料
 // 這是一個很大的物件，裡面用「巢狀」的方式（物件裡面還有物件、陣列）
 // 裝著這篇貼文需要的所有資訊。
+// 先放一份「載入中」用的預設假資料，避免 API 還沒回來之前畫面整個空白、報錯。
 const post = ref({
-  communityPostId: 8842, // 對應資料庫 post_id
-  userId: 1, // 對應 user_id
+  communityPostId: null,
+  userId: null,
   user: {
-    name: 'Emily_穿搭日記',
+    name: '載入中...',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily',
-    location: '台北'
+    location: ''
   },
   isFollowing: false,
-  // postDate：對應 post_date，示範資料用「2 小時前」的時間。
-  postDate: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-  status: 'published', // 對應 status
-  // images：對應 Post_Images 表，一篇貼文可以有多張圖片，這裡先放一張示範。
-  // 指向剛才 import 的本地圖片變數。
+  postDate: new Date().toISOString(),
+  status: 'published',
   images: [
-    { postImageId: 201, imageFileName: 'post2.jpg', sortOrder: 1, url: postImage }
+    { postImageId: null, imageFileName: null, sortOrder: 1, url: postImage }
   ],
-  content: '今天走簡約韓系風格，這套針織上衣與打褶寬褲質感超好，版型顯瘦又舒服，很適合秋天約會或上班～ 全身都可以直接在下方點擊購買！',
-  commentsCount: 86,
-  isLiked: false, // 「我」有沒有按讚
-  // 這裡本來有個 isSaved 存「我」有沒有收藏，現在改成從共用的收藏清單
-  // （savedPosts，在 CommunityView.vue 裡）即時判斷，不用自己在這裡另外存一份，
-  // 這樣才不會發生「這裡顯示已收藏，但 UserProfileView 收藏頁籤卻沒有」這種兩邊資料兜不起來的情況。
-  //
-  // taggedProducts：這篇貼文標記的商品，對應 Post_Tagged_Products 表。
-  // productId 對應資料庫真正的欄位，用來跟下面 products 清單裡的 productId 對應，
-  // 才能找出這個標記商品實際的 productRoute（商品連結）。
-  taggedProducts: [
-    { taggedId: 1, productId: 101, name: '針織上衣' },
-    { taggedId: 2, productId: 102, name: '高腰寬褲' },
-    { taggedId: 3, productId: 103, name: '托特包' }
-  ]
+  content: '',
+  commentsCount: 0,
+  isLiked: false,
+  taggedProducts: []
 })
+
+// notFound：如果這個 id 在資料庫裡根本找不到對應的貼文，用這個來控制畫面顯示「找不到這篇貼文」。
+const notFound = ref(false)
+
+// fetchPost：向後端要「這一篇」貼文的完整資料。
+const fetchPost = async () => {
+  // route.params.id：讀出網址上 :id 這段動態參數的值，是字串型別
+  // （例如網址是 /community/post/3，這裡拿到的就是 "3"）。
+  const id = route.params.id
+  try {
+    const res = await axios.get(`${API_BASE}/api/CommunityPost/${id}`)
+
+    // 這支 API 找不到資料時，後端是回傳 null（不是觸發 404 錯誤），
+    // 所以要自己檢查 res.data 是不是 null，不能只靠 try/catch 判斷。
+    if (!res.data) {
+      notFound.value = true
+      return
+    }
+
+    const p = res.data
+    post.value = {
+      communityPostId: p.communityPostId,
+      userId: p.userId,
+      user: p.user || { name: '未知使用者', avatar: '', location: '' },
+      isFollowing: false, // API 目前沒有回傳「我有沒有追蹤這個人」，先預設沒有追蹤
+      postDate: p.postDate,
+      status: p.status,
+      images: (p.images && p.images.length)
+        ? p.images.map(img => ({
+            postImageId: img.postImageId,
+            imageFileName: img.imageFileName,
+            sortOrder: img.sortOrder,
+            // imageFileName 本身已經帶路徑了（例如 "/images/posts/post01_1.jpg"），
+            // 直接接在 API_BASE 後面組成完整網址，跟 CommunityView.vue 的做法一樣。
+            url: `${API_BASE}${img.imageFileName}`
+          }))
+        : [{ postImageId: null, imageFileName: null, sortOrder: 1, url: postImage }], // 完全沒有圖片時的保底畫面
+      content: p.content,
+      commentsCount: p.commentsCount ?? 0,
+      isLiked: false,
+      taggedProducts: p.taggedProducts || []
+    }
+    // 讚數也要跟著這篇貼文真正的數字重設，不能繼續用寫死的 1248。
+    // ?? 0：如果 p.likesCount 是 undefined 或 null，就用 0 代替，
+    // 避免後端這個欄位漏帶或叫別的名字時，讓 likesNumber 變成 undefined 把整頁弄壞。
+    likesNumber.value = p.likesCount ?? 0
+  } catch (err) {
+    console.error('讀取貼文詳細資料失敗：', err)
+    notFound.value = true
+  }
+}
+
+// onMounted：頁面一打開，就照網址上的 id 去後端要這篇貼文的完整資料。
+onMounted(fetchPost)
 
 // postTimeAgo：把 post.postDate 這個正式時間，轉換成「N 小時前」這種給人看的相對時間文字。
 // 之後接上真的 API，這個計算方式不用變，只是 postDate 會是後端真正回傳的發文時間。
@@ -207,7 +261,16 @@ const addComment = () => {
       -->
       <router-link to="/community" class="back-pill">← 返回社群</router-link>
 
-      <div class="row g-4">
+      <!--
+        notFound：如果網址上的 id 在資料庫裡找不到對應的貼文（例如網址被亂改、
+        或貼文已經被刪除），就顯示這個提示，不要繼續顯示「載入中...」那份假資料。
+      -->
+      <div v-if="notFound" class="not-found-state">
+        <p>找不到這篇貼文，可能已經被刪除，或網址不正確。</p>
+        <router-link to="/community" class="back-pill">← 返回社群</router-link>
+      </div>
+
+      <div class="row g-4" v-else>
 
         <!-- 左側：貼文主體區 (大圖、內文、互動、留言) -->
         <div class="col-12 col-lg-8">
@@ -301,7 +364,7 @@ const addComment = () => {
               <div class="tag-cloud">
                 <span
                   v-for="tag in post.taggedProducts"
-                  :key="tag.taggedId"
+                  :key="tag.postTaggedProductId"
                   class="tag-chip"
                 >#{{ tag.name }}</span>
               </div>
@@ -421,6 +484,13 @@ const addComment = () => {
   transition:all .18s ease;
 }
 .back-pill:hover{ background:var(--ink); color:var(--cream); }
+
+/* ---------- 找不到貼文 ---------- */
+.not-found-state{
+  background:var(--paper); border:1px dashed var(--hairline); border-radius:16px;
+  padding:3rem 2rem; text-align:center; color:var(--ink-soft);
+}
+.not-found-state p{ margin-bottom:1rem; }
 
 /* ---------- 主卡片 ---------- */
 .post-main-card{
