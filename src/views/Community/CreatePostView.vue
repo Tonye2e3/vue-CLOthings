@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 // useRouter：Vue Router 提供的功能，讓我們可以在 <script> 裡面「用程式的方式」
 // 切換網址（例如發文成功後自動跳轉回社群頁），而不是只能靠使用者自己點連結。
 import { useRouter } from 'vue-router'
+// axios：打 API 用的套件，跟 CommunityView.vue、PostDetailView.vue 裡用的是同一套。
+import axios from 'axios'
 
 
 // 全站共用的貼文清單（跟 CommunityView.vue 共用同一份資料，直接 import 那個檔案）
@@ -12,16 +14,21 @@ import { useRouter } from 'vue-router'
 // 回到 CommunityView.vue 的畫面上就會馬上看得到，不需要重新整理頁面、也不需要資料庫。
 import { addPost, currentUser } from '@/views/Community/CommunityView.vue'
 
+// API_BASE：後端 API 專案的網址，跟 CommunityView.vue、PostDetailView.vue 裡用的是同一個。
+const API_BASE = 'https://localhost:7255'
+
 // useRouter() 執行後會拿到一個「路由控制器」物件，
 // 之後想切換頁面，就呼叫 router.push('網址') 就可以了。
 const router = useRouter()
 
 // 表單雙向綁定資料
 // 這個物件會透過 v-model 直接跟畫面上的輸入框「雙向同步」
+
 // （使用者打字，這裡的值自動更新；這裡的值變了，輸入框顯示也會變）。
 const postForm = ref({
   content: '', // 使用者輸入的穿搭心得文字（對應資料庫 Community_Post.content 這個欄位）
-  selectedProducts: [] // 改為陣列，支援複選；存放使用者勾選的商品標籤名稱
+  selectedProducts: [], // 改為陣列，支援複選；存放使用者勾選的商品標籤名稱
+  status: 'public' // 貼文狀態：public（公開）或 hide（隱藏），對應資料庫 Community_Post.status，預設公開
 })
 
 // 圖片檔案與預覽用的 URL（改為陣列，支援多張照片）
@@ -97,46 +104,72 @@ const toggleProduct = (name) => {
   }
 }
 
-/// 送出發文：組出貼文資料，加進全站共用的貼文清單
+/// 送出發文：打真正的 API，把貼文存進資料庫
 // handleSubmit：使用者按下「確認發布」按鈕時，會執行這個函式。
-const handleSubmit = () => {
+// 改成 async，因為裡面要用 await 等後端 API 回應。
+const handleSubmit = async () => {
   // 檢查：如果一張照片都沒選、或是心得文字是空的，就跳出提示視窗、不繼續往下執行。
   if (imageFiles.value.length === 0 || !postForm.value.content) {
     alert('請上傳穿搭照片並填寫貼文心得！')
     return // return 在這裡的作用是「提早結束這個函式」，後面的程式碼都不會被執行。
   }
 
-  // 呼叫從 CommunityView.vue 拿來的 addPost 函式，
-  // 把使用者剛剛填寫的內容，組成跟 CommunityView.vue 裡 posts 陣列
-  // 一樣格式（對照資料庫欄位）的物件，塞進那份共用的貼文清單。
-  addPost({
-    communityPostId: Date.now(), // Date.now() 會回傳「現在的時間」轉成一個數字，拿來當作這篇貼文的唯一編號很方便
-    userId: null, // 之後接上真的登入系統，這裡要換成登入者的 user_id
-    user: { name: currentUser.name, avatar: currentUser.avatar }, // 發文者資訊，來自剛剛 import 的 currentUser
+  // 組出要送給後端的資料，對應 CommunityPostController.cs 的 PostCommunityPost(CommunityPostDTO)。
+  // 圖片、標記商品的部分後端會照這裡的清單，各自新增進 Post_Image、Post_Tagged_Product 兩張表。
+  const payload = {
+    // TODO: 之後接上真的登入系統，這裡要換成登入者的 user_id。
+    // 先用資料庫裡真的存在的測試帳號 id 頂著——後端 UserId 是不可為 null 的 int，送 null 會被擋在綁定階段（400）。
+    userId: 1,
     content: postForm.value.content, // 對應 Community_Post.content
-    postDate: new Date().toISOString(), // 對應 post_date，用「現在」當作發布時間
-    status: 'published', // 對應 status
-    // images：把每張選好的照片轉成 Post_Images 表的格式。
-    // .map((img, idx) => ...)：img 是這一張圖片的資料，idx 是它排第幾個（從 0 開始）。
-    // imageFileName 先用檔案本身的名稱（img.file.name）佔位，之後真的上傳到伺服器，
-    // 後端會回傳伺服器上真正的檔名／路徑，要記得換掉。
-    // sortOrder：用 idx + 1，讓第一張是 1、第二張是 2...，對應 Post_Images.sort_order。
-    // url：本地暫時預覽網址，只在這次瀏覽器分頁有效，之後要換成後端回傳的正式圖片網址。
+    status: postForm.value.status, // 對應 status：public（公開）或 hide（隱藏），來自上面選的公開設定
+    // images：把每張選好的照片轉成 Post_Image 表的格式。
+    // imageFileName 目前先用檔案本身的名稱（img.file.name）佔位——
+    // 真正的圖片上傳（存到 wwwroot/images/posts/ 之類的路徑）禮拜二跟老師確認完再串。
+    images: imageFiles.value.map((img, idx) => ({
+      imageFileName: img.file.name,
+      sortOrder: idx + 1
+    })),
+    // taggedProducts：把選中的商品名稱陣列，轉換成對應 Post_Tagged_Product 格式的物件陣列。
+    // 用 availableProducts.find(...) 找回這個名字對應的 productId。
+    taggedProducts: postForm.value.selectedProducts.map(name => {
+      const matched = availableProducts.value.find(p => p.name === name)
+      return {
+        productId: matched ? matched.productId : null,
+        productRoute: null
+      }
+    })
+  }
+
+  try {
+    await axios.post(`${API_BASE}/api/CommunityPost`, payload)
+  } catch (err) {
+    // API 出錯就提醒使用者，不要假裝發文成功、也不要繼續往下跳轉頁面。
+    console.error('發文失敗：', err)
+    alert('發文失敗，請稍後再試一次！')
+    return
+  }
+
+  // 呼叫從 CommunityView.vue 拿來的 addPost 函式，讓畫面「立刻」看到剛剛發的貼文，
+  // 不用等重新整理、重新打一次 GET API。真正存進資料庫的資料已經在上面 axios.post 那步完成了。
+  addPost({
+    communityPostId: Date.now(), // 這裡只是先讓畫面上有個暫時的唯一編號可以用，跟資料庫實際存的 id 無關
+    userId: null,
+    user: { name: currentUser.name, avatar: currentUser.avatar }, // 發文者資訊，來自剛剛 import 的 currentUser
+    content: postForm.value.content,
+    postDate: new Date().toISOString(),
+    status: postForm.value.status,
     images: imageFiles.value.map((img, idx) => ({
       postImageId: null,
       imageFileName: img.file.name,
       sortOrder: idx + 1,
-      url: img.url
+      url: img.url // 本地暫時預覽網址，之後圖片上傳串好、重新整理頁面後會被 API 回傳的正式網址取代
     })),
     likesCount: 0,
     commentsCount: 0,
-    // .map(...)：把選中的商品名稱陣列，轉換成對應 Post_Tagged_Products 格式的物件陣列。
-    // 用 availableProducts.find(...) 找回這個名字對應的 productId，
-    // productRoute 目前還沒有真正的商品頁可以連，先給 null。
     taggedProducts: postForm.value.selectedProducts.map(name => {
       const matched = availableProducts.value.find(p => p.name === name)
       return {
-        taggedId: null,
+        postTaggedProductId: null,
         productId: matched ? matched.productId : null,
         productRoute: null,
         name
@@ -144,7 +177,6 @@ const handleSubmit = () => {
     })
   })
 
-  // 這裡之後可以串接真正的 API 上傳，目前先跳回社群動態牆
   alert('發文成功！即將返回社群首頁。')
   router.push('/community') // 呼叫路由控制器，把畫面切換到 /community 這個網址
 }
@@ -325,6 +357,21 @@ const handleSubmit = () => {
                 </div>
               </div>
 
+              <!-- 公開／隱藏選擇：對應資料庫 Community_Post.status -->
+              <div class="field-block">
+                <label class="field-label">公開設定</label>
+                <div class="visibility-toggle">
+                  <label class="visibility-option">
+                    <input type="radio" v-model="postForm.status" value="public" />
+                    <span>公開（所有人都看得到）</span>
+                  </label>
+                  <label class="visibility-option">
+                    <input type="radio" v-model="postForm.status" value="hide" />
+                    <span>隱藏（只有自己看得到）</span>
+                  </label>
+                </div>
+              </div>
+
               <div class="compose-actions">
                 <router-link to="/community" class="btn-cancel">取消</router-link>
                 <!-- type="submit"：這個按鈕會觸發上面 <form> 的 @submit.prevent="handleSubmit" -->
@@ -341,7 +388,7 @@ const handleSubmit = () => {
 </template>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap');@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');.fa-solid{font-weight:900  !important;}.create-post-page{width:100%;min-height:100vh;background-color:#F9F4F0  !important;box-sizing:border-box;--cream:#F9F4F0;--paper:#FFFDFB;--ink:#2A2420;--ink-soft:#7A6E63;--plum:#7A4B54;--plum-deep:#5E3941;--ochre:#B8862E;--hairline:#E4D8CC;color:var(--ink);font-family:'Noto Sans TC',sans-serif;}.page-head{padding:2rem 0 1.4rem;}.back-pill{display:inline-flex;align-items:center;gap:.3rem;border:1px solid var(--ink);border-radius:999px;padding:.35rem 1rem;font-size:.82rem;color:var(--ink);text-decoration:none;margin-bottom:1.1rem;transition:all .18s ease;}.back-pill:hover{background:var(--ink);color:var(--cream);}.page-head-inner{display:flex;align-items:center;gap:1.2rem;}.page-head-divider{width:1px;align-self:stretch;background:var(--hairline);flex-shrink:0;}.page-head-text{padding-left:.2rem;}.eyebrow{font-size:.7rem;letter-spacing:.24em;text-transform:uppercase;color:#A9A196;font-weight:600;margin-bottom:.4rem;}.page-title{font-family:'Noto Serif TC',serif;font-weight:900;font-size:clamp(1.5rem,3.2vw,1.9rem);line-height:1.15;margin:0 0 .4rem;color:var(--ink);}.page-sub{font-family:'Noto Serif TC',serif;font-style:italic;color:#9C9086;font-size:.9rem;margin:0;}.compose-card{background:var(--paper);border:1px solid var(--hairline);border-radius:22px;overflow:hidden;}.compose-grid{display:grid;grid-template-columns:1fr 1.1fr;}.compose-media{position:relative;background:var(--cream);padding:1.6rem;display:flex;flex-direction:column;}.compose-media .tag-label{position:absolute;top:16px;left:1rem;z-index:2;background:var(--plum);color:#fff;font-size:.72rem;letter-spacing:.05em;font-weight:600;padding:.32rem .8rem .32rem 1.1rem;box-shadow:0 4px 10px rgba(0,0,0,.18);}.compose-media .tag-label::after{content:"";position:absolute;left:0;bottom:-7px;border-width:0 8px 7px 0;border-style:solid;border-color:transparent var(--plum-deep) transparent transparent;}.dropzone{position:relative;flex:1;min-height:360px;border:1.5px dashed var(--hairline);background:var(--paper);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;transition:border-color .2s ease,background .2s ease;}.dropzone:hover{border-color:var(--plum);}.dropzone.has-image{border-style:solid;}.file-input-hidden{position:absolute;inset:0;opacity:0;cursor:pointer;}.dropzone-empty{display:flex;flex-direction:column;align-items:center;gap:.4rem;color:var(--ink-soft);padding:2rem;text-align:center;}.dz-icon{font-size:2rem;margin-bottom:.3rem;}.dz-title{font-family:'Noto Serif TC',serif;font-weight:700;color:var(--ink);font-size:1rem;}.dz-sub{font-size:.78rem;}.dropzone-preview{width:100%;height:100%;min-height:360px;object-fit:cover;display:block;}.dropzone-hover{position:absolute;inset:0;background:rgba(42,36,32,.45);color:#fff;font-size:.9rem;font-weight:600;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s ease;pointer-events:none;}.dropzone.has-image:hover .dropzone-hover{opacity:1;}.thumb-row{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:.9rem;}.thumb-item{position:relative;width:64px;height:64px;border-radius:6px;overflow:hidden;border:1px solid var(--hairline);flex-shrink:0;}.thumb-item img{width:100%;height:100%;object-fit:cover;display:block;}.thumb-cover-badge{position:absolute;bottom:0;left:0;right:0;background:rgba(42,36,32,.72);color:#fff;font-size:.58rem;text-align:center;padding:.1rem 0;}.thumb-remove{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(42,36,32,.75);color:#fff;border:none;font-size:.62rem;line-height:1;display:flex;align-items:center;justify-content:center;transition:background .18s ease;}.thumb-remove:hover{background:var(--plum);}.thumb-add{width:64px;height:64px;border-radius:6px;border:1.5px dashed var(--hairline);display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:var(--ink-soft);cursor:pointer;position:relative;flex-shrink:0;transition:border-color .18s ease,color .18s ease;}.thumb-add:hover{border-color:var(--plum);color:var(--plum);}.upload-hint{font-size:.76rem;color:var(--ink-soft);margin:.7rem 0 0;}.compose-body{padding:2rem 2rem 1.8rem;display:flex;flex-direction:column;}.field-block{margin-bottom:1.6rem;}.field-label{display:block;font-family:'Noto Serif TC',serif;font-weight:700;font-size:.95rem;color:var(--ink);margin-bottom:.6rem;}.field-textarea{width:100%;border:1px solid var(--hairline);background:var(--cream);border-radius:4px;padding:.9rem 1rem;font-family:'Noto Sans TC',sans-serif;font-size:.92rem;color:var(--ink);resize:vertical;transition:border-color .18s ease,background .18s ease;}.field-textarea:focus{outline:none;border-color:var(--plum);background:var(--paper);}.field-textarea::placeholder{color:var(--ink-soft);}.tag-preview{margin-top:.9rem;padding-top:.9rem;border-top:1px dashed var(--hairline);display:flex;flex-wrap:wrap;gap:.5rem;}.tag-chip{display:inline-block;font-size:.78rem;padding:.4rem .9rem;border-radius:999px;background:var(--cream);border:1px solid var(--ochre);color:var(--ochre);font-weight:600;}.tag-chip.selected-chip{display:inline-flex;align-items:center;gap:.4rem;background:var(--plum);border-color:var(--plum);color:#fff;}.chip-remove{background:rgba(255,255,255,.25);border:none;color:#fff;width:16px;height:16px;border-radius:50%;font-size:.6rem;line-height:1;display:flex;align-items:center;justify-content:center;transition:background .18s ease;}.chip-remove:hover{background:rgba(255,255,255,.45);}.search-bar{position:relative;display:flex;align-items:center;border:1px solid var(--hairline);background:var(--cream);border-radius:4px;padding:.5rem .5rem .5rem 1rem;transition:border-color .18s ease,background .18s ease;}.search-bar:focus-within{border-color:var(--plum);background:var(--paper);}.search-icon{width:16px;height:16px;color:var(--ink-soft);flex-shrink:0;}.search-input{flex:1;border:none;background:transparent;padding:.15rem .6rem;font-size:.88rem;color:var(--ink);outline:none;}.search-input::placeholder{color:var(--ink-soft);}.search-clear{border:none;background:var(--hairline);color:var(--ink-soft);width:20px;height:20px;border-radius:50%;font-size:.7rem;line-height:1;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:background .18s ease,color .18s ease;}.search-clear:hover{background:var(--plum);color:#fff;}.tag-cloud{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.8rem;}.tag-chip.selectable{border:1px solid var(--hairline);background:var(--paper);color:var(--ink);cursor:pointer;transition:all .18s ease;}.tag-chip.selectable:hover{border-color:var(--ochre);color:var(--ochre);}.tag-chip.selectable.active{background:var(--plum);border-color:var(--plum);color:#fff;}.tag-empty{font-size:.8rem;color:var(--ink-soft);font-family:'Noto Serif TC',serif;font-style:italic;}.compose-actions{margin-top:auto;padding-top:1.4rem;border-top:1px dashed var(--hairline);display:flex;justify-content:flex-end;gap:.8rem;}.btn-cancel{border:1px solid var(--hairline);color:var(--ink-soft);border-radius:4px;padding:.6rem 1.6rem;font-size:.88rem;text-decoration:none;transition:all .18s ease;}.btn-cancel:hover{border-color:var(--ink);color:var(--ink);}.btn-publish{background:var(--ink);color:var(--paper);border:none;border-radius:4px;padding:.65rem 2.1rem;font-size:.9rem;font-weight:600;transition:background .18s ease,transform .18s ease;}.btn-publish:hover{background:var(--plum-deep);transform:translateY(-1px);}@media (max-width:860px){.compose-grid{grid-template-columns:1fr;}.compose-media{padding:1.2rem;}.dropzone,.dropzone-preview{min-height:280px;}.compose-body{padding:1.6rem;}}
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap');@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');.fa-solid{font-weight:900  !important;}.create-post-page{width:100%;min-height:100vh;background-color:#F9F4F0  !important;box-sizing:border-box;--cream:#F9F4F0;--paper:#FFFDFB;--ink:#2A2420;--ink-soft:#7A6E63;--plum:#7A4B54;--plum-deep:#5E3941;--ochre:#B8862E;--hairline:#E4D8CC;color:var(--ink);font-family:'Noto Sans TC',sans-serif;}.page-head{padding:2rem 0 1.4rem;}.back-pill{display:inline-flex;align-items:center;gap:.3rem;border:1px solid var(--ink);border-radius:999px;padding:.35rem 1rem;font-size:.82rem;color:var(--ink);text-decoration:none;margin-bottom:1.1rem;transition:all .18s ease;}.back-pill:hover{background:var(--ink);color:var(--cream);}.page-head-inner{display:flex;align-items:center;gap:1.2rem;}.page-head-divider{width:1px;align-self:stretch;background:var(--hairline);flex-shrink:0;}.page-head-text{padding-left:.2rem;}.eyebrow{font-size:.7rem;letter-spacing:.24em;text-transform:uppercase;color:#A9A196;font-weight:600;margin-bottom:.4rem;}.page-title{font-family:'Noto Serif TC',serif;font-weight:900;font-size:clamp(1.5rem,3.2vw,1.9rem);line-height:1.15;margin:0 0 .4rem;color:var(--ink);}.page-sub{font-family:'Noto Serif TC',serif;font-style:italic;color:#9C9086;font-size:.9rem;margin:0;}.compose-card{background:var(--paper);border:1px solid var(--hairline);border-radius:22px;overflow:hidden;}.compose-grid{display:grid;grid-template-columns:1fr 1.1fr;}.compose-media{position:relative;background:var(--cream);padding:1.6rem;display:flex;flex-direction:column;}.compose-media .tag-label{position:absolute;top:16px;left:1rem;z-index:2;background:var(--plum);color:#fff;font-size:.72rem;letter-spacing:.05em;font-weight:600;padding:.32rem .8rem .32rem 1.1rem;box-shadow:0 4px 10px rgba(0,0,0,.18);}.compose-media .tag-label::after{content:"";position:absolute;left:0;bottom:-7px;border-width:0 8px 7px 0;border-style:solid;border-color:transparent var(--plum-deep) transparent transparent;}.dropzone{position:relative;flex:1;min-height:360px;border:1.5px dashed var(--hairline);background:var(--paper);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;transition:border-color .2s ease,background .2s ease;}.dropzone:hover{border-color:var(--plum);}.dropzone.has-image{border-style:solid;}.file-input-hidden{position:absolute;inset:0;opacity:0;cursor:pointer;}.dropzone-empty{display:flex;flex-direction:column;align-items:center;gap:.4rem;color:var(--ink-soft);padding:2rem;text-align:center;}.dz-icon{font-size:2rem;margin-bottom:.3rem;}.dz-title{font-family:'Noto Serif TC',serif;font-weight:700;color:var(--ink);font-size:1rem;}.dz-sub{font-size:.78rem;}.dropzone-preview{width:100%;height:100%;min-height:360px;object-fit:cover;display:block;}.dropzone-hover{position:absolute;inset:0;background:rgba(42,36,32,.45);color:#fff;font-size:.9rem;font-weight:600;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s ease;pointer-events:none;}.dropzone.has-image:hover .dropzone-hover{opacity:1;}.thumb-row{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:.9rem;}.thumb-item{position:relative;width:64px;height:64px;border-radius:6px;overflow:hidden;border:1px solid var(--hairline);flex-shrink:0;}.thumb-item img{width:100%;height:100%;object-fit:cover;display:block;}.thumb-cover-badge{position:absolute;bottom:0;left:0;right:0;background:rgba(42,36,32,.72);color:#fff;font-size:.58rem;text-align:center;padding:.1rem 0;}.thumb-remove{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(42,36,32,.75);color:#fff;border:none;font-size:.62rem;line-height:1;display:flex;align-items:center;justify-content:center;transition:background .18s ease;}.thumb-remove:hover{background:var(--plum);}.thumb-add{width:64px;height:64px;border-radius:6px;border:1.5px dashed var(--hairline);display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:var(--ink-soft);cursor:pointer;position:relative;flex-shrink:0;transition:border-color .18s ease,color .18s ease;}.thumb-add:hover{border-color:var(--plum);color:var(--plum);}.upload-hint{font-size:.76rem;color:var(--ink-soft);margin:.7rem 0 0;}.compose-body{padding:2rem 2rem 1.8rem;display:flex;flex-direction:column;}.field-block{margin-bottom:1.6rem;}.field-label{display:block;font-family:'Noto Serif TC',serif;font-weight:700;font-size:.95rem;color:var(--ink);margin-bottom:.6rem;}.field-textarea{width:100%;border:1px solid var(--hairline);background:var(--cream);border-radius:4px;padding:.9rem 1rem;font-family:'Noto Sans TC',sans-serif;font-size:.92rem;color:var(--ink);resize:vertical;transition:border-color .18s ease,background .18s ease;}.field-textarea:focus{outline:none;border-color:var(--plum);background:var(--paper);}.field-textarea::placeholder{color:var(--ink-soft);}.visibility-toggle{display:flex;flex-wrap:wrap;gap:1.2rem;}.visibility-option{display:flex;align-items:center;gap:.5rem;font-size:.88rem;color:var(--ink);cursor:pointer;}.visibility-option input[type="radio"]{accent-color:var(--plum);width:16px;height:16px;cursor:pointer;}.tag-preview{margin-top:.9rem;padding-top:.9rem;border-top:1px dashed var(--hairline);display:flex;flex-wrap:wrap;gap:.5rem;}.tag-chip{display:inline-block;font-size:.78rem;padding:.4rem .9rem;border-radius:999px;background:var(--cream);border:1px solid var(--ochre);color:var(--ochre);font-weight:600;}.tag-chip.selected-chip{display:inline-flex;align-items:center;gap:.4rem;background:var(--plum);border-color:var(--plum);color:#fff;}.chip-remove{background:rgba(255,255,255,.25);border:none;color:#fff;width:16px;height:16px;border-radius:50%;font-size:.6rem;line-height:1;display:flex;align-items:center;justify-content:center;transition:background .18s ease;}.chip-remove:hover{background:rgba(255,255,255,.45);}.search-bar{position:relative;display:flex;align-items:center;border:1px solid var(--hairline);background:var(--cream);border-radius:4px;padding:.5rem .5rem .5rem 1rem;transition:border-color .18s ease,background .18s ease;}.search-bar:focus-within{border-color:var(--plum);background:var(--paper);}.search-icon{width:16px;height:16px;color:var(--ink-soft);flex-shrink:0;}.search-input{flex:1;border:none;background:transparent;padding:.15rem .6rem;font-size:.88rem;color:var(--ink);outline:none;}.search-input::placeholder{color:var(--ink-soft);}.search-clear{border:none;background:var(--hairline);color:var(--ink-soft);width:20px;height:20px;border-radius:50%;font-size:.7rem;line-height:1;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:background .18s ease,color .18s ease;}.search-clear:hover{background:var(--plum);color:#fff;}.tag-cloud{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.8rem;}.tag-chip.selectable{border:1px solid var(--hairline);background:var(--paper);color:var(--ink);cursor:pointer;transition:all .18s ease;}.tag-chip.selectable:hover{border-color:var(--ochre);color:var(--ochre);}.tag-chip.selectable.active{background:var(--plum);border-color:var(--plum);color:#fff;}.tag-empty{font-size:.8rem;color:var(--ink-soft);font-family:'Noto Serif TC',serif;font-style:italic;}.compose-actions{margin-top:auto;padding-top:1.4rem;border-top:1px dashed var(--hairline);display:flex;justify-content:flex-end;gap:.8rem;}.btn-cancel{border:1px solid var(--hairline);color:var(--ink-soft);border-radius:4px;padding:.6rem 1.6rem;font-size:.88rem;text-decoration:none;transition:all .18s ease;}.btn-cancel:hover{border-color:var(--ink);color:var(--ink);}.btn-publish{background:var(--ink);color:var(--paper);border:none;border-radius:4px;padding:.65rem 2.1rem;font-size:.9rem;font-weight:600;transition:background .18s ease,transform .18s ease;}.btn-publish:hover{background:var(--plum-deep);transform:translateY(-1px);}@media (max-width:860px){.compose-grid{grid-template-columns:1fr;}.compose-media{padding:1.2rem;}.dropzone,.dropzone-preview{min-height:280px;}.compose-body{padding:1.6rem;}}
 </style>
 
 <!-- 不加 scoped：讓這段 CSS 變成全域樣式，直接套用到 body 上 -->
