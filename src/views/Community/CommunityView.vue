@@ -83,7 +83,7 @@ export const posts = reactive([
     ],
     likesCount: 1200,
     commentsCount: 89,
-    taggedProducts: [{ taggedId: 1, productId: 3, productRoute: '/shop/product/3', name: '羊毛混紡針織外套' }]
+    taggedProducts: [{ postTaggedProductId: 1, productId: 3, productRoute: '/shop/product/3', name: '羊毛混紡針織外套' }]
   },
   {
     communityPostId: 2,
@@ -97,7 +97,7 @@ export const posts = reactive([
     ],
     likesCount: 856,
     commentsCount: 42,
-    taggedProducts: [{ taggedId: 2, productId: 1, productRoute: '/shop/product/1', name: '經典圓領短T' }]
+    taggedProducts: [{ postTaggedProductId: 2, productId: 1, productRoute: '/shop/product/1', name: '經典圓領短T' }]
   },
   {
     communityPostId: 3,
@@ -111,7 +111,7 @@ export const posts = reactive([
     ],
     likesCount: 2400,
     commentsCount: 158,
-    taggedProducts: [{ taggedId: 3, productId: 2, productRoute: '/shop/product/2', name: '法式碎花洋裝' }]
+    taggedProducts: [{ postTaggedProductId: 3, productId: 2, productRoute: '/shop/product/2', name: '法式碎花洋裝' }]
   },
   {
     communityPostId: 4,
@@ -125,7 +125,7 @@ export const posts = reactive([
     ],
     likesCount: 631,
     commentsCount: 27,
-    taggedProducts: [{ taggedId: 4, productId: 4, productRoute: '/shop/product/4', name: '修身牛仔褲' }]
+    taggedProducts: [{ postTaggedProductId: 4, productId: 4, productRoute: '/shop/product/4', name: '修身牛仔褲' }]
   },
   {
     communityPostId: 5,
@@ -139,7 +139,7 @@ export const posts = reactive([
     ],
     likesCount: 1100,
     commentsCount: 54,
-    taggedProducts: [{ taggedId: 5, productId: 5, productRoute: '/shop/product/5', name: '百褶及膝裙' }]
+    taggedProducts: [{ postTaggedProductId: 5, productId: 5, productRoute: '/shop/product/5', name: '百褶及膝裙' }]
   }
 ])
 
@@ -186,9 +186,69 @@ export const toggleSavePost = (post) => {
 // ============================================================
 // 這裡開始是這個頁面「自己專屬」的邏輯，不會被其他檔案拿去用
 // ============================================================
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+// axios：專門用來打 API 的套件（發送 HTTP 請求），跟瀏覽器內建的 fetch 功能類似，
+// 但用起來更方便（例如自動把回傳的 JSON 轉成 JavaScript 物件，不用自己再解析一次）。
+import axios from 'axios'
 
 // posts 已經在上面的 <script> 區塊宣告並 export，這裡同一個檔案內可以直接使用，不用再 import
+
+// API_BASE：後端 API 專案的網址。之後如果 API 換了 port，或是之後要部署到正式環境
+// 換成真正的網域，只要改這一行，下面所有 API 呼叫都會跟著換。
+const API_BASE = 'https://localhost:7255'
+
+// fetchPosts：向後端要「全部貼文」的資料，成功拿到之後取代掉原本寫死的假資料。
+// async function：宣告成「非同步函式」，代表裡面可以用 await「等」一個需要花時間的動作
+// （像是打 API 這種要等網路回應的操作）完成，再繼續往下執行，而不會卡住整個網頁。
+const fetchPosts = async () => {
+  try {
+    // axios.get(網址)：對這個網址發送 GET 請求。
+    // await：先暫停在這一行，等 API 真的回應了，才把結果存進 res，再往下執行。
+    const res = await axios.get(`${API_BASE}/api/CommunityPost`)
+
+    // res.data：axios 已經把後端回傳的 JSON 自動轉換成 JavaScript 的陣列／物件了，
+    // 這裡直接可以用 .map(...) 這種陣列方法，不用自己再解析一次字串。
+    // .map(p => ({ ... }))：把後端回傳的每一筆資料，轉換成畫面需要的格式。
+    // 大部分欄位名稱其實跟後端 DTO 已經一致（因為之前有跟後端一起對過欄位名稱），
+    // 這裡主要是幫 images 陣列裡每張圖，組出一個可以直接放進 <img> 的完整網址，
+    // 因為後端目前只回傳 imageFileName（檔名），還沒有回傳完整網址。
+    const apiPosts = res.data.map(p => ({
+      communityPostId: p.communityPostId,
+      userId: p.userId,
+      user: p.user || { name: '未知使用者', avatar: '' },
+      content: p.content,
+      postDate: p.postDate,
+      status: p.status,
+      images: (p.images || []).map(img => ({
+        postImageId: img.postImageId,
+        imageFileName: img.imageFileName,
+        sortOrder: img.sortOrder,
+        // imageFileName 本身已經帶路徑了（例如 "/images/posts/post01_1.jpg"），
+        // 不是單純的檔名，所以這裡直接接在 API_BASE 後面就好，
+        // 不用再自己加一段 /uploads/ 進去（之前那樣寫網址會多一層、變成錯的路徑）。
+        url: `${API_BASE}${img.imageFileName}`
+      })),
+      likesCount: p.likesCount,
+      commentsCount: p.commentsCount,
+      taggedProducts: p.taggedProducts || []
+    }))
+
+    // posts.splice(0, posts.length, ...apiPosts)：
+    // 因為 posts 是 reactive() 陣列，不能直接用 posts = apiPosts 整個換掉
+    // （reactive 包起來的變數不能重新賦值，只能改裡面的內容），
+    // 所以用 splice 先把陣列裡原本所有假資料都刪掉（從第 0 筆開始，刪 posts.length 筆），
+    // 再把 apiPosts 裡的每一筆都塞進去，這樣畫面才會正確地跟著更新。
+    posts.splice(0, posts.length, ...apiPosts)
+  } catch (err) {
+    // 如果打 API 失敗（後端沒開、網址打錯、CORS 設定問題...），
+    // 先在瀏覽器主控台印出錯誤內容方便除錯，畫面就繼續顯示原本的假資料，不會整頁空白。
+    console.error('讀取貼文列表失敗：', err)
+  }
+}
+
+// onMounted：Vue 的生命週期鉤子，代表「這個元件的畫面第一次被畫出來、掛載到網頁上之後」
+// 要執行的動作。在這裡呼叫 fetchPosts，就是「頁面一打開，就馬上去後端要最新的貼文資料」。
+onMounted(fetchPosts)
 
 // formatCount：跟上面那個 <script>（非 setup）區塊裡的 formatCount 是「一模一樣」的函式，
 // 這裡要重複宣告一次，是因為 Vue 的規則是：<template> 只能直接使用宣告在
