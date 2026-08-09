@@ -6,7 +6,9 @@
 // ref() 是 Vue 提供的功能，用來建立一個「會被畫面自動追蹤」的變數。
 // 白話說：只要 ref() 包起來的資料改變了，畫面上有用到這個資料的地方
 // 會自動跟著重新顯示，不用自己手動去更新 HTML。
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+// axios：打 API 用的套件，跟 CommunityView.vue、PostDetailView.vue 裡用的是同一套。
+import axios from 'axios'
 
 // 收藏功能共用資料（跟 PostDetailView.vue 共用同一份收藏清單，直接 import 那個檔案）
 // savedPosts：使用者收藏的所有貼文，格式對照 Community_Favorite + Community_Post：
@@ -16,6 +18,15 @@ import { ref } from 'vue'
 // 因為這裡是「別的檔案」透過 import 拿到它，並不是同一個 SFC 裡的 <script setup>／<template>
 // 那種限制，所以可以直接在這個檔案的 <template> 裡正常使用。
 import { savedPosts, formatCount } from '@/views/Community/CommunityView.vue'
+
+// API_BASE：後端 API 專案的網址，跟 CommunityView.vue、PostDetailView.vue 裡用的是同一個。
+const API_BASE = 'https://localhost:7255'
+
+// viewedUserId：現在看的是哪個使用者的個人頁。
+// 之後接上真的登入系統／路由參數（例如網址帶 /profile/:userId），這裡要換成真正的值；
+// 先用資料庫裡真的存在的測試帳號 id 頂著，跟 CreatePostView.vue 目前的做法一樣。
+const viewedUserId = 1
+
 
 
 // 使用者個人資料
@@ -48,40 +59,37 @@ const activeTab = ref('works')
 // 欄位對照資料庫（Community_Post）：communityPostId、content（合併原本的 title）、
 // image（對應 Post_Images 第一張圖）、likesCount／commentsCount（純數字，顯示時再用
 // formatCount 轉成「1.2k」這種縮寫）、tags（對應 Post_Tagged_Products 的商品名稱）。
-const userPosts = ref([
-  {
-    communityPostId: 1,
-    content: '春日約會穿搭 · 碎花洋裝',
-    image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&auto=format&fit=crop&q=80',
-    likesCount: 2341,
-    commentsCount: 128,
-    tags: ['#法式碎花洋裝', '#皮革側背包'] // 這篇貼文的標籤，也是一個陣列（字串陣列）
-  },
-  {
-    communityPostId: 2,
-    content: '秋冬層次感 · 大衣外套',
-    image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=600&auto=format&fit=crop&q=80',
-    likesCount: 1876,
-    commentsCount: 94,
-    tags: ['#羊毛長大衣', '#親膚針織衫']
-  },
-  {
-    communityPostId: 3,
-    content: '休閒日常 · 針織上衣',
-    image: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=600&auto=format&fit=crop&q=80',
-    likesCount: 3102,
-    commentsCount: 210,
-    tags: ['#V領軟糯針織', '#高腰休閒褲']
-  },
-  {
-    communityPostId: 4,
-    content: '通勤 OL 風 · 配件搭配',
-    image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=600&auto=format&fit=crop&q=80',
-    likesCount: 1542,
-    commentsCount: 76,
-    tags: ['#質感西裝外套', '#真皮皮帶']
+// 先給空陣列，畫面會等 fetchUserPosts() 打完 API 才有資料，避免還沒載入完就出現假資料。
+const userPosts = ref([])
+
+// fetchUserPosts：跟後端要「這個使用者自己發的所有貼文」，
+// 打的是 CommunityPostController.cs 裡新增的 GET api/CommunityPost/user/{userid}。
+const fetchUserPosts = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/api/CommunityPost/user/${viewedUserId}`)
+    // 後端回傳的格式（CommunityPostDTO）跟這頁 template 原本期待的格式不太一樣，
+    // 這裡把它轉成 template 需要的形狀：content、image（取第一張圖）、likesCount、
+    // commentsCount、tags（把 taggedProducts 陣列轉成 '#商品名稱' 字串陣列）。
+    userPosts.value = res.data.map(post => ({
+      communityPostId: post.communityPostId,
+      content: post.content,
+      image: post.images && post.images.length > 0
+        ? `${API_BASE}${post.images[0].imageFileName}`
+        : '',
+      likesCount: post.likesCount,
+      commentsCount: post.commentsCount,
+      tags: post.taggedProducts.map(t => `#${t.name}`)
+    }))
+  } catch (err) {
+    console.error('讀取個人貼文失敗：', err)
   }
-])
+}
+
+// onMounted：這個元件的畫面第一次被畫出來之後，自動執行裡面的程式碼一次。
+// 跟 PostDetailView.vue 抓單篇貼文的邏輯是一樣的模式。
+onMounted(() => {
+  fetchUserPosts()
+})
 
 // 這是頁籤按鈕要顯示的清單：每個頁籤有一個「代號」(key，程式判斷用)
 // 跟一個「顯示文字」(label，給人看的)。
@@ -89,9 +97,7 @@ const userPosts = ref([
 // 只有純顯示用途，所以不需要讓 Vue 特別去「追蹤」它的變化。
 const tabs = [
   { key: 'works', label: '穿搭作品' },
-  { key: 'saved', label: '收藏' },
-  { key: 'products', label: '同款商品' },
-  { key: 'about', label: '關於我' }
+  { key: 'saved', label: '收藏' }
 ]
 
 // 這是一個「函式」（function，可以想成一個按鈕按下去要執行的一段動作）。
