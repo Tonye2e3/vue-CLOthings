@@ -104,8 +104,11 @@ const fetchPost = async () => {
   }
 }
 
-// onMounted：頁面一打開，就照網址上的 id 去後端要這篇貼文的完整資料。
-onMounted(fetchPost)
+// onMounted：頁面一打開，就照網址上的 id 去後端要這篇貼文的完整資料，同時也要這篇貼文的留言。
+onMounted(() => {
+  fetchPost()
+  fetchComments()
+})
 
 // postTimeAgo：把 post.postDate 這個正式時間，轉換成「N 小時前」這種給人看的相對時間文字。
 // 之後接上真的 API，這個計算方式不用變，只是 postDate 會是後端真正回傳的發文時間。
@@ -197,27 +200,50 @@ const similarPosts = ref([
   { id: 3, image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=300&auto=format&fit=crop&q=80' }
 ])
 
-// 留言列表：一開始先放兩筆假留言當範例
-// 欄位對照 Post_Comments 表：postCommentId、parentCommentId（回覆留言用，這裡示範資料都還沒有人回覆，
-// 所以先都是 null）、commentText、commentDate。
-const comments = ref([
-  {
-    postCommentId: 1,
-    parentCommentId: null,
-    user: '小美',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=May',
-    commentText: '這套超好看！請問褲子是什麼顏色？',
-    commentDate: new Date(Date.now() - 60 * 60 * 1000).toISOString()
-  },
-  {
-    postCommentId: 2,
-    parentCommentId: null,
-    user: '阿圓',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jerry',
-    commentText: '已收藏~等發薪就下單 !!!',
-    commentDate: new Date(Date.now() - 30 * 60 * 1000).toISOString()
+// 留言列表：等 fetchComments() 打完 API 才會有資料，先給空陣列避免顯示假留言。
+// 欄位對照 Post_Comment 表：postCommentId、parentCommentId（回覆留言用，parentCommentId
+// 有值代表這則是在回覆某一則留言）、commentText、commentDate，user／avatar 是後端 join User 表組出來的。
+const comments = ref([])
+
+// groupedComments：把後端回來的「一維陣列」，依 parentCommentId 整理成
+// 「主留言 + 底下往內縮的回覆」這種巢狀結構，跟 IG 留言區的呈現方式一樣。
+// parentCommentId 是 null（或沒有值）的是主留言，parentCommentId 指到誰，
+// 就代表這則是在回覆那一則留言。
+const groupedComments = computed(() => {
+  const topLevel = comments.value.filter(c => !c.parentCommentId)
+  return topLevel.map(c => ({
+    ...c,
+    replies: comments.value
+      .filter(r => r.parentCommentId === c.postCommentId)
+      // 回覆本身照留言時間「舊到新」排，符合對話的閱讀順序（跟主留言新到舊的排序方向相反）
+      .sort((a, b) => new Date(a.commentDate) - new Date(b.commentDate))
+  }))
+})
+
+// replyingTo：目前正在回覆哪一則留言。null 代表現在是要發「新的主留言」，
+// 有值的話代表輸入框上面會出現「回覆 @xxx」的提示，送出時會帶上 parentCommentId。
+const replyingTo = ref(null)
+
+// startReply：點某則留言的「回覆」按鈕時執行，把輸入框切換成「回覆這則留言」的模式。
+const startReply = (comment) => {
+  replyingTo.value = comment
+}
+
+// cancelReply：取消回覆，輸入框切回「發新留言」的模式。
+const cancelReply = () => {
+  replyingTo.value = null
+}
+
+// fetchComments：跟後端要「這篇貼文底下的所有留言」，
+// 打的是 PostCommentController.cs 裡的 GET api/PostComment/post/{communitypostid}。
+const fetchComments = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/api/PostComment/post/${route.params.id}`)
+    comments.value = res.data
+  } catch (err) {
+    console.error('讀取留言失敗：', err)
   }
-])
+}
 
 // newComment：跟留言輸入框做雙向綁定，存使用者「正在打字、還沒送出」的留言內容
 const newComment = ref('')
@@ -227,22 +253,31 @@ const toggleFollow = () => {
 }
 
 // addComment：按下「送出」按鈕或在輸入框按 Enter 時執行。
-const addComment = () => {
+// 改成 async，因為裡面要 await 打 API。
+const addComment = async () => {
   // .trim()：去掉文字前後的空白。如果去掉空白後是空字串，代表使用者其實沒打字，
   // 直接 return（提早結束函式），不新增這則空白留言。
   if (!newComment.value.trim()) return
-  // .unshift(...)：把一筆新留言加到 comments 陣列的「最前面」
-  // （原本用的是 .push()，加到最後面；改成 .unshift() 之後，
-  // 剛送出的留言就會排在留言列表最上方，最新的留言最先被看到）。
-  comments.value.unshift({
-    postCommentId: Date.now(), // 用目前時間當作這則留言的唯一編號
-    parentCommentId: null, // 不是回覆別人的留言，直接留在最外層
-    user: '我', // 這裡先寫死成「我」，之後接上真正的登入系統可以換成真實使用者名稱
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Me',
-    commentText: newComment.value,
-    commentDate: new Date().toISOString()
-  })
+
+  try {
+    await axios.post(`${API_BASE}/api/PostComment`, {
+      // replyingTo 有值代表現在是在回覆某一則留言，parentCommentId 就帶那則留言的 id；
+      // 沒有值（一般發新留言）就帶 null。
+      parentCommentId: replyingTo.value ? replyingTo.value.postCommentId : null,
+      communityPostId: post.value.communityPostId,
+      userId: 1, // TODO: 之後接上真的登入系統，這裡要換成登入者的 user_id（先用測試帳號頂著，跟 CreatePostView.vue 一致）
+      commentText: newComment.value
+    })
+  } catch (err) {
+    console.error('送出留言失敗：', err)
+    alert('留言失敗，請稍後再試一次！')
+    return
+  }
+
   newComment.value = '' // 送出後把輸入框清空，方便使用者繼續打下一則留言
+  replyingTo.value = null // 送出後回到「發新留言」模式，不用使用者自己按取消
+  post.value.commentsCount += 1 // 留言數 +1，跟按讚數那邊 likesNumber 的處理方式一樣，先讓畫面立刻反應
+  fetchComments() // 重新跟後端要一次留言列表，這樣剛送出的留言才會有資料庫真正給的 postCommentId、commentDate、user、avatar
 }
 </script>
 
@@ -377,13 +412,35 @@ const addComment = () => {
               </div>
 
               <div class="comments-list">
-                <div v-for="c in comments" :key="c.postCommentId" class="comment-row">
-                  <img :src="c.avatar" class="comment-avatar" alt="avatar" />
-                  <div class="comment-bubble">
-                    <span class="comment-user">{{ c.user }}</span>
-                    <span>{{ c.commentText }}</span>
+                <!-- v-for="c in groupedComments"：只跑主留言，每則主留言底下再跑一次 c.replies 畫出它的回覆 -->
+                <div v-for="c in groupedComments" :key="c.postCommentId" class="comment-thread">
+                  <div class="comment-row">
+                    <img :src="c.avatar" class="comment-avatar" alt="avatar" />
+                    <div class="comment-bubble">
+                      <span class="comment-user">{{ c.user }}</span>
+                      <span>{{ c.commentText }}</span>
+                      <button class="btn-reply" @click="startReply(c)">回覆</button>
+                      <!-- 有人回覆過這則留言時，顯示「已回覆 N 則」，跟 IG 一樣讓人知道底下有討論 -->
+                      <span v-if="c.replies.length" class="reply-count">已回覆 {{ c.replies.length }} 則</span>
+                    </div>
+                  </div>
+
+                  <!-- 回覆列表：往內縮排（class="comment-reply"），跟 IG 留言底下的回覆呈現方式一樣 -->
+                  <div v-for="r in c.replies" :key="r.postCommentId" class="comment-row comment-reply">
+                    <img :src="r.avatar" class="comment-avatar" alt="avatar" />
+                    <div class="comment-bubble">
+                      <span class="comment-user">{{ r.user }}</span>
+                      <span>{{ r.commentText }}</span>
+                      <button class="btn-reply" @click="startReply(c)">回覆</button>
+                    </div>
                   </div>
                 </div>
+              </div>
+
+              <!-- 正在回覆某則留言時的提示：顯示「回覆 @xxx」，可以按 ✕ 取消、切回發新留言 -->
+              <div v-if="replyingTo" class="replying-to-row">
+                回覆 <strong>@{{ replyingTo.user }}</strong>
+                <button class="btn-cancel-reply" @click="cancelReply">✕</button>
               </div>
 
               <!-- 輸入留言 -->
@@ -398,7 +455,7 @@ const addComment = () => {
                   type="text"
                   v-model="newComment"
                   class="comment-input"
-                  placeholder="留下你的想法..."
+                  :placeholder="replyingTo ? `回覆 @${replyingTo.user}...` : '留下你的想法...'"
                   @keyup.enter="addComment"
                 />
                 <button class="btn-send" @click="addComment">送出</button>
@@ -609,8 +666,10 @@ const addComment = () => {
   width:6px; height:6px; border-radius:50%; background:var(--ochre);
 }
 
-.comments-list{ display:flex; flex-direction:column; gap:.7rem; margin-bottom:1.1rem; }
+.comments-list{ display:flex; flex-direction:column; gap:1rem; margin-bottom:1.1rem; }
+.comment-thread{ display:flex; flex-direction:column; gap:.5rem; }
 .comment-row{ display:flex; align-items:flex-start; gap:.6rem; }
+.comment-row.comment-reply{ margin-left:2.4rem; } /* 往內縮排，跟 IG 的回覆呈現方式一樣 */
 .comment-avatar{ width:28px; height:28px; border-radius:50%; object-fit:cover; flex-shrink:0; }
 .comment-bubble{
   background:var(--paper);
@@ -619,8 +678,30 @@ const addComment = () => {
   padding:.55rem .9rem;
   font-size:.85rem; color:var(--ink);
   width:100%;
+  display:flex; align-items:baseline; flex-wrap:wrap; gap:.4rem;
 }
-.comment-user{ font-weight:700; margin-right:.5rem; }
+.comment-user{ font-weight:700; margin-right:.1rem; }
+.btn-reply{
+  background:none; border:none; padding:0;
+  font-size:.78rem; color:var(--ink-soft); cursor:pointer;
+  margin-left:auto; flex-shrink:0;
+}
+.btn-reply:hover{ color:var(--plum); }
+.reply-count{ font-size:.76rem; color:var(--ochre); font-weight:600; width:100%; }
+
+.replying-to-row{
+  display:flex; align-items:center; gap:.5rem;
+  font-size:.8rem; color:var(--ink-soft);
+  margin-bottom:.5rem;
+}
+.btn-cancel-reply{
+  border:none; background:var(--hairline); color:var(--ink-soft);
+  width:18px; height:18px; border-radius:50%;
+  font-size:.68rem; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .18s ease,color .18s ease;
+}
+.btn-cancel-reply:hover{ background:var(--plum); color:#fff; }
 
 .comment-input-row{ display:flex; gap:.6rem; }
 .comment-input{
