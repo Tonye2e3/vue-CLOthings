@@ -26,6 +26,10 @@ import postImage from '@/assets/Postimage/post2.jpg'
 // API_BASE：後端 API 專案的網址，跟 CommunityView.vue 裡用的是同一個。
 const API_BASE = 'https://localhost:7255'
 
+// currentTestUserId：先用資料庫裡真的存在的測試帳號 id 頂著，跟 CreatePostView.vue 目前的做法一樣。
+// TODO: 之後接上真的登入系統，這裡要換成登入者的 user_id。
+const currentTestUserId = 1
+
 // route：呼叫 useRoute() 拿到「目前網址」的資訊物件。
 const route = useRoute()
 
@@ -91,7 +95,7 @@ const fetchPost = async () => {
         : [{ postImageId: null, imageFileName: null, sortOrder: 1, url: postImage }], // 完全沒有圖片時的保底畫面
       content: p.content,
       commentsCount: p.commentsCount ?? 0,
-      isLiked: false,
+      isLiked: false, // 先給預設值，實際有沒有按過讚由下面 fetchLikeStatus() 另外去問後端才知道
       taggedProducts: p.taggedProducts || []
     }
     // 讚數也要跟著這篇貼文真正的數字重設，不能繼續用寫死的 1248。
@@ -104,10 +108,32 @@ const fetchPost = async () => {
   }
 }
 
-// onMounted：頁面一打開，就照網址上的 id 去後端要這篇貼文的完整資料，同時也要這篇貼文的留言。
+// myLikeId：如果目前這個使用者已經對這篇貼文按過讚，這裡存那筆 Post_Like 紀錄的 postLikesId，
+// 之後要取消讚（DELETE）要靠這個 id 才能刪對紀錄。還沒按過讚就是 null。
+const myLikeId = ref(null)
+
+// fetchLikeStatus：問後端「這個使用者有沒有幫這篇貼文按過讚」，
+// 打的是 PostLikeController.cs 裡的 GET api/PostLike/post/{communitypostid}/user/{userid}。
+const fetchLikeStatus = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/api/PostLike/post/${route.params.id}/user/${currentTestUserId}`)
+    if (res.data) {
+      post.value.isLiked = true
+      myLikeId.value = res.data.postLikesId
+    } else {
+      post.value.isLiked = false
+      myLikeId.value = null
+    }
+  } catch (err) {
+    console.error('讀取按讚狀態失敗：', err)
+  }
+}
+
+// onMounted：頁面一打開，就照網址上的 id 去後端要這篇貼文的完整資料、留言，還有這個使用者按讚過沒有。
 onMounted(() => {
   fetchPost()
   fetchComments()
+  fetchLikeStatus()
 })
 
 // postTimeAgo：把 post.postDate 這個正式時間，轉換成「N 小時前」這種給人看的相對時間文字。
@@ -129,12 +155,35 @@ const likesNumber = ref(1248) // 對應原本的 '1,248'
 // 自動幫數字加上千分位逗號。
 const likesDisplay = computed(() => likesNumber.value.toLocaleString())
 
-// toggleLike：按下愛心按鈕時執行。
-const toggleLike = () => {
-  post.value.isLiked = !post.value.isLiked // 先把「有沒有按讚」的狀態反過來
-  // 如果現在是「已按讚」狀態，就 +1；如果是「取消讚」，就 -1
-  // 條件 ? A : B 這種寫法叫三元運算子：條件成立回傳 A，不成立回傳 B。
-  likesNumber.value += post.value.isLiked ? 1 : -1
+// toggleLike：按下愛心按鈕時執行。改成 async，因為裡面要 await 打 API。
+const toggleLike = async () => {
+  if (post.value.isLiked) {
+    // 目前是「已按讚」狀態 → 這次是要取消讚 → 打 DELETE，刪掉 myLikeId 那筆紀錄
+    try {
+      await axios.delete(`${API_BASE}/api/PostLike/${myLikeId.value}`)
+    } catch (err) {
+      console.error('取消讚失敗：', err)
+      return // 失敗就不要動畫面上的狀態，維持「已按讚」原樣
+    }
+    post.value.isLiked = false
+    myLikeId.value = null
+    likesNumber.value -= 1
+  } else {
+    // 目前是「還沒按讚」狀態 → 這次是要按讚 → 打 POST 新增一筆 Post_Like 紀錄
+    try {
+      await axios.post(`${API_BASE}/api/PostLike`, {
+        communityPostId: post.value.communityPostId,
+        userId: currentTestUserId
+      })
+    } catch (err) {
+      console.error('按讚失敗：', err)
+      return
+    }
+    // POST 只會回傳成功與否，不會回傳剛剛新增那筆紀錄的 id，
+    // 所以要重新問一次後端才知道 myLikeId 是多少（之後要取消讚會用到），跟留言那邊的做法一樣。
+    await fetchLikeStatus()
+    likesNumber.value += 1
+  }
 }
 
 // isSaved：這篇貼文現在有沒有被收藏。
@@ -265,7 +314,7 @@ const addComment = async () => {
       // 沒有值（一般發新留言）就帶 null。
       parentCommentId: replyingTo.value ? replyingTo.value.postCommentId : null,
       communityPostId: post.value.communityPostId,
-      userId: 1, // TODO: 之後接上真的登入系統，這裡要換成登入者的 user_id（先用測試帳號頂著，跟 CreatePostView.vue 一致）
+      userId: currentTestUserId, // 先用測試帳號頂著，跟 CreatePostView.vue 一致
       commentText: newComment.value
     })
   } catch (err) {
