@@ -551,8 +551,7 @@ const toggleFollow = (creator) => {
               </router-link>
               <div class="stat-row">
                 <span>♥ {{ formatCount(featurePost.likesCount) }}</span>
-                <span>💬 {{ formatCount(featurePost.commentsCount) }}</span>
-                <a href="#" class="link-out">查看單品 →</a>
+                <span>💬 {{ formatCount(featurePost.commentsCount) }}</span>               
               </div>
             </div>
           </div>
@@ -607,8 +606,7 @@ const toggleFollow = (creator) => {
                     轉換成縮寫格式。這樣資料本身仍然是「可以排序、可以比大小」的數字。
                   -->
                   <span>♥ {{ formatCount(post.likesCount) }}</span>
-                  <span>💬 {{ formatCount(post.commentsCount) }}</span>
-                  <a href="#">單品</a>
+                  <span>💬 {{ formatCount(post.commentsCount) }}</span>                 
                 </div>
               </div>
             </div>

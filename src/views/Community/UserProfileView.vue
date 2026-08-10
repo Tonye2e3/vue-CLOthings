@@ -100,9 +100,7 @@ onMounted(() => {
 // 只有純顯示用途，所以不需要讓 Vue 特別去「追蹤」它的變化。
 const tabs = [
   { key: 'works', label: '穿搭作品' },
-  { key: 'saved', label: '收藏' },
-  { key: 'products', label: '同款商品' },
-  { key: 'about', label: '關於我' }
+  { key: 'saved', label: '收藏' }
 ]
 
 // 這是一個「函式」（function，可以想成一個按鈕按下去要執行的一段動作）。
@@ -277,7 +275,6 @@ const toggleFollow = () => {
               <!-- formatCount：把純數字轉成「1.2k」這種縮寫，跟 CommunityView.vue import 進來的是同一個函式 -->
               <span>♥ {{ formatCount(post.likesCount) }}</span>
               <span>💬 {{ formatCount(post.commentsCount) }}</span>
-              <router-link :to="`/community/post/${post.communityPostId}`" class="ms-auto">查看同款</router-link>
             </div>
 
             <div class="tag-cloud">
@@ -314,8 +311,7 @@ const toggleFollow = () => {
 
               <div class="post-stats">
                 <span>♥ {{ formatCount(post.likesCount) }}</span>
-                <span>💬 {{ formatCount(post.commentsCount) }}</span>
-                <router-link :to="`/community/post/${post.communityPostId}`" class="ms-auto">查看同款</router-link>
+                <span>💬 {{ formatCount(post.commentsCount) }}</span>                
               </div>
 
               <div class="tag-cloud">
