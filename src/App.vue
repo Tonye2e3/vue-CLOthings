@@ -21,7 +21,7 @@ const router = useRouter()
 //======== SiteHeader.vue 開始==========
 const navItems = [
   { label: 'Home', to: { name: 'home' } },
-  { label: 'Shop', to: { name: 'Shop' } },
+  { label: 'Shop', to: { name: 'shop' } },
   { label: 'Community', to: { name: 'Community' } },
   { label: 'Group Buying', to: { name: 'GroupProducts' } },
 ]
@@ -38,7 +38,9 @@ function logout() {
 <template>
   <header class="site-header">
     <div class="header-inner">
-      <img src="@/assets/CLO.things LOGO.png" alt="CLO.things logo" class="logo" />
+      <RouterLink :to="{ name: 'home' }" aria-label="首頁"
+        ><img src="@/assets/CLO.things LOGO.png" alt="CLO.things logo" class="logo"
+      /></RouterLink>
       <nav class="main-nav">
         <RouterLink v-for="item in navItems" :key="item.label" :to="item.to" class="nav-link">
           {{ item.label }}
@@ -46,19 +48,27 @@ function logout() {
       </nav>
 
       <div class="header-actions">
-        <button class="icon-btn" type="button" aria-label="搜尋"><IconSearch /></button>
-        <button class="icon-btn" type="button" aria-label="收藏"><IconHeart /></button>
+        <button class="icon-btn" type="button" aria-label="搜尋">
+          <IconSearch />
+        </button>
+
+        <RouterLink :to="{ name: 'favorite' }" class="icon-btn" aria-label="收藏">
+          <IconHeart />
+        </RouterLink>
         <RouterLink
           v-if="authStore.isLoggedIn"
           :to="{ name: 'user' }"
           class="icon-btn"
           aria-label="帳號"
-          ><IconUser
-        /></RouterLink>
-        <RouterLink v-else :to="{ name: 'login' }" class="icon-btn" aria-label="帳號"
-          ><IconUser
-        /></RouterLink>
-        <button class="icon-btn" type="button" aria-label="購物車"><IconCart /></button>
+        >
+          <IconUser />
+        </RouterLink>
+        <RouterLink v-else :to="{ name: 'login' }" class="icon-btn" aria-label="帳號">
+          <IconUser />
+        </RouterLink>
+        <RouterLink :to="{ name: 'cart' }" class="icon-btn" aria-label="購物車">
+          <IconCart />
+        </RouterLink>
       </div>
     </div>
   </header>
@@ -74,10 +84,18 @@ function logout() {
       </nav>
 
       <div class="social-icons">
-        <a href="#" aria-label="Facebook"><IconFacebook /></a>
-        <a href="#" aria-label="Instagram"><IconInstagram /></a>
-        <a href="#" aria-label="LINE"><IconLine /></a>
-        <a href="#" aria-label="YouTube"><IconYoutube /></a>
+        <a href="#" aria-label="Facebook">
+          <IconFacebook />
+        </a>
+        <a href="#" aria-label="Instagram">
+          <IconInstagram />
+        </a>
+        <a href="#" aria-label="LINE">
+          <IconLine />
+        </a>
+        <a href="#" aria-label="YouTube">
+          <IconYoutube />
+        </a>
       </div>
 
       <p class="copyright">© 2026 CLOthings. All rights reserved.</p>
@@ -88,18 +106,24 @@ function logout() {
 <style scoped>
 .main-container {
   width: 100%;
-  max-width: 1200px; /* 依照設計需求調整內容的最大寬度 */
-  margin: 0 auto; /* 上下 0，左右自動置中 */
-  padding: 0 20px; /* 手機和平板時的左右安全邊距 */
+  max-width: 1200px;
+  /* 依照設計需求調整內容的最大寬度 */
+  margin: 0 auto;
+  /* 上下 0，左右自動置中 */
+  padding: 0 20px;
+  /* 手機和平板時的左右安全邊距 */
   box-sizing: border-box;
 }
 
 .logo {
   height: 40px;
   padding-left: 15px;
-  object-fit: cover; /* 保持圖片比例填滿 */
-  overflow: hidden; /* 超出部分裁掉 */
-  justify-self: start; /* 靠左 */
+  object-fit: cover;
+  /* 保持圖片比例填滿 */
+  overflow: hidden;
+  /* 超出部分裁掉 */
+  justify-self: start;
+  /* 靠左 */
   /*border-radius: 50%;  讓元素變成圓形 */
 }
 
@@ -121,7 +145,8 @@ function logout() {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  padding: 0 2px; /* 這個是左右安全邊距，可依需求調整大小 */
+  padding: 0 2px;
+  /* 這個是左右安全邊距，可依需求調整大小 */
   box-sizing: border-box;
   position: relative;
 }
@@ -129,7 +154,8 @@ function logout() {
 .main-nav {
   display: flex;
   gap: 32px;
-  justify-self: center; /* 永遠置中 */
+  justify-self: center;
+  /* 永遠置中 */
 }
 
 .nav-link {
@@ -152,7 +178,8 @@ function logout() {
 .header-actions {
   display: flex;
   gap: 4px;
-  justify-self: end; /* 靠右 */
+  justify-self: end;
+  /* 靠右 */
 }
 
 .icon-btn {
@@ -213,6 +240,7 @@ function logout() {
   opacity: 0.8;
   transition: opacity 0.2s ease;
 }
+
 .footer-links a:hover {
   opacity: 1;
   color: var(--home-accent);
@@ -236,6 +264,7 @@ function logout() {
     background-color 0.2s ease,
     color 0.2s ease;
 }
+
 .social-icons a:hover {
   background: var(--home-accent);
   color: #fff;
