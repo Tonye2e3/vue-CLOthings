@@ -17,7 +17,7 @@ import axios from 'axios'
 // 跟 CommunityView.vue 自己 <template> 要另外重複宣告一份不一樣——
 // 因為這裡是「別的檔案」透過 import 拿到它，並不是同一個 SFC 裡的 <script setup>／<template>
 // 那種限制，所以可以直接在這個檔案的 <template> 裡正常使用。
-import { savedPosts, formatCount } from '@/views/Community/CommunityView.vue'
+import { savedPosts, loadSavedPosts, formatCount } from '@/views/Community/CommunityView.vue'
 
 // API_BASE：後端 API 專案的網址，跟 CommunityView.vue、PostDetailView.vue 裡用的是同一個。
 const API_BASE = 'https://localhost:7255'
@@ -87,8 +87,11 @@ const fetchUserPosts = async () => {
 
 // onMounted：這個元件的畫面第一次被畫出來之後，自動執行裡面的程式碼一次。
 // 跟 PostDetailView.vue 抓單篇貼文的邏輯是一樣的模式。
+// 也順便呼叫 loadSavedPosts，避免使用者是直接連進這頁（沒先經過 CommunityView.vue），
+// 導致收藏頁籤看起來是空的。
 onMounted(() => {
   fetchUserPosts()
+  loadSavedPosts()
 })
 
 // 這是頁籤按鈕要顯示的清單：每個頁籤有一個「代號」(key，程式判斷用)
@@ -97,7 +100,9 @@ onMounted(() => {
 // 只有純顯示用途，所以不需要讓 Vue 特別去「追蹤」它的變化。
 const tabs = [
   { key: 'works', label: '穿搭作品' },
-  { key: 'saved', label: '收藏' }
+  { key: 'saved', label: '收藏' },
+  { key: 'products', label: '同款商品' },
+  { key: 'about', label: '關於我' }
 ]
 
 // 這是一個「函式」（function，可以想成一個按鈕按下去要執行的一段動作）。

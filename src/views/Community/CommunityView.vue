@@ -16,6 +16,15 @@
 // 這樣兩個檔案就能共用同一份資料，而不是各自擁有一份自己的假資料。
 // ============================================================
 import { reactive } from 'vue'
+// axios：打 API 用的套件，這個 <script> 區塊要另外自己 import 一次，
+// 跟下面 <script setup> 那個 import axios 是各自獨立的，不會共用。
+import axios from 'axios'
+
+// API_BASE：後端 API 專案的網址，跟下面 <script setup> 用的是同一個。
+const API_BASE = 'https://localhost:7255'
+
+// currentTestUserId：先用資料庫裡真的存在的測試帳號 id 頂著，等登入系統做好再換掉。
+const currentTestUserId = 1
 
 // reactive() 跟前面看到的 ref() 功能很像，也是讓 Vue 追蹤資料變化、
 // 資料一改畫面就自動更新。差別是 reactive() 通常用在「物件」或「陣列」上，
@@ -159,24 +168,64 @@ export const addPost = (post) => {
 // 兩個檔案共用同一份 savedPosts，所以只要有一邊改了，另一邊畫面就會自動更新。
 // ------------------------------------------------------------
 
-// savedPosts：使用者收藏的貼文清單，一開始是空陣列（還沒收藏任何東西）。
+// savedPosts：使用者收藏的貼文清單，一開始是空陣列，等 loadSavedPosts() 打完 API 才會有資料。
 export const savedPosts = reactive([])
+
+// loadSavedPosts：跟後端要「這個使用者收藏的所有貼文」，
+// 打的是 CommunityFavoriteController.cs 裡的 GET api/CommunityFavorite/user/{userid}。
+// App.vue 或這個頁面掛載時呼叫一次，把 savedPosts 填成資料庫裡真正的收藏清單。
+export const loadSavedPosts = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/api/CommunityFavorite/user/${currentTestUserId}`)
+    savedPosts.splice(0, savedPosts.length) // 先清空，避免重複呼叫時舊資料疊加
+    res.data.forEach(p => {
+      savedPosts.push({
+        communityPostId: p.communityPostId,
+        content: p.content,
+        image: (p.images && p.images.length) ? `${API_BASE}${p.images[0].imageFileName}` : '',
+        likesCount: p.likesCount,
+        commentsCount: p.commentsCount,
+        tags: (p.taggedProducts || []).map(t => `#${t.name}`)
+      })
+    })
+  } catch (err) {
+    console.error('讀取收藏清單失敗：', err)
+  }
+}
 
 // isPostSaved：檢查某篇貼文（用 communityPostId 判斷）現在是不是已經在收藏清單裡。
 // .some(...)：陣列方法，只要陣列裡「有任何一筆」符合條件，就回傳 true，否則回傳 false。
 export const isPostSaved = (communityPostId) => savedPosts.some(p => p.communityPostId === communityPostId)
 
-// toggleSavePost：切換某篇貼文的收藏狀態。
+// toggleSavePost：切換某篇貼文的收藏狀態。改成 async，因為裡面要打真正的 API。
 // post 參數是一個「整理好格式」的貼文物件，欄位名稱對照 Community_Favorite +
 // Community_Post：communityPostId、content、image、likesCount、commentsCount、tags。
-// findIndex：找出這篇貼文目前在 savedPosts 陣列裡「排第幾個」，找不到會回傳 -1。
-export const toggleSavePost = (post) => {
+export const toggleSavePost = async (post) => {
   const idx = savedPosts.findIndex(p => p.communityPostId === post.communityPostId)
+
   if (idx === -1) {
-    // 還沒收藏過 → 加到收藏清單最前面
+    // 還沒收藏過 → 打 POST 新增一筆 Community_Favorite 紀錄
+    try {
+      await axios.post(`${API_BASE}/api/CommunityFavorite`, {
+        userId: currentTestUserId,
+        communityPostId: post.communityPostId
+      })
+    } catch (err) {
+      console.error('收藏失敗：', err)
+      return // API 失敗就不要動本地清單，避免畫面顯示「已收藏」但資料庫其實沒存到
+    }
     savedPosts.unshift(post)
   } else {
-    // 已經收藏過了 → 從收藏清單移除，等於取消收藏
+    // 已經收藏過了 → 先問後端這筆收藏紀錄的 id，再打 DELETE 刪掉
+    try {
+      const res = await axios.get(`${API_BASE}/api/CommunityFavorite/post/${post.communityPostId}/user/${currentTestUserId}`)
+      if (res.data) {
+        await axios.delete(`${API_BASE}/api/CommunityFavorite/${res.data.communityFavoriteId}`)
+      }
+    } catch (err) {
+      console.error('取消收藏失敗：', err)
+      return
+    }
     savedPosts.splice(idx, 1)
   }
 }
@@ -187,15 +236,10 @@ export const toggleSavePost = (post) => {
 // 這裡開始是這個頁面「自己專屬」的邏輯，不會被其他檔案拿去用
 // ============================================================
 import { ref, computed, onMounted } from 'vue'
-// axios：專門用來打 API 的套件（發送 HTTP 請求），跟瀏覽器內建的 fetch 功能類似，
-// 但用起來更方便（例如自動把回傳的 JSON 轉成 JavaScript 物件，不用自己再解析一次）。
-import axios from 'axios'
 
 // posts 已經在上面的 <script> 區塊宣告並 export，這裡同一個檔案內可以直接使用，不用再 import
-
-// API_BASE：後端 API 專案的網址。之後如果 API 換了 port，或是之後要部署到正式環境
-// 換成真正的網域，只要改這一行，下面所有 API 呼叫都會跟著換。
-const API_BASE = 'https://localhost:7255'
+// axios、API_BASE 現在也移到上面那個 <script> 區塊宣告了（因為 loadSavedPosts 也需要用到），
+// 這裡同樣不用再重複 import／宣告一次。
 
 // fetchPosts：向後端要「全部貼文」的資料，成功拿到之後取代掉原本寫死的假資料。
 // async function：宣告成「非同步函式」，代表裡面可以用 await「等」一個需要花時間的動作
@@ -248,7 +292,11 @@ const fetchPosts = async () => {
 
 // onMounted：Vue 的生命週期鉤子，代表「這個元件的畫面第一次被畫出來、掛載到網頁上之後」
 // 要執行的動作。在這裡呼叫 fetchPosts，就是「頁面一打開，就馬上去後端要最新的貼文資料」。
-onMounted(fetchPosts)
+// 同時也呼叫 loadSavedPosts，把這個使用者收藏過的貼文清單一起讀回來。
+onMounted(() => {
+  fetchPosts()
+  loadSavedPosts()
+})
 
 // formatCount：跟上面那個 <script>（非 setup）區塊裡的 formatCount 是「一模一樣」的函式，
 // 這裡要重複宣告一次，是因為 Vue 的規則是：<template> 只能直接使用宣告在
