@@ -149,7 +149,8 @@ const handleEditFileChange = (event) => {
   const files = Array.from(event.target.files || [])
   files.forEach(file => {
     editForm.value.images.push({
-      imageFileName: file.name, // 先用檔案原始名稱佔位，等圖片上傳功能做好再換掉
+      file, // 保留原始檔案本身，saveEdit 真正送出前要用它上傳
+      imageFileName: file.name, // 先用檔案原始名稱佔位，saveEdit 上傳成功後會換成真正的路徑
       sortOrder: editForm.value.images.length + 1,
       url: URL.createObjectURL(file), // 本地暫時預覽網址
       isNew: true
@@ -163,8 +164,32 @@ const removeEditImage = (index) => {
   editForm.value.images.splice(index, 1)
 }
 
-// saveEdit：按下「儲存」時執行，打 PUT api/CommunityPost/{id}。
+// saveEdit：按下「儲存」時執行，先把「新選的照片」真正上傳，再打 PUT api/CommunityPost/{id}。
 const saveEdit = async (post) => {
+  // 第一步：把 isNew 是 true 的照片（這次新選的）真正上傳到後端，
+  // 舊照片（isNew 是 false）已經在伺服器上了，不用再傳一次。
+  const newImages = editForm.value.images.filter(img => img.isNew)
+
+  if (newImages.length > 0) {
+    const formData = new FormData()
+    newImages.forEach(img => formData.append('files', img.file))
+
+    try {
+      const uploadRes = await axios.post(`${API_BASE}/api/CommunityPost/upload-images`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      // uploadRes.data 的順序跟 newImages 送出的順序是對應的，
+      // 把每一筆新照片的 imageFileName 換成後端真正回傳的路徑。
+      newImages.forEach((img, idx) => {
+        img.imageFileName = uploadRes.data[idx]
+      })
+    } catch (err) {
+      console.error('圖片上傳失敗：', err)
+      alert('圖片上傳失敗，請稍後再試一次！')
+      return
+    }
+  }
+
   // 送出前先把 sortOrder 依照現在畫面上的順序重新編一次號（1、2、3...），
   // 避免使用者移除中間某張照片後，順序留下缺口（例如變成 1、3、4）。
   const images = editForm.value.images.map((img, idx) => ({
@@ -421,7 +446,7 @@ const toggleFollow = () => {
                 </label>
               </div>
               <p class="edit-photo-hint">
-                第一張會作為封面。禮拜二確認完上傳做法前，新選的照片先只在這個瀏覽器分頁看得到，重新整理會消失。
+                第一張會作為封面
               </p>
 
               <div class="edit-visibility">

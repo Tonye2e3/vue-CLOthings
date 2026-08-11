@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 // useRouter：Vue Router 提供的功能，讓我們可以在 <script> 裡面「用程式的方式」
 // 切換網址（例如發文成功後自動跳轉回社群頁），而不是只能靠使用者自己點連結。
 import { useRouter } from 'vue-router'
@@ -37,15 +37,27 @@ const postForm = ref({
 // url：給 <img> 標籤顯示用的「本地暫時預覽網址」（不是真的上傳到網路上的網址）
 const imageFiles = ref([])
 
-// 模擬商城可標記的熱門單品
-// productId 對應資料庫 Post_Tagged_Products.product_id
-const availableProducts = ref([
-  { productId: 1, name: '經典圓領短T' },
-  { productId: 2, name: '法式碎花洋裝' },
-  { productId: 3, name: '羊毛混紡針織外套' },
-  { productId: 4, name: '修身牛仔褲' },
-  { productId: 5, name: '百褶及膝裙' }
-])
+// 可標記的商品清單：先給空陣列，等 fetchProducts() 打完 API 才會有真正資料庫裡的商品，
+// 這樣才不會有商品「搜尋不到」的問題（之前是寫死只有 5 筆假資料）。
+// productId 對應資料庫 Post_Tagged_Product.Product_Id
+const availableProducts = ref([])
+
+// fetchProducts：跟後端要「全部商品」清單，打的是 ProductController.cs 裡的 GET api/Product。
+const fetchProducts = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/api/Product`)
+    availableProducts.value = res.data.map(p => ({
+      productId: p.productId,
+      name: p.productName
+    }))
+  } catch (err) {
+    console.error('讀取商品清單失敗：', err)
+  }
+}
+
+onMounted(() => {
+  fetchProducts()
+})
 
 // 搜尋標籤商品
 // productSearch：使用者在「標記標籤商品」那個搜尋框打的文字。
@@ -114,6 +126,28 @@ const handleSubmit = async () => {
     return // return 在這裡的作用是「提早結束這個函式」，後面的程式碼都不會被執行。
   }
 
+  // 第一步：把選好的照片真正上傳到後端，存進 wwwroot/images/posts/，拿回真正的路徑。
+  // FormData：瀏覽器內建的物件，專門用來包「檔案」這種二進位資料送出去
+  // （一般的 axios.post(url, { ... }) 送 JSON 沒辦法包真正的檔案內容，要用 FormData）。
+  const formData = new FormData()
+  imageFiles.value.forEach(img => {
+    // 'files' 這個欄位名稱要跟後端 UploadImages(List<IFormFile> files) 的參數名稱一致，
+    // 模型繫結才抓得到；append 同一個名稱多次，後端就會收到一個「檔案清單」。
+    formData.append('files', img.file)
+  })
+
+  let uploadedPaths = []
+  try {
+    const uploadRes = await axios.post(`${API_BASE}/api/CommunityPost/upload-images`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    uploadedPaths = uploadRes.data
+  } catch (err) {
+    console.error('圖片上傳失敗：', err)
+    alert('圖片上傳失敗，請稍後再試一次！')
+    return
+  }
+
   // 組出要送給後端的資料，對應 CommunityPostController.cs 的 PostCommunityPost(CommunityPostDTO)。
   // 圖片、標記商品的部分後端會照這裡的清單，各自新增進 Post_Image、Post_Tagged_Product 兩張表。
   const payload = {
@@ -122,11 +156,10 @@ const handleSubmit = async () => {
     userId: 1,
     content: postForm.value.content, // 對應 Community_Post.content
     status: postForm.value.status, // 對應 status：public（公開）或 hide（隱藏），來自上面選的公開設定
-    // images：把每張選好的照片轉成 Post_Image 表的格式。
-    // imageFileName 目前先用檔案本身的名稱（img.file.name）佔位——
-    // 真正的圖片上傳（存到 wwwroot/images/posts/ 之類的路徑）禮拜二跟老師確認完再串。
-    images: imageFiles.value.map((img, idx) => ({
-      imageFileName: img.file.name,
+    // images：用「剛剛上傳完、後端真正回傳的路徑」組成 Post_Image 表的格式，
+    // 不再是檔案原始名稱佔位了——uploadedPaths 陣列的順序跟 imageFiles 是對應的。
+    images: uploadedPaths.map((path, idx) => ({
+      imageFileName: path,
       sortOrder: idx + 1
     })),
     // taggedProducts：把選中的商品名稱陣列，轉換成對應 Post_Tagged_Product 格式的物件陣列。
@@ -158,11 +191,13 @@ const handleSubmit = async () => {
     content: postForm.value.content,
     postDate: new Date().toISOString(),
     status: postForm.value.status,
-    images: imageFiles.value.map((img, idx) => ({
+    images: uploadedPaths.map((path, idx) => ({
       postImageId: null,
-      imageFileName: img.file.name,
+      imageFileName: path,
       sortOrder: idx + 1,
-      url: img.url // 本地暫時預覽網址，之後圖片上傳串好、重新整理頁面後會被 API 回傳的正式網址取代
+      // 這裡直接組出跟 CommunityView.vue 一樣的正式網址（API_BASE + 路徑），
+      // 不用再靠本地暫時預覽網址頂著了，因為圖片這時候已經是真的存在伺服器上。
+      url: `${API_BASE}${path}`
     })),
     likesCount: 0,
     commentsCount: 0,
