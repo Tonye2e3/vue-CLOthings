@@ -12,6 +12,7 @@ api.interceptors.request.use(
   (config) => {
     //這是之後登入取得token放的地方
     const token = useAuthStore().token
+    //如果token存在，則將token放入請求頭中
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }

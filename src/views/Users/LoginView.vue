@@ -22,6 +22,7 @@ async function login() {
   try {
     const resp = await api.post('/User/login', data)
     console.log('登入結果', resp)
+    console.log('Pinia 登入資料', authStore)
     authStore.setAuth(resp.data)
     alert('登入成功')
     router.push({ name: 'home' })
@@ -36,12 +37,10 @@ async function login() {
   // // 模擬後端回傳的假資料
   // const fakeResp = {
   //   data: {
-  //     token: 'fake-jwt-token-123',
-  //     user: {
-  //       id: 1,
-  //       name: '測試用戶',
-  //       role: 'admin',
-  //     },
+  //        token: 'fake-jwt-token-123',
+  //        name: '測試用戶',
+  //        account: 'test001',
+  //        role: 'admin'
   //   },
   //   status: 200,
   // }
