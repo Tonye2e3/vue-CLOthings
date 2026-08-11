@@ -7,13 +7,12 @@ import IconSearch from '@/components/icons/IconSearch.vue'
 import IconHeart from '@/components/icons/IconHeart.vue'
 import IconUser from '@/components/icons/IconUser.vue'
 import IconCart from '@/components/icons/IconCart.vue'
-//======== SiteHeader.vue 結束==========
 //======== Sitefooter.vue 開始==========
 import IconFacebook from '@/components/icons/IconFacebook.vue'
 import IconInstagram from '@/components/icons/IconInstagram.vue'
 import IconLine from '@/components/icons/IconLine.vue'
 import IconYoutube from '@/components/icons/IconYoutube.vue'
-//======== Sitefooter.vue 結束==========
+
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -25,10 +24,14 @@ const navItems = [
   { label: 'Community', to: { name: 'Community' } },
   { label: 'Group Buying', to: { name: 'GroupProducts' } },
 ]
-//======== SiteHeader.vue 結束==========
 //======== Sitefooter.vue 開始==========
-const links = ['客服中心', '常見問題（FAQ）', '公司資訊', '隱私政策', '電子報訂閱']
-//======== Sitefooter.vue 結束==========
+const footerLinks = [
+  { label: '客服中心', routeName: 'service' },
+  { label: '常見問題（FAQ）', routeName: null },
+  { label: '公司資訊', routeName: 'about' },
+  { label: '隱私政策', routeName: null },
+]
+
 function logout() {
   authStore.clearAuth()
   router.push('/login')
@@ -80,7 +83,14 @@ function logout() {
   <footer class="site-footer">
     <div class="footer-inner">
       <nav class="footer-links">
-        <a v-for="l in links" :key="l" href="#">{{ l }}</a>
+        <template v-for="l in footerLinks" :key="l.label">
+          <!-- 有 routeName 的 → 用 RouterLink 連到內部頁面 -->
+          <RouterLink v-if="l.routeName" :to="{ name: l.routeName }">
+            {{ l.label }}
+          </RouterLink>
+          <!-- !!!!!!還沒做的頁面 → 暫時用 <a href="#">，之後補!!!!! -->
+          <a v-else href="#">{{ l.label }}</a>
+        </template>
       </nav>
 
       <div class="social-icons">

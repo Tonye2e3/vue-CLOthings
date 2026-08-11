@@ -14,7 +14,9 @@ export const useCartStore = defineStore(
 
     // 增加商品的方法，將商品加入購物車
     function addItem(product) {
-      const existItem = items.value.find((p) => p.id === product.id) // 這個id是否跟我已存在的陣列中有相同的id，如果找不到就會是null
+      const existItem = items.value.find(
+        (p) => p.productSpecificationId === product.productSpecificationId,
+      ) // 這個id是否跟我已存在的陣列中有相同的規格id，如果找不到就會是null
 
       if (existItem) {
         // 商品已存在item之中，如果有找到相同的id，就會執行這段
@@ -27,8 +29,10 @@ export const useCartStore = defineStore(
     }
 
     // 移除商品的方法，將商品從購物車移除
-    function removeItem(id) {
-      const index = items.value.findIndex((i) => i.id === id)
+    function removeItem(productSpecificationId) {
+      const index = items.value.findIndex(
+        (i) => i.productSpecificationId === productSpecificationId,
+      )
       // 找到該商品的索引值，當前陣列當中，如果有相同id則傳到index，如果沒有則傳回-1
       if (index == -1) {
         // 如果沒有找到相同的id，什麼都不用做
@@ -41,14 +45,23 @@ export const useCartStore = defineStore(
     }
 
     // 增減商品數量的方法
-    function reduceItem(id, qty) {
-      const existItem = items.value.find((p) => p.id === id)
+    function changeQty(productSpecificationId, qty) {
+      const existItem = items.value.find((p) => p.productSpecificationId === productSpecificationId)
       if (existItem) {
         // 商品已存在item之中，如果有找到相同的id，就會執行這段
         existItem.quantity += qty // 將該商品的數量加傳入的qty
         if (existItem.quantity <= 0) {
-          removeItem(id)
+          
+          removeItem(productSpecificationId)
         }
+      }
+    }
+
+    // 切換某筆商品的勾選狀態
+    function toggleSelect(productSpecificationId) {
+      const item = items.value.find((p) => p.productSpecificationId === productSpecificationId)
+      if (item) {
+        item.selected = !item.selected // 把 true 變 false、false 變 true
       }
     }
 
@@ -56,11 +69,26 @@ export const useCartStore = defineStore(
     const total = computed(() => {
       let totalAmount = 0
       items.value.forEach((p) => {
-        totalAmount += p.price * p.quantity
+        if (p.selected) {
+          totalAmount += p.price * p.quantity
+        }
       })
       return totalAmount
     })
-    return { items, addItem, removeItem, reduceItem, total } // 回傳模組內的變數、方法、計算屬性
+
+    // 購物車已選件數
+    const selectedCount = computed(() => {
+      let count = 0
+      items.value.forEach((p) => {
+        if (p.selected) {
+          count += p.quantity // 累加勾選商品的數量
+        }
+      })
+      return count
+    })
+
+    return { items, addItem, removeItem, changeQty, selectedCount, total, toggleSelect } // 回傳模組內的變數、方法、計算屬性
   },
   { persist: true },
-) // 加上persist:true，代表這個狀態模組要持久化儲存，當頁面刷新時，資料不會消失
+  // 加上persist:true，代表這個狀態模組要持久化儲存，當頁面刷新時，資料不會消失
+)
