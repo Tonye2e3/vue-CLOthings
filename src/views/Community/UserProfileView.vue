@@ -78,6 +78,9 @@ const fetchUserPosts = async () => {
       image: post.images && post.images.length > 0
         ? `${API_BASE}${post.images[0].imageFileName}`
         : '',
+      // images：保留完整的原始圖片清單（不是只有第一張），編輯貼文換照片時要用到，
+      // 卡片本身的縮圖顯示還是繼續用上面那個扁平的 image 欄位就好。
+      images: post.images || [],
       likesCount: post.likesCount,
       commentsCount: post.commentsCount,
       tags: post.taggedProducts.map(t => `#${t.name}`)
@@ -112,14 +115,27 @@ const deletePost = async (communityPostId) => {
 const editingPostId = ref(null)
 
 // editForm：編輯表單目前打的內容，對應 CommunityPostController.cs 的
-// PutCommunityPost 能改的兩個欄位：content、status。
-const editForm = ref({ content: '', status: 'public' })
+// PutCommunityPost 能改的欄位：content、status、images。
+// images 陣列裡每一筆是 { imageFileName, sortOrder, url, isNew }：
+// isNew 是 false 代表這張是「本來就有」的舊照片（imageFileName 是資料庫裡真的路徑）；
+// isNew 是 true 代表這張是「這次新選的」照片（imageFileName 先用檔案原始名稱佔位，
+// 等圖片上傳功能做好再換成真正存到伺服器後的路徑，跟 CreatePostView.vue 現在的做法一樣）。
+const editForm = ref({ content: '', status: 'public', images: [] })
 
 // startEdit：按下「編輯貼文」時執行，把表單內容預先填成這篇貼文現在的資料，
 // 並把 editingPostId 設成這篇貼文的 id，畫面上就會展開編輯表單。
 const startEdit = (post) => {
   editingPostId.value = post.communityPostId
-  editForm.value = { content: post.content, status: post.status || 'public' }
+  editForm.value = {
+    content: post.content,
+    status: post.status || 'public',
+    images: (post.images || []).map(img => ({
+      imageFileName: img.imageFileName,
+      sortOrder: img.sortOrder,
+      url: `${API_BASE}${img.imageFileName}`,
+      isNew: false
+    }))
+  }
 }
 
 // cancelEdit：取消編輯，收起表單，不送出任何變更。
@@ -127,14 +143,42 @@ const cancelEdit = () => {
   editingPostId.value = null
 }
 
+// handleEditFileChange：編輯表單裡選新照片時執行，邏輯跟 CreatePostView.vue 的
+// handleFileChange 是同一套，只是這裡是加進 editForm.value.images。
+const handleEditFileChange = (event) => {
+  const files = Array.from(event.target.files || [])
+  files.forEach(file => {
+    editForm.value.images.push({
+      imageFileName: file.name, // 先用檔案原始名稱佔位，等圖片上傳功能做好再換掉
+      sortOrder: editForm.value.images.length + 1,
+      url: URL.createObjectURL(file), // 本地暫時預覽網址
+      isNew: true
+    })
+  })
+  event.target.value = ''
+}
+
+// removeEditImage：移除編輯表單裡的其中一張照片（不管是舊照片還是新選的都可以移除）。
+const removeEditImage = (index) => {
+  editForm.value.images.splice(index, 1)
+}
+
 // saveEdit：按下「儲存」時執行，打 PUT api/CommunityPost/{id}。
 const saveEdit = async (post) => {
+  // 送出前先把 sortOrder 依照現在畫面上的順序重新編一次號（1、2、3...），
+  // 避免使用者移除中間某張照片後，順序留下缺口（例如變成 1、3、4）。
+  const images = editForm.value.images.map((img, idx) => ({
+    imageFileName: img.imageFileName,
+    sortOrder: idx + 1
+  }))
+
   try {
     await axios.put(`${API_BASE}/api/CommunityPost/${post.communityPostId}`, {
       communityPostId: post.communityPostId,
       userId: post.userId,
       content: editForm.value.content,
-      status: editForm.value.status
+      status: editForm.value.status,
+      images
     })
   } catch (err) {
     console.error('編輯貼文失敗：', err)
@@ -145,6 +189,8 @@ const saveEdit = async (post) => {
   // 成功後直接更新畫面上這篇貼文的內容，不用重新整理、重打一次 GET API。
   post.content = editForm.value.content
   post.status = editForm.value.status
+  post.images = images
+  post.image = images.length > 0 ? `${API_BASE}${images[0].imageFileName}` : ''
   editingPostId.value = null
 }
 
@@ -163,7 +209,9 @@ onMounted(() => {
 // 只有純顯示用途，所以不需要讓 Vue 特別去「追蹤」它的變化。
 const tabs = [
   { key: 'works', label: '穿搭作品' },
-  { key: 'saved', label: '收藏' }
+  { key: 'saved', label: '收藏' },
+  { key: 'products', label: '同款商品' },
+  { key: 'about', label: '關於我' }
 ]
 
 // 這是一個「函式」（function，可以想成一個按鈕按下去要執行的一段動作）。
@@ -338,6 +386,7 @@ const toggleFollow = () => {
               <!-- formatCount：把純數字轉成「1.2k」這種縮寫，跟 CommunityView.vue import 進來的是同一個函式 -->
               <span>♥ {{ formatCount(post.likesCount) }}</span>
               <span>💬 {{ formatCount(post.commentsCount) }}</span>
+              <router-link :to="`/community/post/${post.communityPostId}`" class="ms-auto">查看同款</router-link>
             </div>
 
             <div class="tag-cloud">
@@ -347,11 +396,34 @@ const toggleFollow = () => {
 
             <!--
               編輯表單：只有這張卡片正在被編輯（editingPostId 等於這篇貼文的 id）才會顯示。
-              目前只能改文字內容跟公開設定，圖片、標記商品維持原樣不能在這裡改
-              （PutCommunityPost 後端目前也只有處理這兩個欄位）。
+              可以改文字內容、公開設定、照片，標記商品維持原樣不能在這裡改
+              （PutCommunityPost 後端目前還沒有處理標記商品的同步）。
             -->
             <div v-if="editingPostId === post.communityPostId" class="edit-form">
               <textarea v-model="editForm.content" class="edit-textarea" rows="3"></textarea>
+
+              <!-- 照片編輯：跟 CreatePostView.vue 的縮圖列是同一套邏輯，只是排版比較精簡 -->
+              <div class="edit-thumb-row">
+                <div class="edit-thumb-item" v-for="(img, idx) in editForm.images" :key="idx">
+                  <img :src="img.url" alt="縮圖" />
+                  <button type="button" class="edit-thumb-remove" @click="removeEditImage(idx)">✕</button>
+                </div>
+                <!-- 這個「＋」縮圖也是一個隱藏的檔案上傳框，讓使用者可以再加選照片 -->
+                <label class="edit-thumb-add">
+                  <input
+                    type="file"
+                    class="file-input-hidden"
+                    accept="image/*"
+                    multiple
+                    @change="handleEditFileChange"
+                  />
+                  ＋
+                </label>
+              </div>
+              <p class="edit-photo-hint">
+                第一張會作為封面。禮拜二確認完上傳做法前，新選的照片先只在這個瀏覽器分頁看得到，重新整理會消失。
+              </p>
+
               <div class="edit-visibility">
                 <label><input type="radio" v-model="editForm.status" value="public" /> 公開</label>
                 <label><input type="radio" v-model="editForm.status" value="hide" /> 隱藏</label>
@@ -398,6 +470,7 @@ const toggleFollow = () => {
               <div class="post-stats">
                 <span>♥ {{ formatCount(post.likesCount) }}</span>
                 <span>💬 {{ formatCount(post.commentsCount) }}</span>
+                <router-link :to="`/community/post/${post.communityPostId}`" class="ms-auto">查看同款</router-link>
               </div>
 
               <div class="tag-cloud">
@@ -409,9 +482,7 @@ const toggleFollow = () => {
 
         <!-- v-else（搭配上面裡層的 v-if）：收藏清單是空的時候，顯示這個提示，而不是一片空白 -->
         <div v-else class="empty-state">
-          <div class="empty-icon">
-            <i class="fa-solid fa-bookmark" style="color: rgb(122, 75, 84);"></i>
-          </div>
+          <div class="empty-icon">📁</div>
           <p class="empty-note">「還沒有收藏任何穿搭，去社群逛逛按個收藏吧。」</p>
         </div>
       </div>
@@ -422,9 +493,7 @@ const toggleFollow = () => {
         意思是「works 不是、saved 也不是」，才會走到這裡。
       -->
       <div v-else class="empty-state">
-        <div class="empty-icon">
-          <i class="fa-solid fa-bookmark" style="color: rgb(122, 75, 84);"></i>
-        </div>
+        <div class="empty-icon">📁</div>
         <p class="empty-note">「這裡的故事，還在整理中。」</p>
       </div>
 
@@ -441,7 +510,6 @@ const toggleFollow = () => {
   然後把下面每一條 CSS 規則也自動加上同樣的屬性選擇器，
   這樣瀏覽器比對的時候就只會匹配到「這個檔案畫出來的元素」。
 */
-@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
 .community-page {
   width: 100%;
   min-height: 100vh;
@@ -664,6 +732,34 @@ const toggleFollow = () => {
 .edit-visibility{ display:flex; gap:1rem; font-size:.8rem; color:var(--ink); }
 .edit-visibility label{ display:flex; align-items:center; gap:.35rem; cursor:pointer; }
 .edit-actions{ display:flex; gap:.6rem; }
+
+.file-input-hidden{
+  position:absolute; opacity:0; width:100%; height:100%;
+  top:0; left:0; cursor:pointer;
+}
+.edit-thumb-row{ display:flex; flex-wrap:wrap; gap:.5rem; }
+.edit-thumb-item{
+  position:relative;
+  width:64px; height:64px; border-radius:6px; overflow:hidden;
+  border:1px solid var(--hairline); flex-shrink:0;
+}
+.edit-thumb-item img{ width:100%; height:100%; object-fit:cover; display:block; }
+.edit-thumb-remove{
+  position:absolute; top:2px; right:2px;
+  width:18px; height:18px; border-radius:50%;
+  background:rgba(0,0,0,.6); color:#fff; border:none;
+  font-size:.65rem; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+}
+.edit-thumb-add{
+  position:relative;
+  width:64px; height:64px; border-radius:6px; flex-shrink:0;
+  border:1px dashed var(--hairline);
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.2rem; color:var(--ink-soft); cursor:pointer;
+}
+.edit-thumb-add:hover{ border-color:var(--plum); color:var(--plum); }
+.edit-photo-hint{ font-size:.72rem; color:var(--ink-soft); margin:0; }
 .btn-cancel-edit{
   flex:1;
   background:transparent; color:var(--ink-soft);
