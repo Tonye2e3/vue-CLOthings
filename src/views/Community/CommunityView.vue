@@ -475,7 +475,7 @@ const toggleFollow = (creator) => {
             type="text"
             v-model="searchQuery"
             class="search-input"
-            placeholder="搜尋穿搭、單品或用戶..."
+            placeholder="搜尋標籤、單品或用戶..."
           />
           <!--
             v-if="searchQuery"：只有搜尋框裡有文字的時候，才顯示這個「清除」按鈕。
@@ -565,7 +565,7 @@ const toggleFollow = (creator) => {
             就改顯示 currentTabCopy.empty 這個針對目前分頁寫好的提示文字。
           -->
           <div class="empty-state" v-if="filteredPosts.length === 0">
-            {{ isSearching ? `找不到符合「${searchQuery}」的穿搭、單品或用戶，換個關鍵字試試。` : currentTabCopy.empty }}
+            {{ isSearching ? `找不到符合「${searchQuery}」的穿搭、標籤或用戶，換個關鍵字試試。` : currentTabCopy.empty }}
           </div>
 
           <!--

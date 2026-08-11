@@ -72,6 +72,8 @@ const fetchUserPosts = async () => {
     // commentsCount、tags（把 taggedProducts 陣列轉成 '#商品名稱' 字串陣列）。
     userPosts.value = res.data.map(post => ({
       communityPostId: post.communityPostId,
+      userId: post.userId,
+      status: post.status,
       content: post.content,
       image: post.images && post.images.length > 0
         ? `${API_BASE}${post.images[0].imageFileName}`
@@ -83,6 +85,67 @@ const fetchUserPosts = async () => {
   } catch (err) {
     console.error('讀取個人貼文失敗：', err)
   }
+}
+
+// deletePost：按下「刪除貼文」時執行。
+// 打的是 CommunityPostController.cs 裡的 DELETE api/CommunityPost/{communitypostid}。
+const deletePost = async (communityPostId) => {
+  // confirm(...)：瀏覽器內建的確認視窗，會跳出「確定／取消」讓使用者選，
+  // 按確定回傳 true，按取消回傳 false。刪除是不能復原的動作，先跟使用者確認一次比較安全。
+  if (!confirm('確定要刪除這篇貼文嗎？刪除後就無法恢復。')) return
+
+  try {
+    await axios.delete(`${API_BASE}/api/CommunityPost/${communityPostId}`)
+  } catch (err) {
+    console.error('刪除貼文失敗：', err)
+    alert('刪除失敗，請稍後再試一次！')
+    return
+  }
+
+  // API 刪除成功後，把畫面上這篇貼文也從 userPosts 移除，不用整頁重新整理、重打一次 API。
+  userPosts.value = userPosts.value.filter(p => p.communityPostId !== communityPostId)
+}
+
+// editingPostId：現在正在編輯哪一篇貼文，null 代表沒有任何一篇正在編輯中。
+// 用「哪一篇的 id」而不是單純 true/false，是因為同一個頁面裡有好幾張貼文卡片，
+// 這樣才知道要在「哪一張」卡片底下顯示編輯表單。
+const editingPostId = ref(null)
+
+// editForm：編輯表單目前打的內容，對應 CommunityPostController.cs 的
+// PutCommunityPost 能改的兩個欄位：content、status。
+const editForm = ref({ content: '', status: 'public' })
+
+// startEdit：按下「編輯貼文」時執行，把表單內容預先填成這篇貼文現在的資料，
+// 並把 editingPostId 設成這篇貼文的 id，畫面上就會展開編輯表單。
+const startEdit = (post) => {
+  editingPostId.value = post.communityPostId
+  editForm.value = { content: post.content, status: post.status || 'public' }
+}
+
+// cancelEdit：取消編輯，收起表單，不送出任何變更。
+const cancelEdit = () => {
+  editingPostId.value = null
+}
+
+// saveEdit：按下「儲存」時執行，打 PUT api/CommunityPost/{id}。
+const saveEdit = async (post) => {
+  try {
+    await axios.put(`${API_BASE}/api/CommunityPost/${post.communityPostId}`, {
+      communityPostId: post.communityPostId,
+      userId: post.userId,
+      content: editForm.value.content,
+      status: editForm.value.status
+    })
+  } catch (err) {
+    console.error('編輯貼文失敗：', err)
+    alert('儲存失敗，請稍後再試一次！')
+    return
+  }
+
+  // 成功後直接更新畫面上這篇貼文的內容，不用重新整理、重打一次 GET API。
+  post.content = editForm.value.content
+  post.status = editForm.value.status
+  editingPostId.value = null
 }
 
 // onMounted：這個元件的畫面第一次被畫出來之後，自動執行裡面的程式碼一次。
@@ -281,6 +344,29 @@ const toggleFollow = () => {
               <!-- 這篇貼文可能有好幾個標籤，所以再用一次 v-for 把每個標籤都畫出來 -->
               <span v-for="tag in post.tags" :key="tag" class="tag-chip">{{ tag }}</span>
             </div>
+
+            <!--
+              編輯表單：只有這張卡片正在被編輯（editingPostId 等於這篇貼文的 id）才會顯示。
+              目前只能改文字內容跟公開設定，圖片、標記商品維持原樣不能在這裡改
+              （PutCommunityPost 後端目前也只有處理這兩個欄位）。
+            -->
+            <div v-if="editingPostId === post.communityPostId" class="edit-form">
+              <textarea v-model="editForm.content" class="edit-textarea" rows="3"></textarea>
+              <div class="edit-visibility">
+                <label><input type="radio" v-model="editForm.status" value="public" /> 公開</label>
+                <label><input type="radio" v-model="editForm.status" value="hide" /> 隱藏</label>
+              </div>
+              <div class="edit-actions">
+                <button class="btn-cancel-edit" @click="cancelEdit">取消</button>
+                <button class="btn-save-edit" @click="saveEdit(post)">儲存</button>
+              </div>
+            </div>
+
+            <!-- 編輯／刪除貼文：只有在「穿搭作品」這個頁籤（自己發的貼文）才會出現，收藏牆那邊不會有 -->
+            <div v-else class="post-manage-actions">
+              <button class="btn-edit-post" @click="startEdit(post)">編輯貼文</button>
+              <button class="btn-delete-post" @click="deletePost(post.communityPostId)">刪除貼文</button>
+            </div>
           </div>
 
         </div>
@@ -311,7 +397,7 @@ const toggleFollow = () => {
 
               <div class="post-stats">
                 <span>♥ {{ formatCount(post.likesCount) }}</span>
-                <span>💬 {{ formatCount(post.commentsCount) }}</span>                
+                <span>💬 {{ formatCount(post.commentsCount) }}</span>
               </div>
 
               <div class="tag-cloud">
@@ -323,7 +409,9 @@ const toggleFollow = () => {
 
         <!-- v-else（搭配上面裡層的 v-if）：收藏清單是空的時候，顯示這個提示，而不是一片空白 -->
         <div v-else class="empty-state">
-          <div class="empty-icon">📁</div>
+          <div class="empty-icon">
+            <i class="fa-solid fa-bookmark" style="color: rgb(122, 75, 84);"></i>
+          </div>
           <p class="empty-note">「還沒有收藏任何穿搭，去社群逛逛按個收藏吧。」</p>
         </div>
       </div>
@@ -334,7 +422,9 @@ const toggleFollow = () => {
         意思是「works 不是、saved 也不是」，才會走到這裡。
       -->
       <div v-else class="empty-state">
-        <div class="empty-icon">📁</div>
+        <div class="empty-icon">
+          <i class="fa-solid fa-bookmark" style="color: rgb(122, 75, 84);"></i>
+        </div>
         <p class="empty-note">「這裡的故事，還在整理中。」</p>
       </div>
 
@@ -351,6 +441,7 @@ const toggleFollow = () => {
   然後把下面每一條 CSS 規則也自動加上同樣的屬性選擇器，
   這樣瀏覽器比對的時候就只會匹配到「這個檔案畫出來的元素」。
 */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
 .community-page {
   width: 100%;
   min-height: 100vh;
@@ -540,6 +631,54 @@ const toggleFollow = () => {
   font-size:.7rem; padding:.28rem .65rem; border-radius:4px;
   background:var(--cream); border:1px solid var(--hairline); color:var(--ink-soft);
 }
+
+.post-manage-actions{ display:flex; gap:.6rem; margin-top:.8rem; }
+
+.btn-edit-post{
+  flex:1;
+  background:transparent; color:var(--ink);
+  border:1px solid var(--ink); border-radius:4px;
+  padding:.45rem; font-size:.78rem; font-weight:600;
+  transition:all .18s ease;
+}
+.btn-edit-post:hover{ background:var(--ink); color:var(--paper); }
+
+.btn-delete-post{
+  flex:1;
+  background:transparent; color:#B4453A;
+  border:1px solid #B4453A; border-radius:4px;
+  padding:.45rem; font-size:.78rem; font-weight:600;
+  transition:all .18s ease;
+}
+.btn-delete-post:hover{ background:#B4453A; color:#fff; }
+
+.edit-form{ margin-top:.8rem; display:flex; flex-direction:column; gap:.6rem; }
+.edit-textarea{
+  width:100%;
+  border:1px solid var(--hairline); border-radius:4px;
+  padding:.6rem .8rem; font-size:.83rem; color:var(--ink);
+  font-family:inherit; resize:vertical;
+  outline:none;
+}
+.edit-textarea:focus{ border-color:var(--plum); }
+.edit-visibility{ display:flex; gap:1rem; font-size:.8rem; color:var(--ink); }
+.edit-visibility label{ display:flex; align-items:center; gap:.35rem; cursor:pointer; }
+.edit-actions{ display:flex; gap:.6rem; }
+.btn-cancel-edit{
+  flex:1;
+  background:transparent; color:var(--ink-soft);
+  border:1px solid var(--hairline); border-radius:4px;
+  padding:.45rem; font-size:.78rem;
+}
+.btn-save-edit{
+  flex:1;
+  background:var(--ink); color:var(--paper);
+  border:none; border-radius:4px;
+  padding:.45rem; font-size:.78rem; font-weight:600;
+  transition:background .18s ease;
+}
+.btn-save-edit:hover{ background:var(--plum-deep); }
+
 
 /* ---------- 其他頁籤空狀態 ---------- */
 .empty-state{
