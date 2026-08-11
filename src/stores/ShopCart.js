@@ -25,7 +25,6 @@ export const useCartStore = defineStore(
         // 商品不存在item之中，如果沒有找到相同的id，就會執行這段
         items.value.push(product) // // 陣列塞一個物件，將商品加入購物車
       }
-      console.log('購物車商品', items.value)
     }
 
     // 移除商品的方法，將商品從購物車移除

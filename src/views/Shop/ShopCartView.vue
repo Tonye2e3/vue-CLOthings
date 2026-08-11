@@ -1,11 +1,19 @@
 <script setup>
 import { useCartStore } from '@/stores/ShopCart' // 引入購物車store
-const cartStore = useCartStore() // 使用購物車store
-
 import { useRouter } from 'vue-router'
+import { useFavoriteStore } from '@/stores/ShopFavorite'
+
+const cartStore = useCartStore() // 使用購物車store
 const router = useRouter()
+const favoriteStore = useFavoriteStore()
+
 function goShop() {
   router.push({ name: 'shop' })
+}
+
+function moveToFavorite(product) {
+  favoriteStore.addFavorite(product) //加入收藏
+  cartStore.removeItem(product.productSpecificationId) // 從購物車移除
 }
 
 // ⚠️ 測試用函式，測完要刪掉
@@ -19,7 +27,6 @@ function addTestItem1() {
     size: 'M',
     image: 'https://placehold.co/80x80?text=shirt',
     quantity: 1,
-    selected: true,
   })
 }
 function addTestItem2() {
@@ -32,7 +39,6 @@ function addTestItem2() {
     size: 'L',
     image: 'https://placehold.co/80x80?text=shirt2',
     quantity: 1,
-    selected: true,
   })
 }
 function addTestItem3() {
@@ -45,7 +51,6 @@ function addTestItem3() {
     size: '32',
     image: 'https://placehold.co/80x80?text=jeans',
     quantity: 1,
-    selected: true,
   })
 }
 </script>
@@ -63,7 +68,7 @@ function addTestItem3() {
 
   <!-- 購物車空狀態 -->
   <div v-if="cartStore.items.length == 0" class="text-center py-5 text-body-secondary">
-    <div class="mb-2 display-1">❤</div>
+    <div class="mb-2 display-3">❤</div>
     <p class="mb-3 display-6">等待一場與美好的相遇</p>
     <br />
     <br />
@@ -134,6 +139,15 @@ function addTestItem3() {
                 </td>
                 <td class="text-end fw-semibold">NT$ {{ product.price * product.quantity }}</td>
                 <td class="text-end">
+                  <!-- 移至收藏 -->
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-link text-secondary p-0 me-3"
+                    @click="moveToFavorite(product)"
+                  >
+                    💗
+                  </button>
+                  <!-- 移除 -->
                   <button
                     type="button"
                     class="btn btn-sm btn-link text-danger p-0"
