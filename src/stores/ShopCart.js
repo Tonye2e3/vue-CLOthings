@@ -50,7 +50,6 @@ export const useCartStore = defineStore(
         // 商品已存在item之中，如果有找到相同的id，就會執行這段
         existItem.quantity += qty // 將該商品的數量加傳入的qty
         if (existItem.quantity <= 0) {
-          
           removeItem(productSpecificationId)
         }
       }
@@ -64,15 +63,9 @@ export const useCartStore = defineStore(
       }
     }
 
-    // 購物車總金額的計算屬性
-    const total = computed(() => {
-      let totalAmount = 0
-      items.value.forEach((p) => {
-        if (p.selected) {
-          totalAmount += p.price * p.quantity
-        }
-      })
-      return totalAmount
+    // 只包含「已勾選」的商品（結帳、送訂單都用這個）
+    const selectedItems = computed(() => {
+      return items.value.filter((p) => p.selected)
     })
 
     // 購物車已選件數
@@ -86,7 +79,44 @@ export const useCartStore = defineStore(
       return count
     })
 
-    return { items, addItem, removeItem, changeQty, selectedCount, total, toggleSelect } // 回傳模組內的變數、方法、計算屬性
+    // 運費：滿 1000 免運，未滿收 60
+    const shippingFee = computed(() => {
+      if (total.value >= 1000) {
+        return 0 // 滿 1000，免運
+      } else {
+        return 60 // 未滿，收 60
+      }
+    })
+
+    // 購物車總金額的計算屬性
+    const total = computed(() => {
+      let totalAmount = 0
+      items.value.forEach((p) => {
+        if (p.selected) {
+          totalAmount += p.price * p.quantity
+        }
+      })
+      return totalAmount
+    })
+
+    // 最終應付金額 = 商品總額 + 運費
+    const finalTotal = computed(() => {
+      return total.value + shippingFee.value
+    })
+
+    return {
+      items,
+      addItem,
+      removeItem,
+      changeQty,
+      toggleSelect,
+      selectedCount,
+      selectedItems,
+      total,
+      shippingFee, 
+      finalTotal,
+      
+    } // 回傳模組內的變數、方法、計算屬性
   },
   { persist: true },
   // 加上persist:true，代表這個狀態模組要持久化儲存，當頁面刷新時，資料不會消失

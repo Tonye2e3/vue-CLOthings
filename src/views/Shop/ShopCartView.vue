@@ -27,6 +27,7 @@ function addTestItem1() {
     size: 'M',
     image: 'https://placehold.co/80x80?text=shirt',
     quantity: 1,
+    selected:true
   })
 }
 function addTestItem2() {
@@ -39,6 +40,7 @@ function addTestItem2() {
     size: 'L',
     image: 'https://placehold.co/80x80?text=shirt2',
     quantity: 1,
+    selected:true
   })
 }
 function addTestItem3() {
@@ -51,6 +53,7 @@ function addTestItem3() {
     size: '32',
     image: 'https://placehold.co/80x80?text=jeans',
     quantity: 1,
+    selected:true
   })
 }
 </script>
