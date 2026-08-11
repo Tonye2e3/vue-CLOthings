@@ -51,3 +51,12 @@ export const cancelGroupOrder = (orderId) =>
 // 編輯訂單（收件人姓名 + 各品項數量）
 export const editGroupOrder = (orderId, payload) =>
   http.put(`/GroupOrder/${orderId}`, payload).then(res => res.data)
+
+// ---- 訂單客服 ----
+// 買家針對某筆訂單提問
+export const createCustomerService = (orderId, payload) =>
+  http.post(`/GroupCustomerService/order/${orderId}`, payload).then(res => res.data)
+
+// 買家查詢自己這筆訂單送出過的客服紀錄
+export const getCustomerServiceByOrder = (orderId) =>
+  http.get(`/GroupCustomerService/order/${orderId}`).then(res => res.data)

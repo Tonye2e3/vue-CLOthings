@@ -53,16 +53,7 @@ const router = createRouter({
   name: 'GroupCheckout',
   component: () => import('../views/GroupShop/GroupCheckoutView.vue'),
 },
-{
-  path: '/GroupShop/admin/products',
-  name: 'GroupProductAdmin',
-  component: () => import('../views/GroupShop/GroupProductAdminView.vue'),
-},
-{
-  path: '/GroupShop/admin/orders',
-  name: 'GroupOrderAdmin',
-  component: () => import('../views/GroupShop/GroupOrderAdminView.vue'),
-},
+
 
     //Community 在註解之間新增個人使用的路由 名字自行修改
     {
