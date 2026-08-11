@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 // useRoute：Vue Router 提供的功能，讓我們可以在 <script> 裡面讀到「目前網址」的資訊，
 // 例如網址上帶的動態參數。router/index.js 裡這個頁面對應的路由是
 // path: '/community/post/:id'，所以網址上 :id 那一段的值，
@@ -129,11 +129,29 @@ const fetchLikeStatus = async () => {
   }
 }
 
-// onMounted：頁面一打開，就照網址上的 id 去後端要這篇貼文的完整資料、留言，還有這個使用者按讚過沒有。
+// onMounted：頁面一打開，就照網址上的 id 去後端要這篇貼文的完整資料、留言、
+// 這個使用者按讚過沒有，還有跟這篇貼文標記過同一個商品的相似穿搭推薦。
 onMounted(() => {
   fetchPost()
   fetchComments()
   fetchLikeStatus()
+  fetchSimilarPosts()
+})
+
+// watch：監看網址上的 :id 這個參數。
+// 因為從「這篇貼文詳細頁」點連結跳到「另一篇貼文詳細頁」時，
+// Vue Router 會重複使用同一個元件（不會整個重新建立），
+// 所以 onMounted 不會再執行第二次，畫面資料就不會跟著新的 id 換。
+// 這裡另外監看 route.params.id，只要它變了（換了一篇貼文），
+// 就重新打一次全部的 API，資料才會真的換成新那篇的內容。
+watch(() => route.params.id, () => {
+  notFound.value = false
+  newComment.value = '' // 清空還沒送出的留言草稿，避免帶到別篇貼文底下去
+  replyingTo.value = null // 取消原本在回覆的狀態，避免對新貼文的留言用到舊貼文的 parentCommentId
+  fetchPost()
+  fetchComments()
+  fetchLikeStatus()
+  fetchSimilarPosts()
 })
 
 // postTimeAgo：把 post.postDate 這個正式時間，轉換成「N 小時前」這種給人看的相對時間文字。
@@ -242,12 +260,22 @@ const findProductRoute = (productId) => {
   return matched ? matched.productRoute : '#'
 }
 
-// 相似穿搭推薦
-const similarPosts = ref([
-  { id: 1, image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80' },
-  { id: 2, image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=300&auto=format&fit=crop&q=80' },
-  { id: 3, image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=300&auto=format&fit=crop&q=80' }
-])
+// 相似穿搭推薦：跟這篇貼文標記過同一個商品的其他貼文，先給空陣列，
+// 等 fetchSimilarPosts() 打完 API 才會有真正資料庫裡的貼文。
+const similarPosts = ref([])
+
+// fetchSimilarPosts：打 CommunityPostController.cs 裡的 GET api/CommunityPost/similar/{communitypostid}。
+const fetchSimilarPosts = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/api/CommunityPost/similar/${route.params.id}`)
+    similarPosts.value = res.data.map(p => ({
+      communityPostId: p.communityPostId,
+      image: (p.images && p.images.length) ? `${API_BASE}${p.images[0].imageFileName}` : postImage
+    }))
+  } catch (err) {
+    console.error('讀取相似穿搭推薦失敗：', err)
+  }
+}
 
 // 留言列表：等 fetchComments() 打完 API 才會有資料，先給空陣列避免顯示假留言。
 // 欄位對照 Post_Comment 表：postCommentId、parentCommentId（回覆留言用，parentCommentId
@@ -545,13 +573,18 @@ const addComment = async () => {
             </button>
           </div>
 
-          <!-- 相似穿搭推薦 -->
+          <!-- 相似穿搭推薦：跟這篇貼文標記過同一個商品的其他貼文，點縮圖可以直接跳過去那篇貼文 -->
           <div class="side-card">
             <div class="side-title"><span class="dot"></span>相似穿搭推薦</div>
             <div class="similar-grid">
-              <div v-for="sim in similarPosts" :key="sim.id" class="similar-thumb">
-                <img :src="sim.image" alt="similar look" />
-              </div>
+              <router-link
+                v-for="sp in similarPosts"
+                :key="sp.communityPostId"
+                :to="`/community/post/${sp.communityPostId}`"
+                class="similar-thumb"
+              >
+                <img :src="sp.image" alt="similar look" />
+              </router-link>
             </div>
           </div>
 
@@ -833,6 +866,7 @@ const addComment = async () => {
 
 .similar-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:.6rem; }
 .similar-thumb{
+  display:block;
   aspect-ratio:3/4; border-radius:6px; overflow:hidden;
   background:var(--cream);
   cursor:pointer;
