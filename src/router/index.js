@@ -27,31 +27,42 @@ const router = createRouter({
     },
 
     //GroupShop 在註解之間新增個人使用的路由 名字自行修改
-   {
-      path: '/GroupShop',
-      name: 'GroupProducts',
-      component: () => import('../views/GroupShop/GroupProductsView.vue'),
-    },
-    {
-      path: '/GroupShop/product/:id',
-      name: 'GroupProductDetail',
-      component: () => import('../views/GroupShop/GroupProductDetail.vue'),
-    },
-    {
-      path: '/GroupShop/checkout',
-      name: 'GroupCart',
-      component: () => import('../views/GroupShop/GroupCartView.vue'),
-    },
-    {
-      path: '/GroupShop/orders',
-      name: 'GroupOrders',
-      component: () => import('../views/GroupShop/GroupOrdersView.vue'),
-    },
-    {
-      path: '/GroupShop/checkout/confirm',
-      name: 'GroupCheckout',
-      component: () => import('../views/GroupShop/GroupCheckoutView.vue'),
-    },
+   //GroupShop 在註解之間新增個人使用的路由 名字自行修改
+{
+  path: '/GroupShop',
+  name: 'GroupProducts',
+  component: () => import('../views/GroupShop/GroupProductsView.vue'),
+},
+{
+  path: '/GroupShop/product/:id',
+  name: 'GroupProductDetail',
+  component: () => import('../views/GroupShop/GroupProductDetail.vue'),
+},
+{
+  path: '/GroupShop/checkout',
+  name: 'GroupCart',
+  component: () => import('../views/GroupShop/GroupCartView.vue'),
+},
+{
+  path: '/GroupShop/orders',
+  name: 'GroupOrders',
+  component: () => import('../views/GroupShop/GroupOrdersView.vue'),
+},
+{
+  path: '/GroupShop/checkout/confirm',
+  name: 'GroupCheckout',
+  component: () => import('../views/GroupShop/GroupCheckoutView.vue'),
+},
+{
+  path: '/GroupShop/admin/products',
+  name: 'GroupProductAdmin',
+  component: () => import('../views/GroupShop/GroupProductAdminView.vue'),
+},
+{
+  path: '/GroupShop/admin/orders',
+  name: 'GroupOrderAdmin',
+  component: () => import('../views/GroupShop/GroupOrderAdminView.vue'),
+},
 
     //Community 在註解之間新增個人使用的路由 名字自行修改
     {
