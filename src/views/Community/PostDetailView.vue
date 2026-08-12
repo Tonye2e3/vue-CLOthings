@@ -243,39 +243,13 @@ const toggleSave = () => {
   })
 }
 
-// 這套穿搭的商品清單（右側欄要顯示的可購買商品）
-// productId／productRoute：對應資料庫 Post_Tagged_Products 真正存的欄位。
-const products = ref([
-  {
-    productId: 101,
-    name: '奶油白V領針織上衣',
-    price: '690',
-    image: 'https://i.pinimg.com/1200x/dc/94/75/dc9475c6d350370bcf6c471e3ee6d6fb.jpg',
-    productRoute: '/shop/product/101'
-  },
-  {
-    productId: 102,
-    name: '高腰垂墜寬褲 (卡其)',
-    price: '890',
-    image: 'https://i.pinimg.com/1200x/f3/dd/f4/f3ddf4c34ff005240958bddb9a8080d0.jpg',
-    productRoute: '/shop/product/102'
-  },
-  {
-    productId: 103,
-    name: '復古麻編單肩托特包',
-    price: '680',
-    image: 'https://i.pinimg.com/736x/f2/cf/7b/f2cf7b273ca7445dce8800f855051f93.jpg',
-    productRoute: '/shop/product/103'
-  }
-])
-
-// findProductRoute：拿貼文標記商品的 productId，去 products 清單裡找同一個 productId 的商品，
-// 回傳它的 productRoute。找不到（例如標記了一個已下架的商品）就回傳 '#'，
-// 這樣連結還是有東西可以點，不會整個報錯。
-const findProductRoute = (productId) => {
-  const matched = products.value.find(p => p.productId === productId)
-  return matched ? matched.productRoute : '#'
-}
+// 「這套穿搭的商品」右側清單：直接用 post.taggedProducts（貼文作者真的搜尋、勾選過的商品），
+// 不再是另一份跟這篇貼文毫不相干的假資料。這樣畫面上只會出現作者自己標記過的東西，
+// 不會出現「使用者身上每一件都被當成我們家商品在賣」這種狀況。
+// totalTaggedPrice：把這篇貼文標記的所有商品價格加總，給「一鍵購買全套穿搭」按鈕顯示用。
+const totalTaggedPrice = computed(() =>
+  post.value.taggedProducts.reduce((sum, t) => sum + (t.price || 0), 0)
+)
 
 // 相似穿搭推薦：跟這篇貼文標記過同一個商品的其他貼文，先給空陣列，
 // 等 fetchSimilarPosts() 打完 API 才會有真正資料庫裡的貼文。
@@ -513,8 +487,7 @@ const addComment = async () => {
               productRoute 目前只是假的路徑（例如 /shop/product/101），
               真的點下去會導到不存在的頁面，demo 階段先不要讓它跳轉，
               只保留視覺樣式（看起來像標籤）。之後商城的商品頁做好、
-              productRoute 是真的網址時，把 <span> 換回 <a :href="findProductRoute(tag.productId)">
-              就可以了，findProductRoute 這個函式邏輯已經寫好、留著沒動。
+              productRoute 是真的網址時，把 <span> 換回 <a :href="tag.productRoute">就可以了。
             -->
             <div class="tagged-products" v-if="post.taggedProducts.length">
               <span class="tagged-label">標記商品</span>
@@ -590,20 +563,19 @@ const addComment = async () => {
         <!-- 右側：這套穿搭的商品與推薦區 -->
         <div class="col-12 col-lg-4">
 
-          <!-- 穿搭商品清單 -->
-          <div class="side-card">
+          <!-- 穿搭商品清單：只顯示這篇貼文作者真的標記過的商品，沒有標記任何商品的貼文，這整張卡片不會出現 -->
+          <div class="side-card" v-if="post.taggedProducts.length">
             <div class="side-title"><span class="dot"></span>這套穿搭的商品</div>
 
             <div class="product-list">
-              <div v-for="item in products" :key="item.productId" class="product-row">
+              <div v-for="item in post.taggedProducts" :key="item.postTaggedProductId" class="product-row">
                 <!--
-                  product-link：把圖片＋商品資訊包成一個區塊，之後接上真的
-                  商品頁時可以換回 <a :href="item.productRoute">，
-                  現在先用 <div> 不會跳轉，只是給老師看畫面用，
-                  跟旁邊「加入購物車」按鈕分開（按鈕還是純粹的按鈕）。
+                  product-link：之後 productRoute 是真的商品頁網址時，可以換回
+                  <a :href="item.productRoute">，現在先用 <div> 不會跳轉。
+                  目前 Product 表沒有圖片欄位（圖片是另一張 ProductImg 表，還沒接），
+                  所以先不顯示縮圖，只顯示名稱、價格。
                 -->
                 <div class="product-link">
-                  <img :src="item.image" class="product-thumb" alt="product" />
                   <div class="product-info">
                     <p class="product-name">{{ item.name }}</p>
                     <p class="product-price">NT$ {{ item.price }}</p>
@@ -614,7 +586,7 @@ const addComment = async () => {
             </div>
 
             <button class="btn-buy-all">
-              一鍵購買全套穿搭 · NT$ 2,860
+              一鍵購買貼文標記商品 · NT$ {{ totalTaggedPrice.toLocaleString() }}
             </button>
           </div>
 
