@@ -1,46 +1,83 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import axios from 'axios'
 
+const route = useRoute()
 const API_BASE = 'https://localhost:7255'
+
+const products = ref([])
+const categories = ref([])
+
+const selectedCategoryId = computed(() => {
+  const id = route.query.categoryId // 網址參數改用 categoryId
+  return id ? Number(id) : null // 網址參數是文字，轉成數字才能跟 id 比對
+})
+
+const filteredProducts = computed(() => {
+  if (!selectedCategoryId.value) {
+    return products.value // 沒選分類 → 全部商品
+  }
+
+  return products.value.filter((p) => p.productCategoryId === selectedCategoryId.value)
+})
+
+const title = computed(() => {
+  if (!selectedCategoryId.value) return '全部商品'
+  // 找出目前分類的名稱來顯示
+  const cat = categories.value.find((c) => c.productCategoryId === selectedCategoryId.value)
+  return cat ? `${cat.categoryName} 商品` : '全部商品'
+})
+
 function getImageUrl(fileName) {
   // 沒有圖檔名時，回傳佔位圖（防呆：有些商品可能還沒圖）
   if (!fileName) {
     return 'https://placehold.co/300x400?text=No+Image'
   }
+
+  // 暫時加這段來偵查，測完刪
+  console.log('我選的分類 id:', selectedCategoryId.value, '型別:', typeof selectedCategoryId.value)
+  console.log(
+    '商品們的分類 id:',
+    products.value.map((p) => p.productCategoryId),
+  )
+  console.log('第一個商品分類 id 的型別:', typeof products.value[0]?.productCategoryId)
+
   return `${API_BASE}/images/product/${fileName}`
 }
-
-const route = useRoute()
-
-const categories = ['WOMEN', 'MEN', 'KIDS', 'BABY']
-
-const products = ref([])
 
 // 頁面一仔入，就打API拿商品
 onMounted(async () => {
   try {
-    const response = await axios.get('https://localhost:7255/api/product')
-    products.value = response.data // API回傳的資料塞進products
+    // 同時打「商品」和「分類」兩個 API
+    const productRes = await axios.get(`${API_BASE}/api/product`)
+    products.value = productRes.data
+
+    const categoryRes = await axios.get(`${API_BASE}/api/productCategory`)
+    categories.value = categoryRes.data
   } catch (error) {
-    console.log('拿商品失敗', error)
+    console.error('載入資料失敗：', error)
   }
 })
-
-const selectedCategory = computed(() => {
-  const category = route.query.category
-  return categories.includes(category) ? category : ''
-})
-
-const filteredProducts = computed(() => products.value)
-
-const title = computed(() => '全部商品')
 </script>
 
 <template>
   <section class="promo">
     <h2 class="section-title">{{ title }}</h2>
+    <div class="category-filter">
+      <RouterLink :to="{ query: {} }" class="cat-btn" :class="{ active: !selectedCategoryId }">
+        全部
+      </RouterLink>
+      <RouterLink
+        v-for="cat in categories"
+        :key="cat.productCategoryId"
+        :to="{ query: { categoryId: cat.productCategoryId } }"
+        class="cat-btn"
+        :class="{ active: selectedCategoryId === cat.productCategoryId }"
+      >
+        {{ cat.categoryName }}
+      </RouterLink>
+    </div>
     <div class="grid">
       <article v-for="p in filteredProducts" :key="p.productId" class="card">
         <div class="card-image">
@@ -140,6 +177,28 @@ const title = computed(() => '全部商品')
   width: 258.4px;
   height: 344.3px;
   object-fit: cover; /* 圖片填滿、裁切多餘部分，不變形 */
+}
+
+.category-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+.cat-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--home-border);
+  border-radius: 4px;
+  text-decoration: none;
+  color: var(--home-text);
+  font-size: 0.85rem;
+  transition: all 0.15s ease;
+}
+.cat-btn:hover,
+.cat-btn.active {
+  background: var(--home-text);
+  color: #fff;
+  border-color: var(--home-text);
 }
 
 @media (max-width: 1024px) {
