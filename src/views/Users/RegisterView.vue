@@ -45,9 +45,12 @@ async function register() {
     router.push({ name: 'login' })
   } catch (error) {
     console.error('註冊失敗：', error)
-    console.log('後端錯誤：', error.response?.data)
 
-    alert('註冊失敗')
+    if (error.response?.status === 409) {
+      alert('此帳號已被使用')
+    } else {
+      alert('註冊失敗，請稍後再試')
+    }
   }
 }
 
