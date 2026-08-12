@@ -12,7 +12,7 @@ const router = useRouter()
 
 function logout() {
   authStore.clearAuth()
-  router.push('/login')
+  router.push({ name: 'login' })
 }
 </script>
 
@@ -43,8 +43,9 @@ function logout() {
 
 <style scoped>
 .content-area {
-  margin-left: 510px; /* 350 + 160 */
+  margin-left: 220px;
   margin-top: 50px;
+  width: 800px;
 }
 
 .sidebar {
@@ -76,11 +77,6 @@ function logout() {
 
 .sidebar a:hover {
   color: #007bff;
-}
-
-.content-area {
-  margin-left: 220px; /* 須與 sidebar 寬度對齊 */
-  width: 800px;
 }
 
 .logout-btn {
