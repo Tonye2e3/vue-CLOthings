@@ -24,6 +24,11 @@ async function login() {
     console.log('登入結果', resp)
     console.log('Pinia 登入資料', authStore)
     authStore.setAuth(resp.data)
+
+    // 第一次：有 Token
+    // const testResp = await api.get('/User')
+    // console.log('有 Token 測試', testResp)
+
     alert('登入成功')
     router.push({ name: 'home' })
   } catch (error) {

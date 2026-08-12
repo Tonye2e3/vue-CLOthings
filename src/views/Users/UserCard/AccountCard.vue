@@ -1,8 +1,11 @@
 <script setup>
 import { ref, reactive } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import api from '@/services/api'
 import { initialUserData } from '../../../services/userFakeData'
 import { isValidAccount, isValidPassword, isValidPhone, isValidEmail } from '@/utils/UserValidator'
 
+const authStore = useAuthStore()
 const userData = reactive({ ...initialUserData })
 const backupData = reactive({}) // 用來暫存原始資料
 const isEditing = ref(false)
@@ -32,9 +35,23 @@ const save = () => {
 
   isEditing.value = false
 }
+
+//測試
+// async function test() {
+//   // 先把 Pinia 登入資料清掉
+//   authStore.clearAuth()
+
+//   try {
+//     const response = await api.get('/User')
+//     console.log('沒有 Token 但成功：', response)
+//   } catch (error) {
+//     console.log('沒有 Token：', error.response?.status)
+//   }
+// }
 </script>
 
 <template>
+  <button class="btn btn-primary" @click="test">test</button>
   <div class="card p-4 shadow mb-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h3 class="fw-bold mb-0">帳戶資料</h3>
