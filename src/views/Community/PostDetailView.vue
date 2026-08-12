@@ -409,12 +409,11 @@ const addComment = async () => {
             <div class="author-bar">
               <!--
                 把大頭貼跟名字包進 <router-link>，讓它可以點擊跳轉。
-                to="/community/profile"：這是我們專案裡「個人檔案頁」(UserProfileView.vue) 對應的網址，
-                跟 CommunityView.vue 側欄「熱門穿搭達人」點頭像時用的是同一個網址，
-                點下去就會切換到 UserProfileView.vue 那個頁面。
+                :to="`/community/profile/${post.userId}`"：帶上這篇貼文真正的發文者 userId，
+                點下去會跳到那個人的個人檔案頁（UserProfileView.vue），不同貼文的作者會連到不同網址。
                 class="text-decoration-none"：Bootstrap 的工具 class，把 <a> 連結預設的底線拿掉。
               -->
-              <router-link to="/community/profile" class="author-info text-decoration-none">
+              <router-link :to="`/community/profile/${post.userId}`" class="author-info text-decoration-none">
                 <img :src="post.user.avatar" class="author-avatar" alt="avatar" />
                 <div>
                   <h6 class="author-name">{{ post.user.name }}</h6>

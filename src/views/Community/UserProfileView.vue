@@ -6,7 +6,10 @@
 // ref() 是 Vue 提供的功能，用來建立一個「會被畫面自動追蹤」的變數。
 // 白話說：只要 ref() 包起來的資料改變了，畫面上有用到這個資料的地方
 // 會自動跟著重新顯示，不用自己手動去更新 HTML。
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
+// useRoute：讀取網址上的動態參數，router/index.js 裡這個頁面對應的路由是
+// path: '/community/profile/:userId'，要用 useRoute() 才能拿到 :userId 那段的值。
+import { useRoute } from 'vue-router'
 // axios：打 API 用的套件，跟 CommunityView.vue、PostDetailView.vue 裡用的是同一套。
 import axios from 'axios'
 
@@ -22,10 +25,15 @@ import { savedPosts, loadSavedPosts, formatCount } from '@/views/Community/Commu
 // API_BASE：後端 API 專案的網址，跟 CommunityView.vue、PostDetailView.vue 裡用的是同一個。
 const API_BASE = 'https://localhost:7255'
 
-// viewedUserId：現在看的是哪個使用者的個人頁。
-// 之後接上真的登入系統／路由參數（例如網址帶 /profile/:userId），這裡要換成真正的值；
-// 先用資料庫裡真的存在的測試帳號 id 頂著，跟 CreatePostView.vue 目前的做法一樣。
-const viewedUserId = 1
+const route = useRoute()
+
+// viewedUserId：現在看的是哪個使用者的個人頁，從網址上的 :userId 讀出來。
+// 網址上的參數本身是字串（例如 "3"），這裡用 Number(...) 轉成數字，
+// 因為後端 API、資料庫的 userId 都是 int，字串跟數字型別不一致，某些比對可能會出錯。
+// 用 computed 而不是普通變數：從「這個人的個人頁」點連結切到「另一個人的個人頁」時，
+// Vue Router 會重複使用同一個元件、不會重新建立，普通變數只會算一次、不會跟著網址變，
+// 這裡用 computed 才能保證 viewedUserId 隨時反映網址上「現在」的 :userId。
+const viewedUserId = computed(() => Number(route.params.userId))
 
 
 
@@ -66,7 +74,7 @@ const userPosts = ref([])
 // 打的是 CommunityPostController.cs 裡新增的 GET api/CommunityPost/user/{userid}。
 const fetchUserPosts = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/api/CommunityPost/user/${viewedUserId}`)
+    const res = await axios.get(`${API_BASE}/api/CommunityPost/user/${viewedUserId.value}`)
     // 後端回傳的格式（CommunityPostDTO）跟這頁 template 原本期待的格式不太一樣，
     // 這裡把它轉成 template 需要的形狀：content、image（取第一張圖）、likesCount、
     // commentsCount、tags（把 taggedProducts 陣列轉成 '#商品名稱' 字串陣列）。
@@ -228,13 +236,23 @@ onMounted(() => {
   loadSavedPosts()
 })
 
+// watch：監看網址上的 :userId 這個參數。
+// 跟 PostDetailView.vue 換貼文時遇到的狀況一樣——從「這個人的個人頁」點連結切到
+// 「另一個人的個人頁」時，Vue Router 會重複使用同一個元件，onMounted 不會再執行第二次，
+// 所以另外監看 :userId，只要它變了（換了要看的人），就重新打一次 API。
+watch(() => route.params.userId, () => {
+  fetchUserPosts()
+})
+
 // 這是頁籤按鈕要顯示的清單：每個頁籤有一個「代號」(key，程式判斷用)
 // 跟一個「顯示文字」(label，給人看的)。
 // 這裡沒有包 ref()，因為這份清單開頭到結束都不會被改變（不會新增/刪除頁籤），
 // 只有純顯示用途，所以不需要讓 Vue 特別去「追蹤」它的變化。
 const tabs = [
   { key: 'works', label: '穿搭作品' },
-  { key: 'saved', label: '收藏' }
+  { key: 'saved', label: '收藏' },
+  { key: 'products', label: '同款商品' },
+  { key: 'about', label: '關於我' }
 ]
 
 // 這是一個「函式」（function，可以想成一個按鈕按下去要執行的一段動作）。
@@ -409,6 +427,7 @@ const toggleFollow = () => {
               <!-- formatCount：把純數字轉成「1.2k」這種縮寫，跟 CommunityView.vue import 進來的是同一個函式 -->
               <span>♥ {{ formatCount(post.likesCount) }}</span>
               <span>💬 {{ formatCount(post.commentsCount) }}</span>
+              <router-link :to="`/community/post/${post.communityPostId}`" class="ms-auto">查看同款</router-link>
             </div>
 
             <div class="tag-cloud">
@@ -492,6 +511,7 @@ const toggleFollow = () => {
               <div class="post-stats">
                 <span>♥ {{ formatCount(post.likesCount) }}</span>
                 <span>💬 {{ formatCount(post.commentsCount) }}</span>
+                <router-link :to="`/community/post/${post.communityPostId}`" class="ms-auto">查看同款</router-link>
               </div>
 
               <div class="tag-cloud">
@@ -503,9 +523,7 @@ const toggleFollow = () => {
 
         <!-- v-else（搭配上面裡層的 v-if）：收藏清單是空的時候，顯示這個提示，而不是一片空白 -->
         <div v-else class="empty-state">
-          <div class="empty-icon">
-            <i class="fa-solid fa-bookmark" style="color: rgb(122, 75, 84);"></i>
-          </div>
+          <div class="empty-icon">📁</div>
           <p class="empty-note">「還沒有收藏任何穿搭，去社群逛逛按個收藏吧。」</p>
         </div>
       </div>
@@ -516,9 +534,7 @@ const toggleFollow = () => {
         意思是「works 不是、saved 也不是」，才會走到這裡。
       -->
       <div v-else class="empty-state">
-        <div class="empty-icon">
-          <i class="fa-solid fa-bookmark" style="color: rgb(122, 75, 84);"></i>
-        </div>
+        <div class="empty-icon">📁</div>
         <p class="empty-note">「這裡的故事，還在整理中。」</p>
       </div>
 

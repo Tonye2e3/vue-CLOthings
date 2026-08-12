@@ -561,7 +561,7 @@ const toggleFollow = (creator) => {
               <img :src="featurePost.images[0]?.url" :alt="featurePost.content" />
             </router-link>
             <div class="feature-body">
-              <router-link to="/community/profile" class="author-row text-decoration-none">
+              <router-link :to="`/community/profile/${featurePost.userId}`" class="author-row text-decoration-none">
                 <img class="avatar" :src="featurePost.user.avatar" alt="avatar" />
                 <div>
                   <div class="author-name">{{ featurePost.user.name }}</div>
@@ -578,6 +578,7 @@ const toggleFollow = (creator) => {
               <div class="stat-row">
                 <span>♥ {{ formatCount(featurePost.likesCount) }}</span>
                 <span>💬 {{ formatCount(featurePost.commentsCount) }}</span>
+                <a href="#" class="link-out">查看單品 →</a>
               </div>
             </div>
           </div>
@@ -617,7 +618,7 @@ const toggleFollow = (creator) => {
               </router-link>
 
               <div class="post-body">
-                <router-link to="/community/profile" class="post-author text-decoration-none">
+                <router-link :to="`/community/profile/${post.userId}`" class="post-author text-decoration-none">
                   <img :src="post.user.avatar" alt="avatar" />
                   <span>{{ post.user.name }}</span>
                 </router-link>
@@ -633,7 +634,8 @@ const toggleFollow = (creator) => {
                     轉換成縮寫格式。這樣資料本身仍然是「可以排序、可以比大小」的數字。
                   -->
                   <span>♥ {{ formatCount(post.likesCount) }}</span>
-                  <span>💬 {{ formatCount(post.commentsCount) }}</span>                 
+                  <span>💬 {{ formatCount(post.commentsCount) }}</span>
+                  <a href="#">單品</a>
                 </div>
               </div>
             </div>
@@ -652,14 +654,20 @@ const toggleFollow = (creator) => {
           <div class="side-card">
             <div class="side-title"><span class="dot"></span>熱門穿搭達人</div>
             <!-- 把 filteredCreators（可能被搜尋篩選過的達人清單）逐筆畫成一列 -->
+            <!--
+              這裡故意不用 router-link：creator.id 是這份假資料自己編的號碼（1、2、3），
+              跟資料庫真正的 userId 沒有對應關係，接上 /community/profile/:userId 只會
+              連到「剛好號碼一樣、但完全不相干」的使用者，比不能點還誤導。
+              等這份達人清單有真的使用者資料串進來後，再改回 router-link。
+            -->
             <div v-for="creator in filteredCreators" :key="creator.id" class="stylist-row">
-              <router-link to="/community/profile" class="d-flex align-items-center text-decoration-none flex-grow-1 min-w-0">
+              <div class="d-flex align-items-center text-decoration-none flex-grow-1 min-w-0">
                 <img class="stylist-avatar" :src="creator.avatar" alt="avatar" />
                 <div class="min-w-0">
                   <div class="stylist-name text-truncate">{{ creator.name }}</div>
                   <div class="stylist-meta">{{ creator.meta }}</div>
                 </div>
-              </router-link>
+              </div>
               <button
                 class="btn-follow"
                 :class="{ following: creator.isFollowing }"

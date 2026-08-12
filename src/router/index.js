@@ -60,7 +60,7 @@ const router = createRouter({
 
     //Community 在註解之間新增個人使用的路由 名字自行修改
     {
-      path: '/community/profile',
+      path: '/community/profile/:userId',
       name: 'CommunityUserProfile',
       component: () => import('@/views/Community/UserProfileView.vue'),
     },
