@@ -635,7 +635,6 @@ const toggleFollow = (creator) => {
                   -->
                   <span>♥ {{ formatCount(post.likesCount) }}</span>
                   <span>💬 {{ formatCount(post.commentsCount) }}</span>
-                  <a href="#">單品</a>
                 </div>
               </div>
             </div>
