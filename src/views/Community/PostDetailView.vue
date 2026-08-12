@@ -96,7 +96,7 @@ const fetchPost = async () => {
       communityPostId: p.communityPostId,
       userId: p.userId,
       user: p.user || { name: '未知使用者', avatar: '', location: '' },
-      isFollowing: false, // API 目前沒有回傳「我有沒有追蹤這個人」，先預設沒有追蹤
+      isFollowing: false, // 先給預設值，實際有沒有追蹤過由下面 fetchFollowStatus() 另外去問後端才知道
       postDate: p.postDate,
       status: p.status,
       images: (p.images && p.images.length)
@@ -118,6 +118,10 @@ const fetchPost = async () => {
     // ?? 0：如果 p.likesCount 是 undefined 或 null，就用 0 代替，
     // 避免後端這個欄位漏帶或叫別的名字時，讓 likesNumber 變成 undefined 把整頁弄壞。
     likesNumber.value = p.likesCount ?? 0
+
+    // fetchFollowStatus 要用到 post.value.userId，一定要等上面 post.value 設定完才能呼叫，
+    // 不能跟 fetchPost() 平行呼叫（那樣 userId 還是初始值 null，會查到錯的人）。
+    fetchFollowStatus()
   } catch (err) {
     console.error('讀取貼文詳細資料失敗：', err)
     notFound.value = true
@@ -316,8 +320,54 @@ const fetchComments = async () => {
 // newComment：跟留言輸入框做雙向綁定，存使用者「正在打字、還沒送出」的留言內容
 const newComment = ref('')
 
-const toggleFollow = () => {
-  post.value.isFollowing = !post.value.isFollowing
+// myFollowId：如果目前這個測試帳號已經追蹤這篇貼文的作者，這裡存那筆 User_Follow 紀錄的
+// userFollowId，之後要取消追蹤（DELETE）要靠這個 id 才能刪對紀錄。還沒追蹤就是 null。
+const myFollowId = ref(null)
+
+// fetchFollowStatus：問後端「這個測試帳號有沒有追蹤這篇貼文的作者」，
+// 打的是 UserFollowController.cs 裡的 GET api/UserFollow/follower/{followerid}/following/{followingid}。
+const fetchFollowStatus = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/api/UserFollow/follower/${currentTestUserId}/following/${post.value.userId}`)
+    if (res.data) {
+      post.value.isFollowing = true
+      myFollowId.value = res.data.userFollowId
+    } else {
+      post.value.isFollowing = false
+      myFollowId.value = null
+    }
+  } catch (err) {
+    console.error('讀取追蹤狀態失敗：', err)
+  }
+}
+
+// toggleFollow：按下「＋ 追蹤」按鈕時執行。改成 async，因為裡面要 await 打 API。
+const toggleFollow = async () => {
+  if (post.value.isFollowing) {
+    // 目前是「已追蹤」狀態 → 這次是要取消追蹤 → 打 DELETE，刪掉 myFollowId 那筆紀錄
+    try {
+      await axios.delete(`${API_BASE}/api/UserFollow/${myFollowId.value}`)
+    } catch (err) {
+      console.error('取消追蹤失敗：', err)
+      return // 失敗就不要動畫面上的狀態，維持「已追蹤」原樣
+    }
+    post.value.isFollowing = false
+    myFollowId.value = null
+  } else {
+    // 目前是「還沒追蹤」狀態 → 這次是要追蹤 → 打 POST 新增一筆 User_Follow 紀錄
+    try {
+      await axios.post(`${API_BASE}/api/UserFollow`, {
+        followerId: currentTestUserId,
+        followingId: post.value.userId
+      })
+    } catch (err) {
+      console.error('追蹤失敗：', err)
+      return
+    }
+    // POST 只會回傳成功與否，不會回傳剛剛新增那筆紀錄的 id，
+    // 所以要重新問一次後端才知道 myFollowId 是多少（之後要取消追蹤會用到），跟按讚那邊的做法一樣。
+    await fetchFollowStatus()
+  }
 }
 
 // addComment：按下「送出」按鈕或在輸入框按 Enter 時執行。
@@ -586,7 +636,7 @@ const addComment = async () => {
             </div>
 
             <button class="btn-buy-all">
-              一鍵購買貼文標記商品 · NT$ {{ totalTaggedPrice.toLocaleString() }}
+              一鍵購買全套穿搭 · NT$ {{ totalTaggedPrice.toLocaleString() }}
             </button>
           </div>
 

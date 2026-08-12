@@ -296,6 +296,7 @@ const fetchPosts = async () => {
 onMounted(() => {
   fetchPosts()
   loadSavedPosts()
+  fetchCreators()
 })
 
 // formatCount：跟上面那個 <script>（非 setup）區塊裡的 formatCount 是「一模一樣」的函式，
@@ -324,12 +325,28 @@ const popularProducts = ref([
   { id: 5, name: '百褶及膝裙' }
 ])
 
-// 穿搭達人資料：右側欄「熱門穿搭達人」清單，每個人有自己的追蹤狀態
-const creators = ref([
-  { id: 1, name: 'Amy_穿搭日記', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Amy', meta: '2.1萬追蹤', isFollowing: false },
-  { id: 2, name: 'Kevin.style', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Kevin', meta: '1.6萬追蹤', isFollowing: false },
-  { id: 3, name: '小雨 rainy', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Rainy', meta: '3.4萬追蹤', isFollowing: true }
-])
+// 穿搭達人資料：右側欄「熱門穿搭達人」清單，先給空陣列，等 fetchCreators() 打完 API 才會有資料。
+const creators = ref([])
+
+// fetchCreators：跟後端要「粉絲數最多的前 3 名」使用者，
+// 打的是 UserFollowController.cs 裡的 GET api/UserFollow/popular-creators。
+const fetchCreators = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/api/UserFollow/popular-creators`, {
+      params: { take: 3, followerId: currentTestUserId }
+    })
+    creators.value = res.data.map(c => ({
+      id: c.userId, // 這個 id 現在是真的 userId，不再是這份清單自己編的假號碼了
+      name: c.name,
+      avatar: c.avatar,
+      meta: `${formatCount(c.followersCount)}追蹤`,
+      isFollowing: c.isFollowing,
+      userFollowId: c.userFollowId
+    }))
+  } catch (err) {
+    console.error('讀取熱門穿搭達人失敗：', err)
+  }
+}
 
 // 頁籤文案（每個頁籤對應的封面卡標籤與副標、沒有內容時顯示的提示文字）
 // 這是一個「物件的物件」，外層用 hot / new / follow 三個 key，
@@ -462,8 +479,36 @@ watch([currentTab, searchQuery], () => {
 // 點擊追蹤按鈕時呼叫：把該達人的 isFollowing 改成相反的值。
 // 這裡的 creator 是從 template 裡 @click="toggleFollow(creator)" 傳進來的，
 // 代表「使用者點的是哪一位達人」。
-const toggleFollow = (creator) => {
-  creator.isFollowing = !creator.isFollowing
+// toggleFollow：按下側欄某位達人的追蹤按鈕時執行。改成 async，因為裡面要 await 打 API。
+const toggleFollow = async (creator) => {
+  if (creator.isFollowing) {
+    try {
+      await axios.delete(`${API_BASE}/api/UserFollow/${creator.userFollowId}`)
+    } catch (err) {
+      console.error('取消追蹤失敗：', err)
+      return
+    }
+    creator.isFollowing = false
+    creator.userFollowId = null
+  } else {
+    try {
+      await axios.post(`${API_BASE}/api/UserFollow`, {
+        followerId: currentTestUserId,
+        followingId: creator.id
+      })
+    } catch (err) {
+      console.error('追蹤失敗：', err)
+      return
+    }
+    creator.isFollowing = true
+    // POST 沒有回傳新建紀錄的 id，重新問一次這位使用者的追蹤狀態，拿到真正的 userFollowId。
+    try {
+      const statusRes = await axios.get(`${API_BASE}/api/UserFollow/follower/${currentTestUserId}/following/${creator.id}`)
+      creator.userFollowId = statusRes.data ? statusRes.data.userFollowId : null
+    } catch (err) {
+      console.error('讀取追蹤狀態失敗：', err)
+    }
+  }
 }
 </script>
 
@@ -653,20 +698,16 @@ const toggleFollow = (creator) => {
           <div class="side-card">
             <div class="side-title"><span class="dot"></span>熱門穿搭達人</div>
             <!-- 把 filteredCreators（可能被搜尋篩選過的達人清單）逐筆畫成一列 -->
-            <!--
-              這裡故意不用 router-link：creator.id 是這份假資料自己編的號碼（1、2、3），
-              跟資料庫真正的 userId 沒有對應關係，接上 /community/profile/:userId 只會
-              連到「剛好號碼一樣、但完全不相干」的使用者，比不能點還誤導。
-              等這份達人清單有真的使用者資料串進來後，再改回 router-link。
-            -->
+            <!-- creator.id 現在是真的 userId（來自 fetchCreators 打的 popular-creators API），
+                 可以放心接 router-link 了，不會再連到不相干的使用者。 -->
             <div v-for="creator in filteredCreators" :key="creator.id" class="stylist-row">
-              <div class="d-flex align-items-center text-decoration-none flex-grow-1 min-w-0">
+              <router-link :to="`/community/profile/${creator.id}`" class="d-flex align-items-center text-decoration-none flex-grow-1 min-w-0">
                 <img class="stylist-avatar" :src="creator.avatar" alt="avatar" />
                 <div class="min-w-0">
                   <div class="stylist-name text-truncate">{{ creator.name }}</div>
                   <div class="stylist-meta">{{ creator.meta }}</div>
                 </div>
-              </div>
+              </router-link>
               <button
                 class="btn-follow"
                 :class="{ following: creator.isFollowing }"

@@ -99,6 +99,10 @@ const fetchUserPosts = async () => {
       commentsCount: post.commentsCount,
       tags: post.taggedProducts.map(t => `#${t.name}`)
     }))
+    // 貼文數：直接用剛剛抓回來的貼文數量就好，不用另外多打一支 API 算，
+    // 跟 CommunityPostController.cs 裡 LikesCount／CommentsCount 用 .Count() 算的道理一樣，
+    // 只是這裡前端已經有資料在手上了，直接拿陣列長度更省一次 API 呼叫。
+    userProfile.value.postsCount = userPosts.value.length
   } catch (err) {
     console.error('讀取個人貼文失敗：', err)
   }
@@ -240,6 +244,11 @@ const saveEdit = async (post) => {
 onMounted(() => {
   fetchUserPosts()
   loadSavedPosts()
+  fetchFollowCounts()
+  // 只有「瀏覽的不是自己」時才需要問追蹤狀態，自己不能追蹤自己。
+  if (viewedUserId.value !== currentTestUserId) {
+    fetchFollowStatus()
+  }
 })
 
 // watch：監看網址上的 :userId 這個參數。
@@ -248,6 +257,14 @@ onMounted(() => {
 // 所以另外監看 :userId，只要它變了（換了要看的人），就重新打一次 API。
 watch(() => route.params.userId, () => {
   fetchUserPosts()
+  fetchFollowCounts()
+  if (viewedUserId.value !== currentTestUserId) {
+    fetchFollowStatus()
+  } else {
+    // 換到看自己的頁面時，重設狀態，避免殘留上一個人的追蹤紀錄 id
+    userProfile.value.isFollowing = false
+    myFollowId.value = null
+  }
 })
 
 // 這是頁籤按鈕要顯示的清單：每個頁籤有一個「代號」(key，程式判斷用)
@@ -259,15 +276,66 @@ const tabs = [
   { key: 'saved', label: '收藏' }
 ]
 
-// 這是一個「函式」（function，可以想成一個按鈕按下去要執行的一段動作）。
-// 按「追蹤」按鈕的時候會呼叫這個函式。
-// userProfile.value：因為 userProfile 是用 ref() 包起來的，
-// 在 <script> 裡面要拿裡面真正的資料，一定要加 .value。
-// （在 <template> 裡面則不用加 .value，Vue 會自動幫你處理，等一下會看到）
-// !userProfile.value.isFollowing：「!」代表「相反」，
-// 所以這行的意思是「把 isFollowing 改成跟現在相反的值」（true 變 false，false 變 true）。
-const toggleFollow = () => {
-  userProfile.value.isFollowing = !userProfile.value.isFollowing
+// myFollowId：如果目前這個測試帳號已經追蹤這個人，這裡存那筆 User_Follow 紀錄的
+// userFollowId，之後要取消追蹤（DELETE）要靠這個 id 才能刪對紀錄。還沒追蹤就是 null。
+const myFollowId = ref(null)
+
+// fetchFollowStatus：問後端「這個測試帳號有沒有追蹤現在瀏覽的這個人」，
+// 打的是 UserFollowController.cs 裡的 GET api/UserFollow/follower/{followerid}/following/{followingid}。
+// fetchFollowCounts：跟後端要「這個人的粉絲數／追蹤中數」，
+// 打的是 UserFollowController.cs 裡的 GET api/UserFollow/counts/{userid}。
+const fetchFollowCounts = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/api/UserFollow/counts/${viewedUserId.value}`)
+    userProfile.value.followersCount = res.data.followersCount
+    userProfile.value.followingCount = res.data.followingCount
+  } catch (err) {
+    console.error('讀取粉絲/追蹤數失敗：', err)
+  }
+}
+
+const fetchFollowStatus = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/api/UserFollow/follower/${currentTestUserId}/following/${viewedUserId.value}`)
+    if (res.data) {
+      userProfile.value.isFollowing = true
+      myFollowId.value = res.data.userFollowId
+    } else {
+      userProfile.value.isFollowing = false
+      myFollowId.value = null
+    }
+  } catch (err) {
+    console.error('讀取追蹤狀態失敗：', err)
+  }
+}
+
+// toggleFollow：按下「追蹤」按鈕時執行。改成 async，因為裡面要 await 打 API。
+const toggleFollow = async () => {
+  if (userProfile.value.isFollowing) {
+    // 目前是「已追蹤」狀態 → 這次是要取消追蹤 → 打 DELETE，刪掉 myFollowId 那筆紀錄
+    try {
+      await axios.delete(`${API_BASE}/api/UserFollow/${myFollowId.value}`)
+    } catch (err) {
+      console.error('取消追蹤失敗：', err)
+      return // 失敗就不要動畫面上的狀態，維持「已追蹤」原樣
+    }
+    userProfile.value.isFollowing = false
+    myFollowId.value = null
+  } else {
+    // 目前是「還沒追蹤」狀態 → 這次是要追蹤 → 打 POST 新增一筆 User_Follow 紀錄
+    try {
+      await axios.post(`${API_BASE}/api/UserFollow`, {
+        followerId: currentTestUserId,
+        followingId: viewedUserId.value
+      })
+    } catch (err) {
+      console.error('追蹤失敗：', err)
+      return
+    }
+    // POST 只會回傳成功與否，不會回傳剛剛新增那筆紀錄的 id，
+    // 所以要重新問一次後端才知道 myFollowId 是多少（之後要取消追蹤會用到）。
+    await fetchFollowStatus()
+  }
 }
 </script>
 
@@ -324,7 +392,8 @@ const toggleFollow = () => {
                 </div>
               </div>
 
-              <div class="action-group">
+              <!-- 只有瀏覽「別人」的個人頁才顯示追蹤／訊息按鈕；瀏覽自己的頁面不會出現這排按鈕 -->
+              <div class="action-group" v-if="viewedUserId !== currentTestUserId">
                 <button
                   class="btn-follow-main"
                   :class="{ following: userProfile.isFollowing }"
@@ -533,9 +602,7 @@ const toggleFollow = () => {
 
         <!-- v-else（搭配上面裡層的 v-if）：收藏清單是空的時候，顯示這個提示，而不是一片空白 -->
         <div v-else class="empty-state">
-          <div class="empty-icon">
-            <i class="fa-solid fa-bookmark" style="color: rgb(122, 75, 84);"></i>
-          </div>
+          <div class="empty-icon">📁</div>
           <p class="empty-note">「還沒有收藏任何穿搭，去社群逛逛按個收藏吧。」</p>
         </div>
       </div>
