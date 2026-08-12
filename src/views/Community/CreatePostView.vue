@@ -121,8 +121,8 @@ const toggleProduct = (name) => {
 // 改成 async，因為裡面要用 await 等後端 API 回應。
 const handleSubmit = async () => {
   // 檢查：如果一張照片都沒選、或是心得文字是空的，就跳出提示視窗、不繼續往下執行。
-  if (imageFiles.value.length === 0 || !postForm.value.content) {
-    alert('請上傳穿搭照片並填寫貼文心得！')
+  if (imageFiles.value.length === 0 || !postForm.value.content || postForm.value.selectedProducts.length === 0) {
+    alert('請上傳穿搭照片、填寫貼文心得，並至少標記一項商品！')
     return // return 在這裡的作用是「提早結束這個函式」，後面的程式碼都不會被執行。
   }
 
@@ -341,7 +341,7 @@ const handleSubmit = async () => {
 
               <div class="field-block">
                 <label class="field-label">
-                  <i class="fa-solid fa-hashtag" style="color: rgb(122, 75, 84);"></i> 標記標籤商品（選填，可複選）
+                  <i class="fa-solid fa-hashtag" style="color: rgb(122, 75, 84);"></i> 標記標籤商品（至少選 1 項，可複選）
                 </label>
                 <div class="search-bar">
                   <svg class="search-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
