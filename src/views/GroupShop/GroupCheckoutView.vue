@@ -251,18 +251,24 @@ const handleSubmit = async () => {
 <style scoped>
 /* 以下都是外觀樣式（顏色、間距、排版），跟商品邏輯無關，可以先不用管 */
 
-/* 把重複用到的顏色集中定義成變數，之後要改主題色只要改這裡，不用每個地方都找一次 */
 .clo-shell {
-  --color-text: #4a3e3d;       /* 主要文字色（深咖啡） */
-  --color-text-muted: #6e5f5c; /* 次要文字色（淺咖啡） */
-  --color-accent: #b87352;     /* 強調色（按鈕、標籤） */
-  --color-bg-page: #f8f5f0;    /* 頁面底色 */
-  --color-border: #e6dccf;     /* 淺邊框線 */
-  --color-border-input: #d8c3b5; /* 輸入框邊框 */
-  --color-hover-bg: #f1e7de;   /* 滑鼠移過去的底色 */
-  --color-active-bg: #ebdcd0;  /* 選單被選中的底色 */
-  --color-dark: #3d3332;       /* 深色底（結帳摘要標題列） */
-  --color-dark-hover: #362d2c; /* 深色按鈕的 hover 狀態 */
+  --color-text: #4a3e3d;
+  --color-text-muted: #6e5f5c;
+  --color-accent: #b87352;
+  --color-bg-page: #f8f5f0;
+  --color-border: #e6dccf;
+  --color-border-input: #d8c3b5;
+  --color-hover-bg: #f1e7de;
+  --color-active-bg: #ebdcd0;
+  --color-dark: #3d3332;
+  --color-dark-hover: #362d2c;
+
+  /* 新增：重複出現的陰影 / 圓角抽成變數 */
+  --shadow-card: 0 1px 4px rgba(74, 62, 61, 0.08);
+  --shadow-panel: 0 2px 10px rgba(74, 62, 61, 0.12);
+  --shadow-float: 0 4px 12px rgba(74, 62, 61, 0.3);
+  --radius-card: 12px;
+  --radius-full: 999px;
 
   min-height: 100vh;
   background-color: var(--color-bg-page);
@@ -285,12 +291,23 @@ const handleSubmit = async () => {
   text-decoration: underline;
 }
 
-.form-card {
+/* form-card 跟 summary-panel 都是白底、大圓角，共用這兩個屬性 */
+.form-card,
+.summary-panel {
   background-color: #fff;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 1px 4px rgba(74, 62, 61, 0.08);
+  border-radius: var(--radius-card);
 }
+.form-card {
+  padding: 20px;
+  box-shadow: var(--shadow-card);
+}
+.summary-panel {
+  overflow: hidden;
+  box-shadow: var(--shadow-panel);
+  position: sticky;
+  top: 20px;
+}
+
 .form-section-title {
   border-bottom: 0.5px solid var(--color-border);
   padding-bottom: 8px;
@@ -312,14 +329,6 @@ const handleSubmit = async () => {
   font-size: 0.9rem;
 }
 
-.summary-panel {
-  background-color: #fff;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 2px 10px rgba(74, 62, 61, 0.12);
-  position: sticky;
-  top: 20px;
-}
 .summary-title {
   background-color: var(--color-dark);
   color: #fff;
@@ -347,14 +356,13 @@ const handleSubmit = async () => {
   background-color: var(--color-dark-hover);
   color: #fff;
 }
-.btn-main:disabled {
-  background-color: var(--color-border-input);
-  color: #fff;
-  cursor: not-allowed;
-}
+/* disabled 跟 disabled:hover 背景/文字色重複，合併成一條 */
+.btn-main:disabled,
 .btn-main:disabled:hover {
   background-color: var(--color-border-input);
+  color: #fff;
 }
+.btn-main:disabled { cursor: not-allowed; }
 
 .floating-cart {
   position: fixed;
@@ -362,13 +370,13 @@ const handleSubmit = async () => {
   bottom: 24px;
   width: 52px;
   height: 52px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background-color: var(--color-text);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(74, 62, 61, 0.3);
+  box-shadow: var(--shadow-float);
   text-decoration: none;
   z-index: 100;
 }
@@ -385,7 +393,7 @@ const handleSubmit = async () => {
   font-weight: 700;
   min-width: 18px;
   height: 18px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;

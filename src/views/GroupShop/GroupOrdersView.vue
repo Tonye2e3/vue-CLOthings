@@ -405,19 +405,22 @@ const submitService = async () => {
 <style scoped>
 /* 以下都是外觀樣式（顏色、間距、排版），跟訂單邏輯無關，可以先不用管 */
 
-/* 把重複用到的顏色集中定義成變數，之後要改主題色只要改這裡，不用每個地方都找一次 */
 .clo-shell {
-  --color-text: #4a3e3d;         /* 主要文字色（深咖啡） */
-  --color-text-muted: #6e5f5c;   /* 次要文字色（淺咖啡） */
-  --color-accent: #b87352;       /* 強調色（按鈕、標籤） */
-  --color-danger: #b8524f;       /* 警示色文字（取消按鈕） */
-  --color-danger-border: #d8887f; /* 警示色邊框（取消按鈕） */
-  --color-danger-bg: #fbeceb;    /* 警示色底（取消按鈕 hover） */
-  --color-bg-page: #f8f5f0;      /* 頁面底色 */
-  --color-border: #e6dccf;       /* 淺邊框線 */
-  --color-border-input: #d8c3b5; /* 輸入框邊框 */
-  --color-hover-bg: #f1e7de;     /* 滑鼠移過去的底色 */
-  --color-active-bg: #ebdcd0;    /* 選單被選中的底色 */
+  --color-text: #4a3e3d;
+  --color-text-muted: #6e5f5c;
+  --color-accent: #b87352;
+  --color-danger: #b8524f;
+  --color-danger-border: #d8887f;
+  --color-danger-bg: #fbeceb;
+  --color-bg-page: #f8f5f0;
+  --color-border: #e6dccf;
+  --color-border-input: #d8c3b5;
+  --color-hover-bg: #f1e7de;
+  --color-active-bg: #ebdcd0;
+  --color-dark-hover: #362d2c; /* 補回：.floating-cart:hover 有用到，原本沒定義會失效 */
+
+  --shadow-float: 0 4px 12px rgba(74, 62, 61, 0.3);
+  --radius-full: 999px;
 
   min-height: 100vh;
   background-color: var(--color-bg-page);
@@ -445,72 +448,56 @@ table tbody td {
   gap: 6px;
 }
 
-.cancel-btn {
-  border: 1px solid var(--color-danger-border);
+/* 三個按鈕外觀骨架一樣（底色、字級、字重、padding、圓角、游標），只有邊框色/文字色不同 */
+.cancel-btn,
+.edit-btn,
+.service-btn {
   background-color: #fff;
-  color: var(--color-danger);
   font-size: 0.8rem;
   font-weight: 600;
   padding: 5px 12px;
   border-radius: 6px;
   cursor: pointer;
+}
+
+.cancel-btn {
+  border: 1px solid var(--color-danger-border);
+  color: var(--color-danger);
 }
 .cancel-btn:hover {
   background-color: var(--color-danger-bg);
 }
 
-.edit-btn {
+/* edit-btn 跟 service-btn 邊框色、hover 底色都一樣，只有文字色不同 */
+.edit-btn,
+.service-btn {
   border: 1px solid var(--color-border-input);
-  background-color: #fff;
-  color: var(--color-text);
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 5px 12px;
-  border-radius: 6px;
-  cursor: pointer;
 }
-.edit-btn:hover {
+.edit-btn:hover,
+.service-btn:hover {
   background-color: var(--color-hover-bg);
 }
+.edit-btn { color: var(--color-text); }
+.service-btn { color: var(--color-text-muted); }
+
+/* disabled 狀態 edit-btn / cancel-btn 完全一樣，合併成一組 */
 .edit-btn:disabled,
 .cancel-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-.edit-btn:disabled:hover {
-  background-color: #fff;
-}
+.edit-btn:disabled:hover,
 .cancel-btn:disabled:hover {
   background-color: #fff;
 }
 
-.service-btn {
-  border: 1px solid var(--color-border-input);
-  background-color: #fff;
-  color: var(--color-text-muted);
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 5px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.service-btn:hover {
-  background-color: var(--color-hover-bg);
-}
-
-.service-record-row {
-  padding: 8px 0;
-  border-bottom: 1px solid var(--color-hover-bg);
-}
-.service-record-row:last-child {
-  border-bottom: none;
-}
-
-/* 編輯訂單 Modal 內，每個商品品項一列 */
+/* 服務紀錄列跟編輯品項列樣式相同，合併 */
+.service-record-row,
 .edit-item-row {
   padding: 8px 0;
   border-bottom: 1px solid var(--color-hover-bg);
 }
+.service-record-row:last-child,
 .edit-item-row:last-child {
   border-bottom: none;
 }
@@ -525,13 +512,13 @@ table tbody td {
   bottom: 24px;
   width: 52px;
   height: 52px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background-color: var(--color-text);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(74, 62, 61, 0.3);
+  box-shadow: var(--shadow-float);
   text-decoration: none;
   z-index: 100;
 }
@@ -548,7 +535,7 @@ table tbody td {
   font-weight: 700;
   min-width: 18px;
   height: 18px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;

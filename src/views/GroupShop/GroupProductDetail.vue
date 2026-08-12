@@ -261,20 +261,24 @@ const handleJoin = async () => {
 <style scoped>
 /* 以下都是外觀樣式（顏色、間距、排版），跟商品邏輯無關，可以先不用管 */
 
-/* 把重複用到的顏色集中定義成變數，之後要改主題色只要改這裡，不用每個地方都找一次 */
 .clo-shell {
-  --color-text: #4a3e3d;         /* 主要文字色（深咖啡） */
-  --color-text-muted: #6e5f5c;   /* 次要文字色（淺咖啡） */
-  --color-muted: #a9998e;        /* 更淡的灰咖啡（未解鎖階層） */
-  --color-accent: #b87352;       /* 強調色（按鈕、進度條、標籤） */
-  --color-success: #4a7c59;      /* 成功色（已解鎖標籤） */
-  --color-bg-page: #f8f5f0;      /* 頁面底色 */
-  --color-border: #e6dccf;       /* 淺邊框線 */
-  --color-hover-bg: #f1e7de;     /* 滑鼠移過去的底色（也用在深色卡片文字） */
-  --color-active-bg: #ebdcd0;    /* 選單被選中的底色（也用在進度條底色） */
-  --color-dark: #3d3332;         /* 深色卡片底（團購專案詳情） */
-  --color-dark-hover: #362d2c;   /* 深色按鈕的 hover 狀態 */
-  --color-desc-text: #cbb9ac;    /* 深色卡片裡的說明文字 */
+  --color-text: #4a3e3d;
+  --color-text-muted: #6e5f5c;
+  --color-muted: #a9998e;
+  --color-accent: #b87352;
+  --color-success: #4a7c59;
+  --color-bg-page: #f8f5f0;
+  --color-border: #e6dccf;
+  --color-hover-bg: #f1e7de;
+  --color-active-bg: #ebdcd0;
+  --color-dark: #3d3332;
+  --color-dark-hover: #362d2c;
+  --color-desc-text: #cbb9ac;
+
+  --shadow-card: 0 1px 4px rgba(74, 62, 61, 0.08);
+  --shadow-float: 0 4px 12px rgba(74, 62, 61, 0.3);
+  --radius-card: 12px;
+  --radius-full: 999px;
 
   min-height: 100vh;
   background-color: var(--color-bg-page);
@@ -284,12 +288,22 @@ const handleJoin = async () => {
 .text-main { color: var(--color-text); }
 .text-accent { color: var(--color-accent); }
 
-.hero-card {
+/* hero-card / panel-card / side-card 都是白底、大圓角、同一種陰影，合併共用部分 */
+.hero-card,
+.panel-card,
+.side-card {
   background-color: #fff;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 1px 4px rgba(74, 62, 61, 0.08);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
 }
+.hero-card,
+.side-card {
+  overflow: hidden;
+}
+.panel-card {
+  padding: 20px;
+}
+
 .hero-img {
   width: 100%;
   height: 320px;
@@ -305,17 +319,10 @@ const handleJoin = async () => {
   margin-left: 4px;
 }
 
-.panel-card {
-  background-color: #fff;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 1px 4px rgba(74, 62, 61, 0.08);
-}
-
 .progress-track {
   height: 10px;
   background-color: var(--color-active-bg);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   overflow: hidden;
 }
 .progress-fill {
@@ -343,13 +350,6 @@ const handleJoin = async () => {
   align-items: center;
   justify-content: center;
   width: 18px;
-}
-
-.side-card {
-  background-color: #fff;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 1px 4px rgba(74, 62, 61, 0.08);
 }
 
 .dark-card {
@@ -421,13 +421,13 @@ const handleJoin = async () => {
   bottom: 24px;
   width: 52px;
   height: 52px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background-color: var(--color-text);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(74, 62, 61, 0.3);
+  box-shadow: var(--shadow-float);
   text-decoration: none;
   z-index: 100;
 }
@@ -444,7 +444,7 @@ const handleJoin = async () => {
   font-weight: 700;
   min-width: 18px;
   height: 18px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;

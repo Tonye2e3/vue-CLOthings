@@ -318,21 +318,28 @@ const nextSlide = () => {
 <style scoped>
 /* 以下都是外觀樣式（顏色、間距、排版），跟商品邏輯無關，可以先不用管 */
 
-/* 把重複用到的顏色集中定義成變數，之後要改主題色只要改這裡，不用每個地方都找一次 */
 .clo-shell {
-  --color-text: #4a3e3d;         /* 主要文字色（深咖啡） */
-  --color-text-muted: #6e5f5c;   /* 次要文字色（淺咖啡） */
-  --color-muted: #a9998e;        /* 更淡的灰咖啡（搜尋提示、找不到商品） */
-  --color-accent: #b87352;       /* 強調色（按鈕、標籤） */
-  --color-success: #4a7c59;      /* 成功色（已成團標籤） */
-  --color-success-bg: #e4efe8;   /* 成功色淺底（已成團徽章） */
-  --color-danger: #b8524f;       /* 警示色（進行中標籤底色） */
-  --color-bg-page: #f8f5f0;      /* 頁面底色 */
-  --color-border: #e6dccf;       /* 淺邊框線 */
-  --color-hover-bg: #f1e7de;     /* 滑鼠移過去的底色 */
-  --color-active-bg: #ebdcd0;    /* 選單被選中的底色 */
-  --color-dark: #3d3332;         /* 深色按鈕文字色的基準（跟其他頁一致保留） */
-  --color-dark-hover: #362d2c;   /* 深色按鈕的 hover 狀態 */
+  --color-text: #4a3e3d;
+  --color-text-muted: #6e5f5c;
+  --color-muted: #a9998e;
+  --color-accent: #b87352;
+  --color-success: #4a7c59;
+  --color-success-bg: #e4efe8;
+  --color-danger: #b8524f;
+  --color-bg-page: #f8f5f0;
+  --color-border: #e6dccf;
+  --color-hover-bg: #f1e7de;
+  --color-active-bg: #ebdcd0;
+  --color-dark: #3d3332; /* 跟其他頁一致保留，這頁目前沒直接用到 */
+  --color-dark-hover: #362d2c;
+
+  /* 這份頁面 border-radius:999px 出現非常多次（進度條、徽章、搜尋框、輪播箭頭/圓點、浮動購物車），
+     跟另外三份的變數命名保持一致 */
+  --shadow-card: 0 1px 4px rgba(74, 62, 61, 0.08);
+  --shadow-float: 0 4px 12px rgba(74, 62, 61, 0.3);
+  --radius-md: 8px;
+  --radius-card: 12px;
+  --radius-full: 999px;
 
   min-height: 100vh;
   background-color: var(--color-bg-page);
@@ -345,10 +352,10 @@ const nextSlide = () => {
   padding: 16px 18px;
   margin-bottom: 20px;
   background-color: #fff;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--color-muted);
   font-size: 0.9rem;
-  box-shadow: 0 1px 4px rgba(74, 62, 61, 0.08);
+  box-shadow: var(--shadow-card);
 }
 
 .section-title {
@@ -358,7 +365,7 @@ const nextSlide = () => {
   color: #fff;
   font-weight: 700;
   padding: 10px 18px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   margin-bottom: 16px;
 }
 .bg-done { background-color: var(--color-success); }
@@ -376,9 +383,9 @@ const nextSlide = () => {
 
 .product-card {
   background-color: #fff;
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   overflow: hidden;
-  box-shadow: 0 1px 4px rgba(74, 62, 61, 0.08);
+  box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
 }
@@ -406,14 +413,14 @@ const nextSlide = () => {
 .card-progress-track {
   width: 100%;
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background-color: var(--color-border);
   overflow: hidden;
   margin-top: 8px;
 }
 .card-progress-fill {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   transition: width 0.3s ease;
 }
 
@@ -423,7 +430,7 @@ const nextSlide = () => {
   font-size: 0.72rem;
   font-weight: 700;
   padding: 5px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
 }
 .badge-done {
   background-color: var(--color-success-bg);
@@ -450,7 +457,7 @@ const nextSlide = () => {
   display: flex;
   align-items: center;
   background-color: var(--color-hover-bg);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   padding: 6px 8px 6px 18px;
 }
 .clo-search-below input {
@@ -473,7 +480,7 @@ const nextSlide = () => {
   color: #fff;
   width: 34px;
   height: 34px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -482,7 +489,7 @@ const nextSlide = () => {
 .carousel {
   position: relative;
   height: 360px;
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   overflow: hidden;
   margin-bottom: 20px;
   background-color: #2b2624;
@@ -545,7 +552,7 @@ const nextSlide = () => {
   transform: translateY(-50%);
   width: 38px;
   height: 38px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   border: none;
   background-color: rgba(255, 255, 255, 0.85);
   color: var(--color-text);
@@ -572,7 +579,7 @@ const nextSlide = () => {
 .carousel-dot {
   width: 8px;
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background-color: rgba(255, 255, 255, 0.5);
   cursor: pointer;
 }
@@ -587,13 +594,13 @@ const nextSlide = () => {
   bottom: 24px;
   width: 52px;
   height: 52px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background-color: var(--color-text);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(74, 62, 61, 0.3);
+  box-shadow: var(--shadow-float);
   text-decoration: none;
   z-index: 100;
 }
@@ -610,7 +617,7 @@ const nextSlide = () => {
   font-weight: 700;
   min-width: 18px;
   height: 18px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
