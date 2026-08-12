@@ -60,3 +60,16 @@ export const createCustomerService = (orderId, payload) =>
 // 買家查詢自己這筆訂單送出過的客服紀錄
 export const getCustomerServiceByOrder = (orderId) =>
   http.get(`/GroupCustomerService/order/${orderId}`).then(res => res.data)
+
+// ---- 模擬付款 ----
+// 建立一筆待付款（還沒建立訂單），成功會拿到 paymentId 跟應付金額
+export const createPayment = (payload) =>
+  http.post('/GroupPayment/create', payload).then(res => res.data)
+
+// 「模擬付款頁」打開時，查詢這筆待付款的金額、品項
+export const getPendingPayment = (paymentId) =>
+  http.get(`/GroupPayment/${paymentId}`).then(res => res.data)
+
+// 確認付款結果：success 為 true 才會真的建立訂單
+export const confirmPayment = (paymentId, success) =>
+  http.post(`/GroupPayment/${paymentId}/confirm`, { success }).then(res => res.data)

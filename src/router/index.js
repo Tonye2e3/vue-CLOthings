@@ -53,6 +53,23 @@ const router = createRouter({
   name: 'GroupCheckout',
   component: () => import('../views/GroupShop/GroupCheckoutView.vue'),
 },
+// 模擬付款頁：結帳送出後會先跳到這裡，付款結果確認後才會真的建立訂單
+    {
+      path: '/GroupShop/pay/:paymentId',
+      name: 'GroupFakePayment',
+      component: () => import('../views/GroupShop/GroupFakePaymentView.vue'),
+    },
+    // 管理端：商品管理、訂單管理（目前任何人都能直接連進去，還沒有登入/角色限制）
+    {
+      path: '/GroupShop/admin/products',
+      name: 'GroupProductAdmin',
+      component: () => import('../views/GroupShop/GroupProductAdminView.vue'),
+    },
+    {
+      path: '/GroupShop/admin/orders',
+      name: 'GroupOrderAdmin',
+      component: () => import('../views/GroupShop/GroupOrderAdminView.vue'),
+    },
 
 
     //Community 在註解之間新增個人使用的路由 名字自行修改
