@@ -27,6 +27,12 @@ const API_BASE = 'https://localhost:7255'
 
 const route = useRoute()
 
+// currentTestUserId：目前登入的測試帳號 id，跟 CreatePostView.vue、PostDetailView.vue
+// 用的是同一個測試帳號。之後接上真的登入系統，這裡要換成登入者真正的 user_id。
+// 這個是「我是誰」，跟下面的 viewedUserId（「我正在看誰的頁面」）是兩回事——
+// 只有兩者相等時，才代表「我正在看自己的頁面」，編輯／刪除貼文才該出現。
+const currentTestUserId = 1
+
 // viewedUserId：現在看的是哪個使用者的個人頁，從網址上的 :userId 讀出來。
 // 網址上的參數本身是字串（例如 "3"），這裡用 Number(...) 轉成數字，
 // 因為後端 API、資料庫的 userId 都是 int，字串跟數字型別不一致，某些比對可能會出錯。
@@ -250,9 +256,7 @@ watch(() => route.params.userId, () => {
 // 只有純顯示用途，所以不需要讓 Vue 特別去「追蹤」它的變化。
 const tabs = [
   { key: 'works', label: '穿搭作品' },
-  { key: 'saved', label: '收藏' },
-  { key: 'products', label: '同款商品' },
-  { key: 'about', label: '關於我' }
+  { key: 'saved', label: '收藏' }
 ]
 
 // 這是一個「函式」（function，可以想成一個按鈕按下去要執行的一段動作）。
@@ -274,6 +278,12 @@ const toggleFollow = () => {
     
 
     <div class="container-fluid container-lg pb-5">
+
+      <!--
+        返回社群按鈕：跟 CreatePostView.vue、PostDetailView.vue 的 back-pill 是同一顆按鈕、同一套樣式，
+        統一放在頁面內容最上面，讓使用者從個人頁也能一鍵回到社群列表，不用一直靠瀏覽器的上一頁。
+      -->
+      <router-link to="/community" class="back-pill">← 返回社群</router-link>
 
       <!-- 個人檔案卡 -->
       <div class="profile-card mb-4">
@@ -427,7 +437,6 @@ const toggleFollow = () => {
               <!-- formatCount：把純數字轉成「1.2k」這種縮寫，跟 CommunityView.vue import 進來的是同一個函式 -->
               <span>♥ {{ formatCount(post.likesCount) }}</span>
               <span>💬 {{ formatCount(post.commentsCount) }}</span>
-              <router-link :to="`/community/post/${post.communityPostId}`" class="ms-auto">查看同款</router-link>
             </div>
 
             <div class="tag-cloud">
@@ -436,50 +445,52 @@ const toggleFollow = () => {
             </div>
 
             <!--
-              編輯表單：只有這張卡片正在被編輯（editingPostId 等於這篇貼文的 id）才會顯示。
-              可以改文字內容、公開設定、照片，標記商品維持原樣不能在這裡改
-              （PutCommunityPost 後端目前還沒有處理標記商品的同步）。
+              編輯／刪除貼文：只有在「穿搭作品」這個頁籤（自己發的貼文）才會出現，收藏牆那邊不會有；
+              另外還要 viewedUserId === currentTestUserId 才顯示——也就是「現在瀏覽的這個人」
+              跟「目前登入的我」是同一個人，才代表這是「我自己的」貼文，才能編輯／刪除。
+              瀏覽別人的個人頁時，這整塊（包含編輯表單本身）完全不會出現。
             -->
-            <div v-if="editingPostId === post.communityPostId" class="edit-form">
-              <textarea v-model="editForm.content" class="edit-textarea" rows="3"></textarea>
+            <template v-if="viewedUserId === currentTestUserId">
+              <div v-if="editingPostId === post.communityPostId" class="edit-form">
+                <textarea v-model="editForm.content" class="edit-textarea" rows="3"></textarea>
 
-              <!-- 照片編輯：跟 CreatePostView.vue 的縮圖列是同一套邏輯，只是排版比較精簡 -->
-              <div class="edit-thumb-row">
-                <div class="edit-thumb-item" v-for="(img, idx) in editForm.images" :key="idx">
-                  <img :src="img.url" alt="縮圖" />
-                  <button type="button" class="edit-thumb-remove" @click="removeEditImage(idx)">✕</button>
+                <!-- 照片編輯：跟 CreatePostView.vue 的縮圖列是同一套邏輯，只是排版比較精簡 -->
+                <div class="edit-thumb-row">
+                  <div class="edit-thumb-item" v-for="(img, idx) in editForm.images" :key="idx">
+                    <img :src="img.url" alt="縮圖" />
+                    <button type="button" class="edit-thumb-remove" @click="removeEditImage(idx)">✕</button>
+                  </div>
+                  <!-- 這個「＋」縮圖也是一個隱藏的檔案上傳框，讓使用者可以再加選照片 -->
+                  <label class="edit-thumb-add">
+                    <input
+                      type="file"
+                      class="file-input-hidden"
+                      accept="image/*"
+                      multiple
+                      @change="handleEditFileChange"
+                    />
+                    ＋
+                  </label>
                 </div>
-                <!-- 這個「＋」縮圖也是一個隱藏的檔案上傳框，讓使用者可以再加選照片 -->
-                <label class="edit-thumb-add">
-                  <input
-                    type="file"
-                    class="file-input-hidden"
-                    accept="image/*"
-                    multiple
-                    @change="handleEditFileChange"
-                  />
-                  ＋
-                </label>
-              </div>
-              <p class="edit-photo-hint">
-                第一張會作為封面
-              </p>
+                <p class="edit-photo-hint">
+                  第一張會作為封面
+                </p>
 
-              <div class="edit-visibility">
-                <label><input type="radio" v-model="editForm.status" value="public" /> 公開</label>
-                <label><input type="radio" v-model="editForm.status" value="hide" /> 隱藏</label>
+                <div class="edit-visibility">
+                  <label><input type="radio" v-model="editForm.status" value="public" /> 公開</label>
+                  <label><input type="radio" v-model="editForm.status" value="hide" /> 隱藏</label>
+                </div>
+                <div class="edit-actions">
+                  <button class="btn-cancel-edit" @click="cancelEdit">取消</button>
+                  <button class="btn-save-edit" @click="saveEdit(post)">儲存</button>
+                </div>
               </div>
-              <div class="edit-actions">
-                <button class="btn-cancel-edit" @click="cancelEdit">取消</button>
-                <button class="btn-save-edit" @click="saveEdit(post)">儲存</button>
-              </div>
-            </div>
 
-            <!-- 編輯／刪除貼文：只有在「穿搭作品」這個頁籤（自己發的貼文）才會出現，收藏牆那邊不會有 -->
-            <div v-else class="post-manage-actions">
-              <button class="btn-edit-post" @click="startEdit(post)">編輯貼文</button>
-              <button class="btn-delete-post" @click="deletePost(post.communityPostId)">刪除貼文</button>
-            </div>
+              <div v-else class="post-manage-actions">
+                <button class="btn-edit-post" @click="startEdit(post)">編輯貼文</button>
+                <button class="btn-delete-post" @click="deletePost(post.communityPostId)">刪除貼文</button>
+              </div>
+            </template>
           </div>
 
         </div>
@@ -511,7 +522,6 @@ const toggleFollow = () => {
               <div class="post-stats">
                 <span>♥ {{ formatCount(post.likesCount) }}</span>
                 <span>💬 {{ formatCount(post.commentsCount) }}</span>
-                <router-link :to="`/community/post/${post.communityPostId}`" class="ms-auto">查看同款</router-link>
               </div>
 
               <div class="tag-cloud">
@@ -523,19 +533,11 @@ const toggleFollow = () => {
 
         <!-- v-else（搭配上面裡層的 v-if）：收藏清單是空的時候，顯示這個提示，而不是一片空白 -->
         <div v-else class="empty-state">
-          <div class="empty-icon">📁</div>
+          <div class="empty-icon">
+            <i class="fa-solid fa-bookmark" style="color: rgb(122, 75, 84);"></i>
+          </div>
           <p class="empty-note">「還沒有收藏任何穿搭，去社群逛逛按個收藏吧。」</p>
         </div>
-      </div>
-
-      <!--
-        其它頁籤（同款商品 / 關於我）未開啟時的預設狀態
-        這裡的 v-else 是接在最上面 works 那個 v-if、跟剛剛 saved 那個 v-else-if 後面，
-        意思是「works 不是、saved 也不是」，才會走到這裡。
-      -->
-      <div v-else class="empty-state">
-        <div class="empty-icon">📁</div>
-        <p class="empty-note">「這裡的故事，還在整理中。」</p>
       </div>
 
     </div>
@@ -573,6 +575,16 @@ const toggleFollow = () => {
   color: var(--ink);
   font-family: 'Noto Sans TC', sans-serif;
 }
+
+/* ---------- 返回社群按鈕 ---------- */
+.back-pill{
+  display:inline-flex; align-items:center; gap:.3rem;
+  border:1px solid var(--ink); border-radius:999px;
+  padding:.35rem 1rem; font-size:.82rem; color:var(--ink);
+  text-decoration:none; margin-bottom:1.2rem;
+  transition:all .18s ease;
+}
+.back-pill:hover{ background:var(--ink); color:var(--cream); }
 
 /* ---------- 個人檔案卡 ---------- */
 .profile-card{
