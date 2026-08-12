@@ -234,9 +234,7 @@ onMounted(() => {
 // 只有純顯示用途，所以不需要讓 Vue 特別去「追蹤」它的變化。
 const tabs = [
   { key: 'works', label: '穿搭作品' },
-  { key: 'saved', label: '收藏' },
-  { key: 'products', label: '同款商品' },
-  { key: 'about', label: '關於我' }
+  { key: 'saved', label: '收藏' }
 ]
 
 // 這是一個「函式」（function，可以想成一個按鈕按下去要執行的一段動作）。
@@ -411,7 +409,6 @@ const toggleFollow = () => {
               <!-- formatCount：把純數字轉成「1.2k」這種縮寫，跟 CommunityView.vue import 進來的是同一個函式 -->
               <span>♥ {{ formatCount(post.likesCount) }}</span>
               <span>💬 {{ formatCount(post.commentsCount) }}</span>
-              <router-link :to="`/community/post/${post.communityPostId}`" class="ms-auto">查看同款</router-link>
             </div>
 
             <div class="tag-cloud">
@@ -495,7 +492,6 @@ const toggleFollow = () => {
               <div class="post-stats">
                 <span>♥ {{ formatCount(post.likesCount) }}</span>
                 <span>💬 {{ formatCount(post.commentsCount) }}</span>
-                <router-link :to="`/community/post/${post.communityPostId}`" class="ms-auto">查看同款</router-link>
               </div>
 
               <div class="tag-cloud">
@@ -507,7 +503,9 @@ const toggleFollow = () => {
 
         <!-- v-else（搭配上面裡層的 v-if）：收藏清單是空的時候，顯示這個提示，而不是一片空白 -->
         <div v-else class="empty-state">
-          <div class="empty-icon">📁</div>
+          <div class="empty-icon">
+            <i class="fa-solid fa-bookmark" style="color: rgb(122, 75, 84);"></i>
+          </div>
           <p class="empty-note">「還沒有收藏任何穿搭，去社群逛逛按個收藏吧。」</p>
         </div>
       </div>
@@ -518,7 +516,9 @@ const toggleFollow = () => {
         意思是「works 不是、saved 也不是」，才會走到這裡。
       -->
       <div v-else class="empty-state">
-        <div class="empty-icon">📁</div>
+        <div class="empty-icon">
+          <i class="fa-solid fa-bookmark" style="color: rgb(122, 75, 84);"></i>
+        </div>
         <p class="empty-note">「這裡的故事，還在整理中。」</p>
       </div>
 

@@ -235,7 +235,7 @@ export const toggleSavePost = async (post) => {
 // ============================================================
 // 這裡開始是這個頁面「自己專屬」的邏輯，不會被其他檔案拿去用
 // ============================================================
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 
 // posts 已經在上面的 <script> 區塊宣告並 export，這裡同一個檔案內可以直接使用，不用再 import
 // axios、API_BASE 現在也移到上面那個 <script> 區塊宣告了（因為 loadSavedPosts 也需要用到），
@@ -378,8 +378,10 @@ const tabPosts = computed(() => {
     // followingNames 這個名單裡的貼文。
     return posts.filter(p => followingNames.includes(p.user.name))
   }
-  // 熱門：維持假資料原本的順序（可想像成已經依熱度排序好）
-  return posts
+  // 熱門：依按讚數（likesCount）新到舊排序，likesCount 是 Community_Post 那邊真正的資料，
+  // 不用再想像成「已經排好」了。跟「最新」那段一樣，用展開運算子複製一份陣列再排序，
+  // 避免直接改到原始 posts 的順序。
+  return [...posts].sort((a, b) => b.likesCount - a.likesCount)
 })
 
 // 搜尋（可搜尋貼文標題、標籤商品、用戶名），在目前分頁的結果之上再過濾一次
@@ -433,6 +435,30 @@ const featurePost = computed(() => (isSearching.value ? null : filteredPosts.val
 // （.slice(1) 的意思是「從陣列的第 1 筆開始，取到最後」，等於跳過第 0 筆）。
 const gridPosts = computed(() => (isSearching.value ? filteredPosts.value : filteredPosts.value.slice(1)))
 
+// visibleGridCount：網格區「現在願意顯示到第幾篇」，一開始只顯示前 6 篇，
+// 按「載入更多穿搭」再一次多顯示 6 篇，不是一開始就把全部貼文塞滿畫面。
+const GRID_PAGE_SIZE = 6
+const visibleGridCount = ref(GRID_PAGE_SIZE)
+
+// visibleGridPosts：真正給 template 用 v-for 畫出來的清單，是 gridPosts 裡「前 visibleGridCount 篇」。
+// .slice(0, n)：從陣列開頭取到第 n 筆（不含第 n 筆）。
+const visibleGridPosts = computed(() => gridPosts.value.slice(0, visibleGridCount.value))
+
+// hasMoreGridPosts：判斷還有沒有更多沒顯示出來的貼文，用來決定「載入更多穿搭」按鈕要不要出現，
+// 全部都顯示完了就不用再讓使用者看到一顆按下去沒有反應的按鈕。
+const hasMoreGridPosts = computed(() => visibleGridCount.value < gridPosts.value.length)
+
+// loadMoreGridPosts：按下「載入更多穿搭」時執行，一次多開放顯示 6 篇。
+const loadMoreGridPosts = () => {
+  visibleGridCount.value += GRID_PAGE_SIZE
+}
+
+// 切換分頁（熱門／最新／追蹤中）或搜尋條件改變時，把「顯示到第幾篇」重設回第一頁，
+// 不然從「熱門」切到「最新」，網格會用上一個分頁殘留的展開數量，可能一次跳出一大堆貼文。
+watch([currentTab, searchQuery], () => {
+  visibleGridCount.value = GRID_PAGE_SIZE
+})
+
 // 點擊追蹤按鈕時呼叫：把該達人的 isFollowing 改成相反的值。
 // 這裡的 creator 是從 template 裡 @click="toggleFollow(creator)" 傳進來的，
 // 代表「使用者點的是哪一位達人」。
@@ -475,7 +501,7 @@ const toggleFollow = (creator) => {
             type="text"
             v-model="searchQuery"
             class="search-input"
-            placeholder="搜尋標籤、單品或用戶..."
+            placeholder="搜尋穿搭、單品或用戶..."
           />
           <!--
             v-if="searchQuery"：只有搜尋框裡有文字的時候，才顯示這個「清除」按鈕。
@@ -551,7 +577,7 @@ const toggleFollow = (creator) => {
               </router-link>
               <div class="stat-row">
                 <span>♥ {{ formatCount(featurePost.likesCount) }}</span>
-                <span>💬 {{ formatCount(featurePost.commentsCount) }}</span>               
+                <span>💬 {{ formatCount(featurePost.commentsCount) }}</span>
               </div>
             </div>
           </div>
@@ -565,16 +591,17 @@ const toggleFollow = (creator) => {
             就改顯示 currentTabCopy.empty 這個針對目前分頁寫好的提示文字。
           -->
           <div class="empty-state" v-if="filteredPosts.length === 0">
-            {{ isSearching ? `找不到符合「${searchQuery}」的穿搭、標籤或用戶，換個關鍵字試試。` : currentTabCopy.empty }}
+            {{ isSearching ? `找不到符合「${searchQuery}」的穿搭、單品或用戶，換個關鍵字試試。` : currentTabCopy.empty }}
           </div>
 
           <!--
             其餘貼文：雙欄網格
             v-if="gridPosts.length"：gridPosts 陣列裡如果「有東西」(長度大於 0，也就是條件成立)，才畫這個區塊。
-            v-for="post in gridPosts"：把 gridPosts 裡每一筆貼文都畫成一張小卡片。
+            v-for="post in visibleGridPosts"：只把「目前願意顯示的那幾篇」畫成小卡片，
+            不是把 gridPosts 全部畫出來——視覺上一開始只會看到 6 篇，按「載入更多穿搭」才會再多幾篇。
           -->
           <div class="post-grid" v-if="gridPosts.length">
-            <div v-for="post in gridPosts" :key="post.communityPostId" class="post-card">
+            <div v-for="post in visibleGridPosts" :key="post.communityPostId" class="post-card">
 
               <router-link :to="`/community/post/${post.communityPostId}`" class="post-media d-block text-decoration-none">
                 <span class="tag-label" v-if="post.taggedProducts && post.taggedProducts[0]">
@@ -612,11 +639,12 @@ const toggleFollow = (creator) => {
             </div>
           </div>
 
-          <!-- 載入更多 -->
-          <div class="load-more-wrap">
-            <button class="btn-load">載入更多穿搭 ▾</button>
+          <!-- 載入更多：只有還有更多沒顯示出來的貼文時才出現，全部顯示完就自動收起來 -->
+          <div class="load-more-wrap" v-if="hasMoreGridPosts">
+            <button class="btn-load" @click="loadMoreGridPosts">載入更多穿搭 ▾</button>
           </div>
         </div>
+
 
         <!-- 右側：側邊欄 -->
         <div class="col-12 col-lg-3">
