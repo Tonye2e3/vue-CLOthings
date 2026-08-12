@@ -1,55 +1,48 @@
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import axios from 'axios'
 
 const route = useRoute()
 
 const categories = ['WOMEN', 'MEN', 'KIDS', 'BABY']
 
-const products = [
-  { name: '寬版落肩T恤', desc: '柔軟純棉，寬鬆版型', price: 'NT$390', tag: '新品上市', category: 'WOMEN' },
-  { name: '輕薄羽絨外套', desc: '輕量保暖，可收納', price: 'NT$1,990', tag: '期間限定', category: 'WOMEN' },
-  { name: '直筒牛仔褲', desc: '百搭版型，彈性耐穿布料', price: 'NT$890', tag: '新品上市', category: 'WOMEN' },
-  { name: '素色連帽外套', desc: '簡約百搭，四季皆宜', price: 'NT$1,290', tag: '新品上市', category: 'MEN' },
-  { name: '修身西裝褲', desc: '俐落版型，商務休閒兩用', price: 'NT$990', tag: '期間限定', category: 'MEN' },
-  { name: '針織開襟衫', desc: '簡約線條，四季皆宜', price: 'NT$690', tag: '期間限定', category: 'MEN' },
-  { name: '童趣印花T恤', desc: '柔軟純棉，活動好穿脫', price: 'NT$290', tag: '新品上市', category: 'KIDS' },
-  { name: '保暖刷毛外套', desc: '輕量刷毛，戶外遊玩必備', price: 'NT$690', tag: '期間限定', category: 'KIDS' },
-  { name: '彈性運動褲', desc: '彈性布料，好動不受限', price: 'NT$490', tag: '新品上市', category: 'KIDS' },
-  { name: '純棉包屁衣', desc: '親膚透氣，呵護寶寶肌膚', price: 'NT$290', tag: '新品上市', category: 'BABY' },
-  { name: '柔軟連身衣', desc: '柔軟布料，寶寶穿著更舒適', price: 'NT$390', tag: '期間限定', category: 'BABY' },
-  { name: '透氣嬰兒外套', desc: '輕薄透氣，四季皆宜', price: 'NT$590', tag: '新品上市', category: 'BABY' },
-]
+const products = ref([])
+
+// 頁面一仔入，就打API拿商品
+onMounted(async () => {
+  try {
+    const response = await axios.get('https://localhost:7255/api/product')
+    products.value = response.data // API回傳的資料塞進products
+    console.log('拿到的商品:', response.data)
+  } catch (error) {
+    console.log('拿商品失敗', error)
+  }
+})
 
 const selectedCategory = computed(() => {
   const category = route.query.category
   return categories.includes(category) ? category : ''
 })
 
-const filteredProducts = computed(() =>
-  selectedCategory.value
-    ? products.filter((p) => p.category === selectedCategory.value)
-    : products,
-)
+const filteredProducts = computed(() => products.value)
 
-const title = computed(() =>
-  selectedCategory.value ? `${selectedCategory.value} 商品` : '全部商品',
-)
+const title = computed(() => '全部商品')
 </script>
 
 <template>
   <section class="promo">
     <h2 class="section-title">{{ title }}</h2>
     <div class="grid">
-      <article v-for="p in filteredProducts" :key="p.category + p.name" class="card">
+      <article v-for="p in filteredProducts" :key="p.productId" class="card">
         <div class="card-image">
-          <span class="card-tag">{{ p.tag }}</span>
+          <span class="card-tag">{{ p.status }}</span>
           <span class="placeholder-label">商品圖片</span>
         </div>
         <div class="card-body">
-          <h3 class="card-name">{{ p.name }}</h3>
-          <p class="card-desc">{{ p.desc }}</p>
-          <p class="card-price">{{ p.price }}</p>
+          <h3 class="card-name">{{ p.productName }}</h3>
+          <p class="card-desc">{{ p.description }}</p>
+          <p class="card-price">TWD {{ p.price }}</p>
         </div>
       </article>
     </div>
