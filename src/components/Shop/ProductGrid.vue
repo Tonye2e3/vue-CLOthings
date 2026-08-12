@@ -3,6 +3,15 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 
+const API_BASE = 'https://localhost:7255'
+function getImageUrl(fileName) {
+  // 沒有圖檔名時，回傳佔位圖（防呆：有些商品可能還沒圖）
+  if (!fileName) {
+    return 'https://placehold.co/300x400?text=No+Image'
+  }
+  return `${API_BASE}/images/product/${fileName}`
+}
+
 const route = useRoute()
 
 const categories = ['WOMEN', 'MEN', 'KIDS', 'BABY']
@@ -14,7 +23,6 @@ onMounted(async () => {
   try {
     const response = await axios.get('https://localhost:7255/api/product')
     products.value = response.data // API回傳的資料塞進products
-    console.log('拿到的商品:', response.data)
   } catch (error) {
     console.log('拿商品失敗', error)
   }
@@ -37,12 +45,12 @@ const title = computed(() => '全部商品')
       <article v-for="p in filteredProducts" :key="p.productId" class="card">
         <div class="card-image">
           <span class="card-tag">{{ p.status }}</span>
-          <span class="placeholder-label">商品圖片</span>
+          <img :src="getImageUrl(p.productImgFile)" :alt="p.productName" class="product-img" />
         </div>
         <div class="card-body">
           <h3 class="card-name">{{ p.productName }}</h3>
           <p class="card-desc">{{ p.description }}</p>
-          <p class="card-price">TWD {{ p.price }}</p>
+          <p class="card-price">TWD {{ p.price.toLocaleString() }}</p>
         </div>
       </article>
     </div>
@@ -126,6 +134,12 @@ const title = computed(() => '全部商品')
   font-size: 1rem;
   font-weight: 700;
   color: var(--home-text);
+}
+
+.product-img {
+  width: 258.4px;
+  height: 344.3px;
+  object-fit: cover; /* 圖片填滿、裁切多餘部分，不變形 */
 }
 
 @media (max-width: 1024px) {
