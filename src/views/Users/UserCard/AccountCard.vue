@@ -35,19 +35,6 @@ const save = () => {
 
   isEditing.value = false
 }
-
-//測試
-// async function test() {
-//   // 先把 Pinia 登入資料清掉
-//   authStore.clearAuth()
-
-//   try {
-//     const response = await api.get('/User')
-//     console.log('沒有 Token 但成功：', response)
-//   } catch (error) {
-//     console.log('沒有 Token：', error.response?.status)
-//   }
-// }
 </script>
 
 <template>
