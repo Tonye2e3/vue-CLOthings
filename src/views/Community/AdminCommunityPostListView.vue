@@ -119,9 +119,11 @@ const deletePost = async (post) => {
                   class="tag-chip"
                 >{{ tag.name }}</span>
               </td>
-              <td class="cell-actions">
-                <router-link :to="`/admin/community/posts/${post.communityPostId}`" class="btn-admin-detail">詳情</router-link>
-                <button class="btn-admin-delete" @click="deletePost(post)">刪除</button>
+              <td>
+                <div class="cell-actions">
+                  <router-link :to="`/admin/community/posts/${post.communityPostId}`" class="btn-admin-detail">詳情</router-link>
+                  <button class="btn-admin-delete" @click="deletePost(post)">刪除</button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -148,30 +150,33 @@ const deletePost = async (post) => {
 </template>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
 .admin-page{
   width:100%; min-height:100vh;
-  background:#F4F4F5;
+  background-color:#F9F4F0 !important;
   padding:2rem 0;
-  --ink:#1F2937; --ink-soft:#6B7280; --paper:#FFFFFF; --hairline:#E5E7EB;
-  --plum:#7A4B54; --plum-deep:#5E3941;
+  --cream:#F9F4F0; --paper:#FFFDFB; --ink:#2A2420; --ink-soft:#7A6E63;
+  --plum:#7A4B54; --plum-deep:#5E3941; --ochre:#B8862E; --hairline:#E4D8CC;
   font-family:'Noto Sans TC', sans-serif;
   color:var(--ink);
 }
 .admin-container{ max-width:1200px; margin:0 auto; padding:0 1.5rem; }
 .admin-breadcrumb{ font-size:.8rem; color:var(--ink-soft); margin-bottom:.3rem; }
-.admin-title{ font-size:1.6rem; font-weight:800; margin-bottom:1.4rem; }
+.admin-title{ font-family:'Noto Serif TC', serif; font-weight:900; font-size:1.6rem; margin-bottom:1.4rem; color:var(--ink); }
 .admin-loading{ padding:2rem; text-align:center; color:var(--ink-soft); }
 
 .admin-card{
-  background:var(--paper); border:1px solid var(--hairline); border-radius:10px;
+  background:var(--paper); border:1px solid var(--hairline); border-radius:16px;
   padding:1.2rem; overflow-x:auto;
 }
-.admin-table{ width:100%; border-collapse:collapse; font-size:.86rem; }
+.admin-table{ width:auto; border-collapse:collapse; font-size:.86rem; }
 .admin-table th{
   text-align:left; padding:.7rem .6rem; border-bottom:2px solid var(--hairline);
   color:var(--ink-soft); font-weight:700; white-space:nowrap;
+  font-family:'Noto Serif TC', serif;
 }
 .admin-table td{ padding:.7rem .6rem; border-bottom:1px solid var(--hairline); vertical-align:middle; }
+.admin-table tbody tr:hover{ background:var(--cream); }
 .cell-content{ max-width:220px; }
 .cell-nowrap{ white-space:nowrap; color:var(--ink-soft); }
 .cell-thumb{ width:56px; height:56px; object-fit:cover; border-radius:6px; display:block; }
@@ -180,37 +185,42 @@ const deletePost = async (post) => {
   display:inline-block; padding:.25rem .7rem; border-radius:999px;
   font-size:.76rem; font-weight:700; color:#fff;
 }
-.badge-public{ background:#16A34A; }
-.badge-hide{ background:#9CA3AF; }
-.badge-check{ background:#D97706; }
+.badge-public{ background:#5E8C61; }
+.badge-hide{ background:var(--ink-soft); }
+.badge-check{ background:var(--ochre); }
 
 .tag-chip{
-  display:inline-block; background:#CFFAFE; color:#0E7490;
-  font-size:.72rem; padding:.2rem .55rem; border-radius:4px;
+  display:inline-block; background:var(--cream); color:var(--plum);
+  border:1px solid var(--hairline);
+  font-size:.72rem; padding:.2rem .55rem; border-radius:999px;
   margin:.1rem .2rem .1rem 0;
 }
 
-.cell-actions{ display:flex; gap:.4rem; white-space:nowrap; }
+.cell-actions{ display:inline-flex; gap:.4rem; white-space:nowrap; }
 .btn-admin-detail{
-  display:inline-block; background:#3B82F6; color:#fff;
+  display:inline-block; background:var(--ink); color:var(--paper);
   border:none; border-radius:4px; padding:.35rem .7rem; font-size:.78rem;
-  text-decoration:none;
+  text-decoration:none; transition:background .18s ease;
 }
+.btn-admin-detail:hover{ background:var(--plum-deep); }
 .btn-admin-delete{
-  background:#EF4444; color:#fff;
-  border:none; border-radius:4px; padding:.35rem .7rem; font-size:.78rem;
+  background:transparent; color:#B4453A;
+  border:1px solid #B4453A; border-radius:4px; padding:.35rem .7rem; font-size:.78rem;
+  transition:all .18s ease;
 }
+.btn-admin-delete:hover{ background:#B4453A; color:#fff; }
 
 .admin-pagination{
   display:flex; align-items:center; justify-content:space-between;
-  margin-top:1rem; padding-top:1rem; border-top:1px solid var(--hairline);
+  margin-top:1rem; padding-top:1rem; border-top:1px dashed var(--hairline);
   font-size:.82rem; color:var(--ink-soft);
 }
 .pagination-buttons{ display:flex; gap:.3rem; }
 .btn-page{
   border:1px solid var(--hairline); background:var(--paper); color:var(--ink);
-  border-radius:4px; padding:.3rem .7rem; font-size:.8rem;
+  border-radius:4px; padding:.3rem .7rem; font-size:.8rem; transition:all .18s ease;
 }
+.btn-page:hover:not(:disabled){ border-color:var(--plum); color:var(--plum); }
 .btn-page.active{ background:var(--plum); border-color:var(--plum); color:#fff; }
 .btn-page:disabled{ opacity:.4; }
 </style>
