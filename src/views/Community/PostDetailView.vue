@@ -60,7 +60,23 @@ const post = ref({
 // notFound：如果這個 id 在資料庫裡根本找不到對應的貼文，用這個來控制畫面顯示「找不到這篇貼文」。
 const notFound = ref(false)
 
-// fetchPost：向後端要「這一篇」貼文的完整資料。
+// currentImageIndex：主圖輪播現在顯示 post.images 裡的第幾張（從 0 開始算）。
+// 每次換到新的一篇貼文時要記得歸零，不然會出現「這篇貼文明明只有 1 張圖，
+// 卻想顯示上一篇貼文停在的第 3 張」這種指到不存在的索引的情況。
+const currentImageIndex = ref(0)
+
+// prevImage／nextImage：按輪播箭頭時執行。
+// % post.value.images.length：取餘數，讓索引超過最後一張時自動繞回第一張，
+// 索引小於 0 時（在第一張按「上一張」）也用同樣的算法繞到最後一張。
+const prevImage = () => {
+  const len = post.value.images.length
+  currentImageIndex.value = (currentImageIndex.value - 1 + len) % len
+}
+const nextImage = () => {
+  const len = post.value.images.length
+  currentImageIndex.value = (currentImageIndex.value + 1) % len
+}
+
 const fetchPost = async () => {
   // route.params.id：讀出網址上 :id 這段動態參數的值，是字串型別
   // （例如網址是 /community/post/3，這裡拿到的就是 "3"）。
@@ -148,6 +164,7 @@ watch(() => route.params.id, () => {
   notFound.value = false
   newComment.value = '' // 清空還沒送出的留言草稿，避免帶到別篇貼文底下去
   replyingTo.value = null // 取消原本在回覆的狀態，避免對新貼文的留言用到舊貼文的 parentCommentId
+  currentImageIndex.value = 0 // 換到新貼文時輪播歸零，從第一張開始顯示
   fetchPost()
   fetchComments()
   fetchLikeStatus()
@@ -414,11 +431,40 @@ const addComment = async () => {
               </button>
             </div>
 
-            <!-- 主圖（拿掉了浮在照片上的定位標籤，因為資料庫沒有存座標） -->
+            <!-- 主圖：改成可以左右切換的輪播，顯示 CreatePostView.vue 上傳時選的每一張照片，
+                 不再固定只顯示第一張。currentImageIndex 記錄現在顯示第幾張（從 0 開始）。 -->
             <div class="post-media">
               <span class="tag-label" v-if="post.taggedProducts[0]">封面故事</span>
-              <!-- images 是陣列（對應 Post_Images），這裡固定顯示第一張 -->
-              <img :src="post.images[0]?.url" class="post-image" alt="post image" />
+              <img :src="post.images[currentImageIndex]?.url" class="post-image" alt="post image" />
+
+              <!-- 上一張／下一張箭頭：只有超過 1 張照片才顯示，不然單張照片也會出現沒意義的箭頭 -->
+              <template v-if="post.images.length > 1">
+                <button class="media-arrow media-arrow-prev" @click="prevImage">‹</button>
+                <button class="media-arrow media-arrow-next" @click="nextImage">›</button>
+                <!-- 圓點指示器：點某個點可以直接跳到那張照片，目前顯示的那個點會反白 -->
+                <div class="media-dots">
+                  <button
+                    v-for="(img, idx) in post.images"
+                    :key="idx"
+                    class="media-dot"
+                    :class="{ active: idx === currentImageIndex }"
+                    @click="currentImageIndex = idx"
+                  ></button>
+                </div>
+              </template>
+            </div>
+
+            <!-- 縮圖列：跟輪播是同一份 post.images，點縮圖也能直接跳到那張，主圖跟縮圖列點法互通 -->
+            <div class="post-thumb-row" v-if="post.images.length > 1">
+              <button
+                v-for="(img, idx) in post.images"
+                :key="idx"
+                class="post-thumb-item"
+                :class="{ active: idx === currentImageIndex }"
+                @click="currentImageIndex = idx"
+              >
+                <img :src="img.url" alt="縮圖" />
+              </button>
             </div>
 
             <!-- 按讚/分享/收藏 動作列 -->
@@ -690,6 +736,40 @@ const addComment = async () => {
   border-width:0 6px 6px 0; border-style:solid;
   border-color:transparent var(--plum-deep) transparent transparent;
 }
+
+/* ---------- 主圖輪播：箭頭、圓點 ---------- */
+.media-arrow{
+  position:absolute; top:50%; transform:translateY(-50%); z-index:3;
+  width:36px; height:36px; border-radius:50%;
+  background:rgba(0,0,0,.45); color:#fff; border:none;
+  font-size:1.3rem; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .18s ease;
+}
+.media-arrow:hover{ background:rgba(0,0,0,.7); }
+.media-arrow-prev{ left:12px; }
+.media-arrow-next{ right:12px; }
+
+.media-dots{
+  position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:3;
+  display:flex; gap:.4rem;
+}
+.media-dot{
+  width:7px; height:7px; border-radius:50%;
+  background:rgba(255,255,255,.55); border:none; padding:0;
+  transition:background .18s ease, transform .18s ease;
+}
+.media-dot.active{ background:#fff; transform:scale(1.25); }
+
+/* ---------- 縮圖列 ---------- */
+.post-thumb-row{ display:flex; gap:.5rem; margin-bottom:1.1rem; }
+.post-thumb-item{
+  width:56px; height:56px; border-radius:6px; overflow:hidden; flex-shrink:0;
+  border:2px solid transparent; padding:0; background:none;
+  transition:border-color .18s ease;
+}
+.post-thumb-item.active{ border-color:var(--plum); }
+.post-thumb-item img{ width:100%; height:100%; object-fit:cover; display:block; }
 
 /* ---------- 互動列 ---------- */
 .action-bar{
