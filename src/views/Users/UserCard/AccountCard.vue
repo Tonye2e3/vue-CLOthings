@@ -1,14 +1,35 @@
 <script setup>
-import { ref, reactive } from 'vue'
-import { useAuthStore } from '@/stores/auth'
+import { ref, reactive, onMounted } from 'vue'
 import api from '@/services/api'
-import { initialUserData } from '../../../services/userFakeData'
 import { isValidAccount, isValidPassword, isValidPhone, isValidEmail } from '@/utils/UserValidator'
 
-const authStore = useAuthStore()
-const userData = reactive({ ...initialUserData })
+const userData = reactive({
+  userId: null,
+  username: '',
+  account: '',
+  email: '',
+  phone: '',
+  countryCode: '',
+  twoFactorEnabled: false,
+})
 const backupData = reactive({}) // 用來暫存原始資料
 const isEditing = ref(false)
+
+async function getUserData() {
+  try {
+    const resp = await api.get('/User/me')
+
+    Object.assign(userData, resp.data)
+
+    console.log('帳戶資料：', userData)
+  } catch (error) {
+    console.error('取得帳戶資料失敗：', error)
+  }
+}
+
+onMounted(() => {
+  getUserData()
+})
 
 const toggleEdit = () => {
   // 進入編輯模式時，先備份原始資料
@@ -24,11 +45,10 @@ const cancel = () => {
 
 const save = () => {
   // 直接使用雙向繫結的 userData，不需要再複製
-  const passwordError = isValidPassword(userData.password)
   const phoneError = isValidPhone(userData.phone)
   const emailError = isValidEmail(userData.email)
 
-  if (passwordError || phoneError || emailError) {
+  if (phoneError || emailError) {
     alert('請修正錯誤後再儲存')
     return
   }
@@ -47,7 +67,7 @@ const save = () => {
     <div v-if="!isEditing">
       <p><strong>帳號：</strong>{{ userData.account }}</p>
       <p><strong>暱稱：</strong>{{ userData.username }}</p>
-      <p><strong>密碼：</strong>{{ userData.password ? '••••••' : '未設定' }}</p>
+
       <p><strong>郵件：</strong>{{ userData.email }}</p>
       <p><strong>電話：</strong>{{ userData.phone }}</p>
       <button
@@ -63,15 +83,7 @@ const save = () => {
     <div v-else>
       <input v-model="userData.account" class="form-control mb-2" placeholder="帳號" readonly />
       <input v-model="userData.username" class="form-control mb-2" placeholder="暱稱" />
-      <input
-        v-model="userData.password"
-        type="password"
-        class="form-control mb-2"
-        placeholder="密碼"
-      />
-      <span v-if="isValidPassword(userData.password)" class="form text text-danger">
-        {{ isValidPassword(userData.password) }}
-      </span>
+
       <input v-model="userData.email" type="email" class="form-control mb-2" placeholder="郵件" />
       <span class="form text text-danger">{{ isValidEmail(userData.email) }}</span>
       <input

@@ -1,4 +1,6 @@
 <script setup>
+import IconGoogle from '@/components/icons/iconGoogle.vue'
+import IconLineColorful from '@/components/icons/IconLineColorful.vue'
 import { isValidAccount, isValidPassword } from '@/utils/UserValidator'
 import { ref } from 'vue'
 
@@ -9,10 +11,9 @@ import api from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 const authStore = useAuthStore()
 
-import { useRouter } from 'vue-router'
-import IconGoogle from '@/components/icons/iconGoogle.vue'
-import IconLineColorful from '@/components/icons/IconLineColorful.vue'
+import { useRouter, useRoute } from 'vue-router'
 const router = useRouter()
+const route = useRoute()
 
 async function login() {
   const data = {
@@ -23,14 +24,15 @@ async function login() {
     const resp = await api.post('/User/login', data)
     console.log('登入結果', resp)
     console.log('Pinia 登入資料', authStore)
+
     authStore.setAuth(resp.data)
 
-    // 第一次：有 Token
-    // const testResp = await api.get('/User')
-    // console.log('有 Token 測試', testResp)
+    //測試get me功能
+    // const meResp = await api.get('/User/me')
+    // console.log('目前使用者：', meResp.data)
 
     alert('登入成功')
-    router.push({ name: 'home' })
+    router.push(route.query.redirect || '/')
   } catch (error) {
     if (error.response?.status === 401) {
       alert('帳號或密碼錯誤')

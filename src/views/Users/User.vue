@@ -3,6 +3,17 @@ import AccountCard from './UserCard/AccountCard.vue'
 import AddressCard from './UserCard/AddressCard.vue'
 import ProfileCard from './UserCard/ProfileCard.vue'
 import oAuthCard from './UserCard/OAuthCard.vue'
+
+import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
+
+const authStore = useAuthStore()
+const router = useRouter()
+
+function logout() {
+  authStore.clearAuth()
+  router.push('/login')
+}
 </script>
 
 <template>
@@ -14,6 +25,9 @@ import oAuthCard from './UserCard/OAuthCard.vue'
         <li><a href="#profile">個人資料</a></li>
         <li><a href="#address">收件資料</a></li>
         <li><a href="#oauth">第三方登入</a></li>
+        <li>
+          <button type="button" class="logout-btn" @click="logout">登出</button>
+        </li>
       </ul>
     </nav>
 
@@ -67,5 +81,18 @@ import oAuthCard from './UserCard/OAuthCard.vue'
 .content-area {
   margin-left: 220px; /* 須與 sidebar 寬度對齊 */
   width: 800px;
+}
+
+.logout-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #dc3545;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.logout-btn:hover {
+  color: #b02a37;
 }
 </style>
