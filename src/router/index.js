@@ -85,7 +85,11 @@ const router = createRouter({
       name: 'AdminCommunityPostList',
       component: () => import('@/views/Community/AdminCommunityPostListView.vue'),
     },
-    
+    {
+      path: '/admin/community/posts/:id',
+      name: 'AdminCommunityPostDetail',
+      component: () => import('@/views/Community/AdminCommunityPostDetailView.vue'),
+    },
 
     //User 在註解之間新增個人使用的路由 名字自行修改
     {
