@@ -35,14 +35,6 @@ function getImageUrl(fileName) {
     return 'https://placehold.co/300x400?text=No+Image'
   }
 
-  // 暫時加這段來偵查，測完刪
-  console.log('我選的分類 id:', selectedCategoryId.value, '型別:', typeof selectedCategoryId.value)
-  console.log(
-    '商品們的分類 id:',
-    products.value.map((p) => p.productCategoryId),
-  )
-  console.log('第一個商品分類 id 的型別:', typeof products.value[0]?.productCategoryId)
-
   return `${API_BASE}/images/product/${fileName}`
 }
 
@@ -79,7 +71,12 @@ onMounted(async () => {
       </RouterLink>
     </div>
     <div class="grid">
-      <article v-for="p in filteredProducts" :key="p.productId" class="card">
+      <RouterLink
+        v-for="p in filteredProducts"
+        :key="p.productId"
+        :to="{ name: 'product', params: { id: p.productId } }"
+        class="card"
+      >
         <div class="card-image">
           <span class="card-tag">{{ p.status }}</span>
           <img :src="getImageUrl(p.productImgFile)" :alt="p.productName" class="product-img" />
@@ -89,7 +86,7 @@ onMounted(async () => {
           <p class="card-desc">{{ p.description }}</p>
           <p class="card-price">TWD {{ p.price.toLocaleString() }}</p>
         </div>
-      </article>
+      </RouterLink>
     </div>
   </section>
 </template>
@@ -119,6 +116,9 @@ onMounted(async () => {
   transition:
     box-shadow 0.25s ease,
     transform 0.25s ease;
+  text-decoration: none; /* 拿掉連結底線 */
+  color: inherit; /* 文字用原本顏色，不要變成連結藍色 */
+  display: block; /* 讓它像區塊一樣（RouterLink 預設是行內） */
 }
 .card:hover {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);

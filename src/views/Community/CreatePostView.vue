@@ -3,8 +3,9 @@ import { ref, computed, onMounted } from 'vue'
 // useRouter：Vue Router 提供的功能，讓我們可以在 <script> 裡面「用程式的方式」
 // 切換網址（例如發文成功後自動跳轉回社群頁），而不是只能靠使用者自己點連結。
 import { useRouter } from 'vue-router'
-// axios：打 API 用的套件，跟 CommunityView.vue、PostDetailView.vue 裡用的是同一套。
-import axios from 'axios'
+// api：跟其他頁面共用同一個 axios 實例（src/services/api.js），會自動把登入後的 JWT
+// token 帶進 Authorization header，跟直接 import axios from 'axios' 不一樣。
+import api from '@/services/api'
 
 
 // 全站共用的貼文清單（跟 CommunityView.vue 共用同一份資料，直接 import 那個檔案）
@@ -12,10 +13,11 @@ import axios from 'axios'
 // 用 export 開放出來的那兩個東西（可以回去那個檔案最上面看說明）。
 // 因為兩邊抓到的是「同一份」資料，所以只要在這裡呼叫 addPost() 新增一篇貼文，
 // 回到 CommunityView.vue 的畫面上就會馬上看得到，不需要重新整理頁面、也不需要資料庫。
-import { addPost, currentUser } from '@/views/Community/CommunityView.vue'
+import { addPost, currentUser, currentUserId, loadCurrentUserId } from '@/views/Community/CommunityView.vue'
 
-// API_BASE：後端 API 專案的網址，跟 CommunityView.vue、PostDetailView.vue 裡用的是同一個。
-const API_BASE = 'https://localhost:7255'
+// IMAGE_BASE：圖片是靜態檔案，走的不是 /api 這條路徑，不能直接用 api 服務的
+// baseURL（那個含 /api）。這裡把 VITE_API_URL 尾巴的 /api 拿掉，變成純網域。
+const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
 
 // useRouter() 執行後會拿到一個「路由控制器」物件，
 // 之後想切換頁面，就呼叫 router.push('網址') 就可以了。
@@ -45,7 +47,7 @@ const availableProducts = ref([])
 // fetchProducts：跟後端要「全部商品」清單，打的是 ProductController.cs 裡的 GET api/Product。
 const fetchProducts = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/api/Product`)
+    const res = await api.get(`/Product`)
     availableProducts.value = res.data.map(p => ({
       productId: p.productId,
       name: p.productName
@@ -57,6 +59,7 @@ const fetchProducts = async () => {
 
 onMounted(() => {
   fetchProducts()
+  loadCurrentUserId()
 })
 
 // 搜尋標籤商品
@@ -126,6 +129,13 @@ const handleSubmit = async () => {
     return // return 在這裡的作用是「提早結束這個函式」，後面的程式碼都不會被執行。
   }
 
+  // currentUserId 還是 null，代表還沒登入（或 /User/me 還沒查完），
+  // 不能讓使用者以為發文成功、結果 userId 是空的送出去被後端擋掉（400）。
+  if (!currentUserId.value) {
+    alert('請先登入才能發文！')
+    return
+  }
+
   // 第一步：把選好的照片真正上傳到後端，存進 wwwroot/images/posts/，拿回真正的路徑。
   // FormData：瀏覽器內建的物件，專門用來包「檔案」這種二進位資料送出去
   // （一般的 axios.post(url, { ... }) 送 JSON 沒辦法包真正的檔案內容，要用 FormData）。
@@ -138,7 +148,7 @@ const handleSubmit = async () => {
 
   let uploadedPaths = []
   try {
-    const uploadRes = await axios.post(`${API_BASE}/api/CommunityPost/upload-images`, formData, {
+    const uploadRes = await api.post(`/CommunityPost/upload-images`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
     uploadedPaths = uploadRes.data
@@ -151,9 +161,7 @@ const handleSubmit = async () => {
   // 組出要送給後端的資料，對應 CommunityPostController.cs 的 PostCommunityPost(CommunityPostDTO)。
   // 圖片、標記商品的部分後端會照這裡的清單，各自新增進 Post_Image、Post_Tagged_Product 兩張表。
   const payload = {
-    // TODO: 之後接上真的登入系統，這裡要換成登入者的 user_id。
-    // 先用資料庫裡真的存在的測試帳號 id 頂著——後端 UserId 是不可為 null 的 int，送 null 會被擋在綁定階段（400）。
-    userId: 1,
+    userId: currentUserId.value,
     content: postForm.value.content, // 對應 Community_Post.content
     status: postForm.value.status, // 對應 status：public（公開）或 hide（隱藏），來自上面選的公開設定
     // images：用「剛剛上傳完、後端真正回傳的路徑」組成 Post_Image 表的格式，
@@ -174,7 +182,7 @@ const handleSubmit = async () => {
   }
 
   try {
-    await axios.post(`${API_BASE}/api/CommunityPost`, payload)
+    await api.post(`/CommunityPost`, payload)
   } catch (err) {
     // API 出錯就提醒使用者，不要假裝發文成功、也不要繼續往下跳轉頁面。
     console.error('發文失敗：', err)
@@ -186,7 +194,7 @@ const handleSubmit = async () => {
   // 不用等重新整理、重新打一次 GET API。真正存進資料庫的資料已經在上面 axios.post 那步完成了。
   addPost({
     communityPostId: Date.now(), // 這裡只是先讓畫面上有個暫時的唯一編號可以用，跟資料庫實際存的 id 無關
-    userId: null,
+    userId: currentUserId.value,
     user: { name: currentUser.name, avatar: currentUser.avatar }, // 發文者資訊，來自剛剛 import 的 currentUser
     content: postForm.value.content,
     postDate: new Date().toISOString(),
@@ -195,9 +203,9 @@ const handleSubmit = async () => {
       postImageId: null,
       imageFileName: path,
       sortOrder: idx + 1,
-      // 這裡直接組出跟 CommunityView.vue 一樣的正式網址（API_BASE + 路徑），
+      // 這裡直接組出跟 CommunityView.vue 一樣的正式網址（IMAGE_BASE + 路徑），
       // 不用再靠本地暫時預覽網址頂著了，因為圖片這時候已經是真的存在伺服器上。
-      url: `${API_BASE}${path}`
+      url: `${IMAGE_BASE}${path}`
     })),
     likesCount: 0,
     commentsCount: 0,

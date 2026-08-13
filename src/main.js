@@ -15,10 +15,6 @@ const pinia = createPinia() // 先建立 pinia
 pinia.use(piniaPluginPersistedstate) // 讓 pinia 使用持久化套件
 app.use(pinia) // 再把 pinia 給 app 用
 
-pinia.use(piniaPluginPersistedstate)
-
-app.use(pinia)
-
 // app.use(createPinia())
 
 app.use(router)
