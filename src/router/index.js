@@ -83,33 +83,39 @@ const router = createRouter({
       path: '/GroupShop/checkout',
       name: 'GroupCart',
       component: () => import('../views/GroupShop/GroupCartView.vue'),
+      meta: { requiresAuth: true },
     },
     {
       path: '/GroupShop/orders',
       name: 'GroupOrders',
       component: () => import('../views/GroupShop/GroupOrdersView.vue'),
+      meta: { requiresAuth: true },
     },
     {
       path: '/GroupShop/checkout/confirm',
       name: 'GroupCheckout',
       component: () => import('../views/GroupShop/GroupCheckoutView.vue'),
+      meta: { requiresAuth: true },
     },
     // 模擬付款頁：結帳送出後會先跳到這裡，付款結果確認後才會真的建立訂單
     {
       path: '/GroupShop/pay/:paymentId',
       name: 'GroupFakePayment',
       component: () => import('../views/GroupShop/GroupFakePaymentView.vue'),
+      meta: { requiresAuth: true },
     },
-    // 管理端：商品管理、訂單管理（目前任何人都能直接連進去，還沒有登入/角色限制）
+    // 管理端：商品管理、訂單管理（僅 Admin / SuperAdmin 可進入）
     {
       path: '/GroupShop/admin/products',
       name: 'GroupProductAdmin',
       component: () => import('../views/GroupShop/GroupProductAdminView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
     },
     {
       path: '/GroupShop/admin/orders',
       name: 'GroupOrderAdmin',
       component: () => import('../views/GroupShop/GroupOrderAdminView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
     },
 
     //Community 在註解之間新增個人使用的路由 名字自行修改
@@ -182,6 +188,11 @@ router.beforeEach((to) => {
         redirect: to.fullPath,
       },
     }
+  }
+
+  // 要進入的頁面需要管理員權限，而目前登入的角色不是 Admin / SuperAdmin
+  if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    return { name: 'home' }
   }
 })
 

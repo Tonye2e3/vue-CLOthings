@@ -1,9 +1,17 @@
 <template>
-  <h3 class="fw-bold mb-4">團購商品管理</h3>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold mb-0">團購商品管理</h3>
+    <RouterLink :to="{ name: 'GroupProducts' }" class="back-link">
+      ← 返回商品列表
+    </RouterLink>
+  </div>
 
-  <div class="mb-4">
+  <div class="mb-4 d-flex gap-2">
     <button type="button" class="btn btn-success" @click="openCreateModal">
       新增團購商品
+    </button>
+    <button type="button" class="btn btn-outline-secondary" @click="openLookupModal">
+      分類 / 供應商管理
     </button>
   </div>
 
@@ -48,7 +56,7 @@
           </tr>
           <tr v-for="p in pagedProducts" :key="p.id">
             <td class="text-body-secondary small">{{ p.id }}</td>
-            <td><img :src="p.imageUrl" class="img-thumbnail" style="width: 60px" /></td>
+            <td><img :src="resolveImageUrl(p.imageUrl)" class="img-thumbnail" style="width: 60px" /></td>
             <td class="fw-semibold">{{ p.name }}</td>
             <td>
               <span class="badge" :class="getStatusBadgeClass(p.status)">{{ p.status }}</span>
@@ -122,9 +130,15 @@
             <input type="text" class="form-control" v-model="form.productName" />
           </div>
           <div class="mb-3">
-            <label class="form-label">圖片網址</label>
-            <input type="text" class="form-control" v-model="form.productImg" />
-            <img v-if="form.productImg" :src="form.productImg" class="img-thumbnail mt-2" style="width: 80px" />
+            <label class="form-label">商品圖片</label>
+            <input type="file" accept="image/*" class="form-control" @change="handleImageSelect" />
+            <div class="form-text" v-if="uploadingImage">圖片上傳中...</div>
+            <img
+              v-if="form.productImg"
+              :src="resolveImageUrl(form.productImg)"
+              class="img-thumbnail mt-2"
+              style="width: 80px"
+            />
           </div>
           <div class="row g-2 mb-3">
             <div class="col">
@@ -245,7 +259,7 @@
               class="list-group-item list-group-item-action d-flex align-items-center gap-3"
               @click="handlePickProduct(prod)"
             >
-              <img :src="prod.imageUrl" style="width: 48px; height: 48px; object-fit: cover" class="rounded" />
+              <img :src="resolveImageUrl(prod.imageUrl)" style="width: 48px; height: 48px; object-fit: cover" class="rounded" />
               <span class="fw-semibold">{{ prod.name }}</span>
               <span class="text-muted ms-auto">NT$ {{ formatCurrency(prod.price) }}</span>
             </button>
@@ -256,6 +270,99 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" @click="showPickProductModal = false">取消</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 分類 / 供應商管理 Modal ============ -->
+  <div v-if="showLookupModal" class="modal-backdrop fade show"></div>
+  <div
+    v-if="showLookupModal"
+    class="modal fade show d-block"
+    tabindex="-1"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold mb-0">分類 / 供應商管理</h5>
+          <button type="button" class="btn-close" aria-label="Close" @click="showLookupModal = false"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-4">
+            <!-- 分類管理 -->
+            <div class="col-md-6">
+              <h6 class="fw-bold mb-2">分類</h6>
+              <ul class="list-group mb-2">
+                <li
+                  v-for="c in categories"
+                  :key="c.groupProductCategoryId"
+                  class="list-group-item d-flex justify-content-between align-items-center"
+                >
+                  <template v-if="editingCategoryId === c.groupProductCategoryId">
+                    <input type="text" class="form-control form-control-sm me-2" v-model="categoryEditName" />
+                    <div class="d-flex gap-1">
+                      <button type="button" class="btn btn-sm btn-primary" @click="saveCategoryEdit(c)">存</button>
+                      <button type="button" class="btn btn-sm btn-secondary" @click="editingCategoryId = null">取消</button>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <span>{{ c.categoryName }}</span>
+                    <div class="d-flex gap-1">
+                      <button type="button" class="btn btn-sm btn-outline-secondary" @click="startEditCategory(c)">編輯</button>
+                      <button type="button" class="btn btn-sm btn-outline-danger" @click="handleDeleteCategory(c)">刪除</button>
+                    </div>
+                  </template>
+                </li>
+                <li v-if="categories.length === 0" class="list-group-item text-muted text-center">
+                  尚未建立任何分類
+                </li>
+              </ul>
+              <div class="input-group input-group-sm">
+                <input type="text" class="form-control" placeholder="新分類名稱" v-model="newCategoryName" />
+                <button type="button" class="btn btn-outline-primary" @click="handleCreateCategory">新增</button>
+              </div>
+            </div>
+
+            <!-- 供應商管理 -->
+            <div class="col-md-6">
+              <h6 class="fw-bold mb-2">供應商</h6>
+              <ul class="list-group mb-2">
+                <li
+                  v-for="s in suppliers"
+                  :key="s.groupSupplierId"
+                  class="list-group-item d-flex justify-content-between align-items-center"
+                >
+                  <template v-if="editingSupplierId === s.groupSupplierId">
+                    <input type="text" class="form-control form-control-sm me-2" v-model="supplierEditName" />
+                    <div class="d-flex gap-1">
+                      <button type="button" class="btn btn-sm btn-primary" @click="saveSupplierEdit(s)">存</button>
+                      <button type="button" class="btn btn-sm btn-secondary" @click="editingSupplierId = null">取消</button>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <span>{{ s.supplierName }}</span>
+                    <div class="d-flex gap-1">
+                      <button type="button" class="btn btn-sm btn-outline-secondary" @click="startEditSupplier(s)">編輯</button>
+                      <button type="button" class="btn btn-sm btn-outline-danger" @click="handleDeleteSupplier(s)">刪除</button>
+                    </div>
+                  </template>
+                </li>
+                <li v-if="suppliers.length === 0" class="list-group-item text-muted text-center">
+                  尚未建立任何供應商
+                </li>
+              </ul>
+              <div class="input-group input-group-sm">
+                <input type="text" class="form-control" placeholder="新供應商名稱" v-model="newSupplierName" />
+                <button type="button" class="btn btn-outline-primary" @click="handleCreateSupplier">新增</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" @click="showLookupModal = false">關閉</button>
         </div>
       </div>
     </div>
@@ -274,8 +381,43 @@ import {
   addTier,
   deleteTier,
   getCategories,
-  getSuppliers
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  getSuppliers,
+  createSupplier,
+  updateSupplier,
+  deleteSupplier,
+  uploadProductImage
 } from '@/api/groupShopAdmin'
+// 圖片網址工具：後端上傳圖片回傳的是相對路徑（例如 /images/group-products/xxx.jpg），
+// 舊示範資料則是完整網址（例如 https://picsum.photos/...），這裡統一組成完整網址
+const API_BASE = 'https://localhost:7255'
+const resolveImageUrl = (path) => {
+  if (!path) return ''
+  if (path.startsWith('http://') || path.startsWith('https://')) return path
+  return `${API_BASE}${path}`
+}
+
+
+// 圖片上傳中的狀態，避免使用者在上傳完成前就按下儲存
+const uploadingImage = ref(false)
+
+// 選好圖片檔案後：立刻呼叫後端上傳，成功後把回傳的路徑存進 form.productImg
+const handleImageSelect = async (e) => {
+  const file = e.target.files?.[0]
+  if (!file) return
+
+  uploadingImage.value = true
+  try {
+    form.productImg = await uploadProductImage(file)
+  } catch (err) {
+    alert(err.response?.data || '圖片上傳失敗，請稍後再試')
+  } finally {
+    uploadingImage.value = false
+    e.target.value = '' // 清空 input，避免選同一個檔案時 change 事件不會再觸發
+  }
+}
 
 const products = ref([])
 const categories = ref([])
@@ -290,6 +432,86 @@ onMounted(async () => {
   categories.value = await getCategories()
   suppliers.value = await getSuppliers()
 })
+
+// ---- 分類 / 供應商管理 Modal ----
+const showLookupModal = ref(false)
+const openLookupModal = () => {
+  showLookupModal.value = true
+}
+
+// 分類：新增
+const newCategoryName = ref('')
+const handleCreateCategory = async () => {
+  const name = newCategoryName.value.trim()
+  if (!name) return
+  await createCategory({ categoryName: name, description: '' })
+  newCategoryName.value = ''
+  categories.value = await getCategories()
+}
+// 分類：編輯
+const editingCategoryId = ref(null)
+const categoryEditName = ref('')
+const startEditCategory = (c) => {
+  editingCategoryId.value = c.groupProductCategoryId
+  categoryEditName.value = c.categoryName
+}
+const saveCategoryEdit = async (c) => {
+  const name = categoryEditName.value.trim()
+  if (!name) return
+  await updateCategory(c.groupProductCategoryId, { categoryName: name, description: c.description })
+  editingCategoryId.value = null
+  categories.value = await getCategories()
+}
+// 分類：刪除
+const handleDeleteCategory = async (c) => {
+  if (!confirm(`確定要刪除分類「${c.categoryName}」嗎？`)) return
+  try {
+    await deleteCategory(c.groupProductCategoryId)
+    categories.value = await getCategories()
+  } catch (err) {
+    alert(err.response?.data || '這個分類已經有商品在使用，不能刪除')
+  }
+}
+
+// 供應商：新增
+const newSupplierName = ref('')
+const handleCreateSupplier = async () => {
+  const name = newSupplierName.value.trim()
+  if (!name) return
+  await createSupplier({ supplierName: name, contactName: '', contactTitle: '', address: '', phone: '' })
+  newSupplierName.value = ''
+  suppliers.value = await getSuppliers()
+}
+// 供應商：編輯
+const editingSupplierId = ref(null)
+const supplierEditName = ref('')
+const startEditSupplier = (s) => {
+  editingSupplierId.value = s.groupSupplierId
+  supplierEditName.value = s.supplierName
+}
+const saveSupplierEdit = async (s) => {
+  const name = supplierEditName.value.trim()
+  if (!name) return
+  await updateSupplier(s.groupSupplierId, {
+    supplierName: name,
+    contactName: s.contactName,
+    contactTitle: s.contactTitle,
+    address: s.address,
+    phone: s.phone
+  })
+  editingSupplierId.value = null
+  suppliers.value = await getSuppliers()
+}
+// 供應商：刪除
+const handleDeleteSupplier = async (s) => {
+  if (!confirm(`確定要刪除供應商「${s.supplierName}」嗎？`)) return
+  try {
+    await deleteSupplier(s.groupSupplierId)
+    suppliers.value = await getSuppliers()
+  } catch (err) {
+    alert(err.response?.data || '這個供應商已經有商品在使用，不能刪除')
+  }
+}
 
 // ---- 搜尋 ----
 const searchQuery = ref('')
@@ -503,3 +725,15 @@ const getStatusBadgeClass = (status) => {
   return 'text-bg-light text-dark border'
 }
 </script>
+<style scoped>
+.back-link {
+  display: inline-block;
+  font-size: 0.88rem;
+  color: #6c757d;
+  text-decoration: none;
+}
+.back-link:hover {
+  color: #212529;
+  text-decoration: underline;
+}
+</style>
