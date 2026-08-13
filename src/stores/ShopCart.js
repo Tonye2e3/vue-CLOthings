@@ -1,8 +1,6 @@
 import { defineStore } from 'pinia' //引入pinia的模組
 import { computed, ref } from 'vue' //引入vue的內建模組
-
-//定義一個模組屬於狀態管理
-// export const useCartStore = defineStore(狀態名稱, 可以用什麼變數、方法)
+import api from '@/services/api'
 
 export const useCartStore = defineStore(
   'cart',
@@ -28,30 +26,43 @@ export const useCartStore = defineStore(
     }
 
     // 移除商品的方法，將商品從購物車移除
-    function removeItem(productSpecificationId) {
-      const index = items.value.findIndex(
-        (i) => i.productSpecificationId === productSpecificationId,
-      )
+    async function removeItem(productSpecificationId) {
+      const item = items.value.find((p) => p.productSpecificationId === productSpecificationId)
       // 找到該商品的索引值，當前陣列當中，如果有相同id則傳到index，如果沒有則傳回-1
-      if (index == -1) {
-        // 如果沒有找到相同的id，什麼都不用做
-        return
-      } else {
-        // 如果找到相同的id
-        items.value.splice(index, 1) // 將該商品從陣列中移除，從第index索引開始，刪除1個元素
-        // 可加入二重確認是否刪除
+      if (!item) return
+      try {
+        // 打 DELETE API，用 cartId
+        await api.delete(`/cart/${item.cartId}`)
+        // 後端刪成功 → 前端也移除
+        const index = items.value.findIndex(
+          (p) => p.productSpecificationId === productSpecificationId,
+        )
+        items.value.splice(index, 1)
+      } catch (error) {
+        console.error('移除失敗：', error)
       }
     }
 
     // 增減商品數量的方法
-    function changeQty(productSpecificationId, qty) {
-      const existItem = items.value.find((p) => p.productSpecificationId === productSpecificationId)
-      if (existItem) {
-        // 商品已存在item之中，如果有找到相同的id，就會執行這段
-        existItem.quantity += qty // 將該商品的數量加傳入的qty
-        if (existItem.quantity <= 0) {
-          removeItem(productSpecificationId)
-        }
+    async function changeQty(productSpecificationId, delta) {
+      const item = items.value.find((p) => p.productSpecificationId === productSpecificationId)
+      if (!item) return
+
+      const newQty = item.quantity + delta
+
+      // 數量歸零或以下 → 改成移除
+      if (newQty <= 0) {
+        removeItem(productSpecificationId)
+        return
+      }
+
+      try {
+        // 打 PUT API，用 cartId + 新數量
+        await api.put(`/cart/${item.cartId}`, { quantity: newQty })
+        // 後端改成功 → 前端也更新
+        item.quantity = newQty
+      } catch (error) {
+        console.error('改數量失敗：', error)
       }
     }
 
@@ -78,6 +89,19 @@ export const useCartStore = defineStore(
       })
       return count
     })
+
+    // 從後端載入購物車
+    async function loadCart() {
+      try {
+        const response = await api.get('/cart')
+        items.value = response.data.map((item) => ({
+          ...item,
+          selected: true,
+        }))
+      } catch (error) {
+        console.error('載入購物車失敗：', error)
+      }
+    }
 
     // 運費：滿 1000 免運，未滿收 60
     const shippingFee = computed(() => {
@@ -113,9 +137,9 @@ export const useCartStore = defineStore(
       selectedCount,
       selectedItems,
       total,
-      shippingFee, 
+      shippingFee,
       finalTotal,
-      
+      loadCart,
     } // 回傳模組內的變數、方法、計算屬性
   },
   { persist: true },

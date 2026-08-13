@@ -1,0 +1,410 @@
+/* ==================================================
+   User Center - Common Styles
+   會員中心共用樣式
+================================================== */
+
+/* ==================================================
+   Card
+================================================== */
+
+.user-card {
+  padding: 30px;
+
+  background: #ffffff;
+
+  border: 1px solid #e8e8e8;
+  border-radius: 16px;
+
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+/* ==================================================
+   Card Header
+================================================== */
+
+.user-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+
+  gap: 20px;
+
+  margin-bottom: 28px;
+}
+
+.user-section-label {
+  margin: 0 0 4px;
+
+  color: #999999;
+
+  font-size: 11px;
+  font-weight: 700;
+
+  letter-spacing: 1.5px;
+}
+
+.user-card-title {
+  margin: 0;
+
+  color: #181818;
+
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.user-card-description {
+  margin: 7px 0 0;
+
+  color: #888888;
+
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ==================================================
+   Form
+================================================== */
+
+.user-form-grid {
+  display: grid;
+
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  gap: 20px;
+}
+
+.user-form-group {
+  display: flex;
+  flex-direction: column;
+
+  gap: 7px;
+}
+
+.user-form-group-full {
+  grid-column: 1 / -1;
+}
+
+.user-form-label {
+  color: #444444;
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/*
+ Bootstrap 本身已經有 form-control / form-select，
+ 這裡只覆蓋會員中心需要的外觀。
+*/
+
+.user-card .form-control,
+.user-card .form-select {
+  min-height: 44px;
+
+  border: 1px solid #dddddd;
+  border-radius: 8px;
+
+  font-size: 14px;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.user-card .form-control:focus,
+.user-card .form-select:focus {
+  border-color: #777777;
+
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+}
+
+.user-card textarea.form-control {
+  min-height: 110px;
+
+  resize: vertical;
+}
+
+/* ==================================================
+   Information Display
+================================================== */
+
+.user-info-grid {
+  display: grid;
+
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  gap: 20px;
+}
+
+.user-info-item {
+  display: flex;
+  flex-direction: column;
+
+  gap: 6px;
+
+  padding: 16px;
+
+  background: #f8f8f7;
+
+  border-radius: 10px;
+}
+
+.user-info-label {
+  color: #999999;
+
+  font-size: 12px;
+}
+
+.user-info-value {
+  color: #222222;
+
+  font-size: 15px;
+  font-weight: 600;
+
+  word-break: break-word;
+}
+
+/* ==================================================
+   Divider
+================================================== */
+
+.user-divider {
+  width: 100%;
+
+  height: 1px;
+
+  margin: 26px 0;
+
+  background: #eeeeee;
+}
+
+/* ==================================================
+   Buttons
+================================================== */
+
+.user-btn {
+  display: inline-flex;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 6px;
+
+  min-height: 40px;
+
+  padding: 8px 16px;
+
+  border-radius: 8px;
+
+  font-size: 14px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+/* 主要按鈕 */
+
+.user-btn-primary {
+  border: 1px solid #222222;
+
+  background: #222222;
+
+  color: #ffffff;
+}
+
+.user-btn-primary:hover {
+  background: #000000;
+
+  border-color: #000000;
+}
+
+/* 次要按鈕 */
+
+.user-btn-secondary {
+  border: 1px solid #dddddd;
+
+  background: #ffffff;
+
+  color: #555555;
+}
+
+.user-btn-secondary:hover {
+  border-color: #999999;
+
+  background: #f7f7f7;
+}
+
+/* 編輯按鈕 */
+
+.user-btn-outline {
+  border: 1px solid #222222;
+
+  background: #ffffff;
+
+  color: #222222;
+}
+
+.user-btn-outline:hover {
+  background: #222222;
+
+  color: #ffffff;
+}
+
+/* 危險操作 */
+
+.user-btn-danger {
+  border: 1px solid #dc3545;
+
+  background: #ffffff;
+
+  color: #dc3545;
+}
+
+.user-btn-danger:hover {
+  background: #dc3545;
+
+  color: #ffffff;
+}
+
+/* ==================================================
+   Action Area
+================================================== */
+
+.user-actions {
+  display: flex;
+
+  justify-content: flex-end;
+
+  gap: 10px;
+
+  margin-top: 28px;
+}
+
+/* ==================================================
+   Badge
+================================================== */
+
+.user-badge {
+  display: inline-flex;
+
+  align-items: center;
+
+  width: fit-content;
+
+  padding: 5px 10px;
+
+  border-radius: 999px;
+
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.user-badge-dark {
+  background: #222222;
+
+  color: #ffffff;
+}
+
+.user-badge-success {
+  background: #e9f7ef;
+
+  color: #198754;
+}
+
+.user-badge-secondary {
+  background: #eeeeee;
+
+  color: #666666;
+}
+
+/* ==================================================
+   Empty State
+================================================== */
+
+.user-empty {
+  padding: 40px 20px;
+
+  text-align: center;
+
+  background: #fafafa;
+
+  border: 1px dashed #dddddd;
+  border-radius: 12px;
+
+  color: #888888;
+}
+
+.user-empty-title {
+  margin-bottom: 5px;
+
+  color: #444444;
+
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.user-empty-text {
+  margin: 0;
+
+  font-size: 13px;
+}
+
+/* ==================================================
+   Small text
+================================================== */
+
+.user-hint {
+  margin: 0;
+
+  color: #999999;
+
+  font-size: 11px;
+}
+
+/* ==================================================
+   Responsive
+================================================== */
+
+@media (max-width: 768px) {
+  .user-card {
+    padding: 22px;
+  }
+
+  .user-card-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .user-form-grid,
+  .user-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .user-form-group-full {
+    grid-column: auto;
+  }
+
+  .user-actions {
+    flex-direction: column-reverse;
+  }
+
+  .user-actions .user-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 576px) {
+  .user-card {
+    padding: 18px;
+
+    border-radius: 12px;
+  }
+
+  .user-card-title {
+    font-size: 21px;
+  }
+}
