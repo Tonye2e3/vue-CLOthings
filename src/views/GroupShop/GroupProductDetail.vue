@@ -3,24 +3,48 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGroupCartStore } from '@/stores/groupCart'
+import { useAuthStore } from '@/stores/auth'
 // 團購商品 API
 import { getGroupProduct } from '@/api/groupShop'
+// 圖片網址工具：後端上傳圖片回傳的是相對路徑（例如 /images/group-products/xxx.jpg），
+// 舊示範資料則是完整網址（例如 https://picsum.photos/...），這裡統一組成完整網址
+const API_BASE = 'https://localhost:7255'
+const resolveImageUrl = (path) => {
+  if (!path) return ''
+  if (path.startsWith('http://') || path.startsWith('https://')) return path
+  return `${API_BASE}${path}`
+}
+
 
 const route = useRoute()
 const router = useRouter()
 const cartStore = useGroupCartStore()
+const authStore = useAuthStore()
 
-// 左側選單要顯示的項目清單
-const navItems = [
-  { label: '專案瀏覽', icon: 'user', to: '/GroupShop' },
-  { label: '團購紀錄', icon: 'history', to: '/GroupShop/orders' }
-]
+// 一般管理員（Admin）前台只能看不能操作，SuperAdmin 不受限
+const isReadOnly = computed(() => authStore.role === 'Admin')
+
+// 左側選單：一般會員只看得到「專案瀏覽」「團購紀錄」，
+// Admin / SuperAdmin 登入時，「團購紀錄」下面會多出後台管理的兩個項目
+const navItems = computed(() => {
+  const items = [
+    { label: '專案瀏覽', icon: 'user', to: '/GroupShop' },
+    { label: '團購紀錄', icon: 'history', to: '/GroupShop/orders' }
+  ]
+  if (authStore.isAdmin) {
+    items.push(
+      { label: '團購商品管理', icon: 'box', to: '/GroupShop/admin/products' },
+      { label: '團購訂單管理', icon: 'clipboard', to: '/GroupShop/admin/orders' }
+    )
+  }
+  return items
+})
 
 // 判斷某個選單項目是不是「目前所在的頁面」，是的話會加上 active 樣式（醒目提示）
 const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : route.path.startsWith(to))
 
-// 會員名稱：優先帶入登入後存下的會員資料，尚未登入則顯示預設值
-const memberName = ref(localStorage.getItem('memberName') || '會員')
+// 會員名稱：登入狀態統一用 useAuthStore()，尚未登入則顯示預設值
+const memberName = computed(() => authStore.name || '會員')
 
 // 購物車商品數量：直接從 store 拿
 const cartCount = computed(() => cartStore.items.length)
@@ -38,7 +62,13 @@ const product = ref({
 })
 
 onMounted(async () => {
-  await cartStore.fetchCart()
+  // 管理員（Admin）沒有購物車權限，fetchCart 會回 403，
+  // 用 try/catch 包起來，避免購物車失敗連帶讓商品詳情也讀不到
+  try {
+    await cartStore.fetchCart()
+  } catch (e) {
+    // 忽略，購物車數量顯示 0 即可
+  }
   const id = Number(route.params.id)
   product.value = await getGroupProduct(id)
 })
@@ -94,6 +124,13 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
 
 // 按下「加入此團購」時執行的動作：改成呼叫後端加入購物車 API
 const handleJoin = async () => {
+  // 還沒登入的話，提示先註冊/登入，並導去登入頁（帶上 redirect，登入完成後會自動導回這頁）
+  if (!authStore.isLoggedIn) {
+    alert('請先註冊/登入會員')
+    router.push({ name: 'login', query: { redirect: route.fullPath } })
+    return
+  }
+
   await cartStore.addItem({ id: product.value.id })
   router.push('/GroupShop/checkout') // 加入後直接到購物車頁面
 }
@@ -125,6 +162,17 @@ const handleJoin = async () => {
                   <polyline points="1 4 1 10 7 10"></polyline>
                   <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
                 </svg>
+                <svg v-else-if="item.icon === 'box'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
+                  <polyline points="3.29 7 12 12 20.71 7"></polyline>
+                  <line x1="12" y1="22" x2="12" y2="12"></line>
+                </svg>
+                <svg v-else-if="item.icon === 'clipboard'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                  <line x1="9" y1="12" x2="15" y2="12"></line>
+                  <line x1="9" y1="16" x2="15" y2="16"></line>
+                </svg>
               </span>
               <span>{{ item.label }}</span>
             </router-link>
@@ -138,6 +186,17 @@ const handleJoin = async () => {
                 <svg v-else-if="item.icon === 'history'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="1 4 1 10 7 10"></polyline>
                   <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                </svg>
+                <svg v-else-if="item.icon === 'box'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
+                  <polyline points="3.29 7 12 12 20.71 7"></polyline>
+                  <line x1="12" y1="22" x2="12" y2="12"></line>
+                </svg>
+                <svg v-else-if="item.icon === 'clipboard'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                  <line x1="9" y1="12" x2="15" y2="12"></line>
+                  <line x1="9" y1="16" x2="15" y2="16"></line>
                 </svg>
               </span>
               <span>{{ item.label }}</span>
@@ -156,7 +215,7 @@ const handleJoin = async () => {
       <!-- 左側：主商品 -->
       <div class="col-lg-8">
         <div class="hero-card">
-          <img :src="product.imageUrl" class="hero-img" :alt="product.name" />
+          <img :src="resolveImageUrl(product.imageUrl)" class="hero-img" :alt="product.name" />
           <div class="hero-info">
             <h4 class="fw-bold mb-2">{{ product.name }}</h4>
             <div class="d-flex justify-content-between small text-muted mb-1">
@@ -239,7 +298,12 @@ const handleJoin = async () => {
           <p class="small mb-3 desc-text">{{ product.intro }}</p>
 
           <!-- @click 綁定按鈕點擊事件，按下去就會執行上面 script 裡定義的 handleJoin -->
-          <button class="btn btn-main w-100 mt-3" @click="handleJoin">加入此團購</button>
+          <button
+            class="btn btn-main w-100 mt-3"
+            :disabled="isReadOnly"
+            :title="isReadOnly ? '管理員帳號僅供瀏覽，無法加入團購' : ''"
+            @click="handleJoin"
+          >加入此團購</button>
         </div>
       </div>
     </div>
@@ -413,6 +477,10 @@ const handleJoin = async () => {
 .btn-main:hover {
   background-color: var(--color-dark-hover);
   color: #fff;
+}
+.btn-main:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }
 
 .floating-cart {

@@ -1,7 +1,7 @@
 <script setup>
 import IconGoogle from '@/components/icons/iconGoogle.vue'
 import IconLine from '@/components/icons/IconLineColorful.vue'
-import oAuthBindCard from '@/components/usersCard/OAuthBindCard.vue'
+import oAuthBindCard from '@/components/usersCard/oAuthBindCard.vue'
 </script>
 
 <template>

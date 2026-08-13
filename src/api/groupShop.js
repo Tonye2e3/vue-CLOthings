@@ -1,5 +1,5 @@
 // 團購（GroupShop）模組的 API 呼叫，對應後端 GroupProductController / GroupCartController / GroupOrderController
-import http from './http'
+import http from '@/services/api'
 
 // ---- 商品 ----
 // 取得商品列表，keyword 選填（商品名稱模糊搜尋，對應商品列表頁的搜尋框）
@@ -11,9 +11,9 @@ export const getGroupProduct = (id) =>
   http.get(`/GroupProduct/${id}`).then(res => res.data)
 
 // ---- 購物車 ----
-// 取得某個會員的購物車內容
-export const getGroupCart = (userId) =>
-  http.get(`/GroupCart/${userId}`).then(res => res.data)
+// 取得「目前登入者」的購物車內容：UserId 後端從 JWT 取得，前端不用也不能指定
+export const getGroupCart = () =>
+  http.get('/GroupCart').then(res => res.data)
 
 // 加入購物車（同商品已存在的話，後端會自動累加數量）
 export const addToGroupCart = (payload) =>
@@ -27,18 +27,18 @@ export const updateGroupCartQty = (groupCartId, quantity) =>
 export const removeGroupCartItem = (groupCartId) =>
   http.delete(`/GroupCart/${groupCartId}`)
 
-// 清空某會員的購物車
-export const clearGroupCart = (userId) =>
-  http.delete(`/GroupCart/user/${userId}`)
+// 清空「目前登入者」的購物車
+export const clearGroupCart = () =>
+  http.delete('/GroupCart/me')
 
 // ---- 訂單 ----
 // 結帳：把購物車內容送出成一筆訂單
 export const checkoutGroupOrder = (payload) =>
   http.post('/GroupOrder/checkout', payload).then(res => res.data)
 
-// 取得某會員的所有團購訂單
-export const getGroupOrders = (userId) =>
-  http.get(`/GroupOrder/${userId}`).then(res => res.data)
+// 取得「目前登入者」的所有團購訂單：UserId 後端從 JWT 取得
+export const getGroupOrders = () =>
+  http.get('/GroupOrder/mine').then(res => res.data)
 
 // 取得單一訂單詳情（編輯訂單 Modal 用）
 export const getGroupOrderDetail = (orderId) =>

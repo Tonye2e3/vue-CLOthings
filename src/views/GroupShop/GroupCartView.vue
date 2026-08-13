@@ -3,25 +3,51 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGroupCartStore } from '@/stores/groupCart'
+import { useAuthStore } from '@/stores/auth'
+// 圖片網址工具：後端上傳圖片回傳的是相對路徑（例如 /images/group-products/xxx.jpg），
+// 舊示範資料則是完整網址（例如 https://picsum.photos/...），這裡統一組成完整網址
+const API_BASE = 'https://localhost:7255'
+const resolveImageUrl = (path) => {
+  if (!path) return ''
+  if (path.startsWith('http://') || path.startsWith('https://')) return path
+  return `${API_BASE}${path}`
+}
+
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
-const navItems = [
-  { label: '專案瀏覽', icon: 'user', to: '/GroupShop' },
-  { label: '團購紀錄', icon: 'history', to: '/GroupShop/orders' }
-]
+// 一般管理員（Admin）前台只能看不能操作，SuperAdmin 不受限
+const isReadOnly = computed(() => authStore.role === 'Admin')
+
+// 左側選單：一般會員只看得到「專案瀏覽」「團購紀錄」，
+// Admin / SuperAdmin 登入時，「團購紀錄」下面會多出後台管理的兩個項目
+const navItems = computed(() => {
+  const items = [
+    { label: '專案瀏覽', icon: 'user', to: '/GroupShop' },
+    { label: '團購紀錄', icon: 'history', to: '/GroupShop/orders' }
+  ]
+  if (authStore.isAdmin) {
+    items.push(
+      { label: '團購商品管理', icon: 'box', to: '/GroupShop/admin/products' },
+      { label: '團購訂單管理', icon: 'clipboard', to: '/GroupShop/admin/orders' }
+    )
+  }
+  return items
+})
 const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : route.path.startsWith(to))
 
-// 會員名稱：優先帶入登入後存下的會員資料，尚未登入則顯示預設值
-const memberName = ref(localStorage.getItem('memberName') || '會員')
+// 會員名稱：登入狀態統一用 useAuthStore()，尚未登入則顯示預設值
+const memberName = computed(() => authStore.name || '會員')
 
 // 呼叫 useGroupCartStore()
 const cartStore = useGroupCartStore()
 
 // 進到購物車頁時，跟後端同步一次目前的購物車內容
 onMounted(() => {
-  cartStore.fetchCart()
+  // 管理員（Admin）沒有購物車權限，fetchCart 會回 403，補上 catch 避免出現未處理的 Promise 錯誤
+  cartStore.fetchCart().catch(() => {})
 })
 
 // 團購加購專區
@@ -92,6 +118,17 @@ const handleCheckout = () => {
                   <polyline points="1 4 1 10 7 10"></polyline>
                   <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
                 </svg>
+                <svg v-else-if="item.icon === 'box'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
+                  <polyline points="3.29 7 12 12 20.71 7"></polyline>
+                  <line x1="12" y1="22" x2="12" y2="12"></line>
+                </svg>
+                <svg v-else-if="item.icon === 'clipboard'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                  <line x1="9" y1="12" x2="15" y2="12"></line>
+                  <line x1="9" y1="16" x2="15" y2="16"></line>
+                </svg>
               </span>
               <span>{{ item.label }}</span>
             </router-link>
@@ -105,6 +142,17 @@ const handleCheckout = () => {
                 <svg v-else-if="item.icon === 'history'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="1 4 1 10 7 10"></polyline>
                   <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                </svg>
+                <svg v-else-if="item.icon === 'box'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
+                  <polyline points="3.29 7 12 12 20.71 7"></polyline>
+                  <line x1="12" y1="22" x2="12" y2="12"></line>
+                </svg>
+                <svg v-else-if="item.icon === 'clipboard'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                  <line x1="9" y1="12" x2="15" y2="12"></line>
+                  <line x1="9" y1="16" x2="15" y2="16"></line>
                 </svg>
               </span>
               <span>{{ item.label }}</span>
@@ -128,7 +176,7 @@ const handleCheckout = () => {
           </div>
           <!-- v-for 把購物車裡每一項商品都顯示成一列 -->
           <div v-for="item in cartStore.items" :key="item.id" class="cart-row">
-            <img :src="item.imageUrl" class="cart-img" :alt="item.name" />
+            <img :src="resolveImageUrl(item.imageUrl)" class="cart-img" :alt="item.name" />
             <div class="cart-item-info">
               <h6 class="fw-bold mb-1">{{ item.name }}</h6>
               <div class="d-flex align-items-center gap-2 mb-1">
@@ -137,6 +185,7 @@ const handleCheckout = () => {
                   type="number"
                   min="1"
                   :value="item.qty"
+                  :disabled="isReadOnly"
                   @change="updateQty(item.id, Number($event.target.value))"
                   class="qty-input"
                 />
@@ -147,7 +196,7 @@ const handleCheckout = () => {
             </div>
             <div class="cart-item-price">
               <span class="fw-bold">$ {{ formatCurrency(unitPriceOf(item) * item.qty) }}</span>
-              <button class="remove-btn" @click="removeItem(item.id)">
+              <button class="remove-btn" :disabled="isReadOnly" @click="removeItem(item.id)">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -164,7 +213,7 @@ const handleCheckout = () => {
         <div v-if="addonItems.length > 0" class="addon-card">
           <div class="addon-header">團購加購專區</div>
           <div v-for="item in addonItems" :key="item.id" class="addon-row">
-            <img :src="item.imageUrl" class="cart-img" :alt="item.name" />
+            <img :src="resolveImageUrl(item.imageUrl)" class="cart-img" :alt="item.name" />
             <div class="cart-item-info">
               <h6 class="fw-bold mb-1">{{ item.name }}</h6>
               <div class="d-flex align-items-center gap-2 mb-1">
@@ -211,10 +260,11 @@ const handleCheckout = () => {
             </div>
 
             <button class="btn btn-outline w-100 mb-2" @click="continueShopping">繼續購物</button>
-            <!-- 購物車完全空的時候，按鈕會被禁用，避免結帳空訂單 -->
+            <!-- 購物車完全空的時候，或目前是唯讀身分（Admin），按鈕會被禁用 -->
             <button
               class="btn btn-main w-100"
-              :disabled="allItems.length === 0"
+              :disabled="allItems.length === 0 || isReadOnly"
+              :title="isReadOnly ? '管理員帳號僅供瀏覽，無法結帳' : ''"
               @click="handleCheckout"
             >
               前往結帳
@@ -298,6 +348,11 @@ const handleCheckout = () => {
   border: 1px solid var(--color-border-input);
   border-radius: 6px;
   text-align: center;
+}
+.qty-input:disabled,
+.remove-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .cart-item-price {

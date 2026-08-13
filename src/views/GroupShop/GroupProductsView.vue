@@ -5,24 +5,47 @@ import { useRoute } from 'vue-router'
 
 // 團購購物車 store：跟商品詳情頁共用同一份購物車資料
 import { useGroupCartStore } from '@/stores/groupCart'
+import { useAuthStore } from '@/stores/auth'
 // 團購商品 API：改成向後端拿真正的資料，不再用寫死的假資料
 import { getGroupProducts } from '@/api/groupShop'
+// 圖片網址工具：後端上傳圖片回傳的是相對路徑（例如 /images/group-products/xxx.jpg），
+// 舊示範資料則是完整網址（例如 https://picsum.photos/...），這裡統一組成完整網址
+const API_BASE = 'https://localhost:7255'
+const resolveImageUrl = (path) => {
+  if (!path) return ''
+  if (path.startsWith('http://') || path.startsWith('https://')) return path
+  return `${API_BASE}${path}`
+}
+
 
 const route = useRoute()
 const cartStore = useGroupCartStore()
+const authStore = useAuthStore()
 
 const searchKeyword = ref('')
 
-// 左側選單項目
-const navItems = [
-  { label: '專案瀏覽', icon: 'user', to: '/GroupShop' },
-  { label: '團購紀錄', icon: 'history', to: '/GroupShop/orders' }
-]
+// 左側選單：一般會員只看得到「專案瀏覽」「團購紀錄」，
+// Admin / SuperAdmin 登入時，「團購紀錄」下面會多出後台管理的兩個項目
+const navItems = computed(() => {
+  const items = [
+    { label: '專案瀏覽', icon: 'user', to: '/GroupShop' },
+    { label: '團購紀錄', icon: 'history', to: '/GroupShop/orders' }
+  ]
+  if (authStore.isAdmin) {
+    items.push(
+      { label: '團購商品管理', icon: 'box', to: '/GroupShop/admin/products' },
+      { label: '團購訂單管理', icon: 'clipboard', to: '/GroupShop/admin/orders' }
+    )
+  }
+  return items
+})
 // 判斷選單項目是否為目前所在頁面（用來加上醒目樣式）
 const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : route.path.startsWith(to))
 
-// 會員名稱：優先帶入登入後存下的會員資料，尚未登入則顯示預設值
-const memberName = ref(localStorage.getItem('memberName') || '會員')
+// 會員名稱：登入狀態統一用 useAuthStore()，尚未登入則顯示預設值
+const memberName = computed(() => authStore.name || '會員')
+// 一般管理員（Admin）前台只能看不能操作，SuperAdmin 不受限
+const isReadOnly = computed(() => authStore.role === 'Admin')
 // 購物車商品數量：直接從 store 拿，跨頁面即時反映實際品項數
 const cartCount = computed(() => cartStore.items.length)
 
@@ -31,7 +54,13 @@ const cartCount = computed(() => cartStore.items.length)
 const products = ref([])
 
 onMounted(async () => {
-  await cartStore.fetchCart()
+  // 管理員（Admin）沒有購物車權限，fetchCart 會回 403，
+  // 用 try/catch 包起來，避免購物車失敗連帶讓商品列表也讀不到
+  try {
+    await cartStore.fetchCart()
+  } catch (e) {
+    // 忽略，購物車數量顯示 0 即可
+  }
   products.value = await getGroupProducts()
 })
 
@@ -94,21 +123,21 @@ const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
 // 輪播圖資料：之後要接後端管理的活動 Banner，可以整段改成 API 呼叫
 const banners = ref([
   {
-    image: 'https://picsum.photos/seed/clo-banner1/1400/500',
+    image: resolveImageUrl('/images/product/兒童連帽外套.jpeg'),
     badge: '限時優惠至 8/6',
     title: '輕便抗UV連帽外套',
     subtitle: '一件抵擋整個夏天的紫外線',
     price: 1290
   },
   {
-    image: 'https://picsum.photos/seed/clo-banner2/1400/500',
+    image: resolveImageUrl('/images/product/帆布托特包.jpeg'),
     badge: '團購進行中',
     title: '團購托特包 熱銷中',
     subtitle: '滿25件即可享最低團購價',
     price: 711
   },
   {
-    image: 'https://picsum.photos/seed/clo-banner3/1400/500',
+    image: resolveImageUrl('/images/product/羊毛混紡針織外套.jpeg'),
     badge: '新品上市',
     title: '團購針織外套',
     subtitle: '滿15件享最低團購價',
@@ -148,6 +177,17 @@ const nextSlide = () => {
                   <polyline points="1 4 1 10 7 10"></polyline>
                   <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
                 </svg>
+                <svg v-else-if="item.icon === 'box'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
+                  <polyline points="3.29 7 12 12 20.71 7"></polyline>
+                  <line x1="12" y1="22" x2="12" y2="12"></line>
+                </svg>
+                <svg v-else-if="item.icon === 'clipboard'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                  <line x1="9" y1="12" x2="15" y2="12"></line>
+                  <line x1="9" y1="16" x2="15" y2="16"></line>
+                </svg>
               </span>
               <span>{{ item.label }}</span>
             </router-link>
@@ -161,6 +201,17 @@ const nextSlide = () => {
                 <svg v-else-if="item.icon === 'history'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="1 4 1 10 7 10"></polyline>
                   <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                </svg>
+                <svg v-else-if="item.icon === 'box'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
+                  <polyline points="3.29 7 12 12 20.71 7"></polyline>
+                  <line x1="12" y1="22" x2="12" y2="12"></line>
+                </svg>
+                <svg v-else-if="item.icon === 'clipboard'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                  <line x1="9" y1="12" x2="15" y2="12"></line>
+                  <line x1="9" y1="16" x2="15" y2="16"></line>
                 </svg>
               </span>
               <span>{{ item.label }}</span>
@@ -244,7 +295,7 @@ const nextSlide = () => {
       <div class="product-grid">
         <div v-for="p in ongoingProducts" :key="p.id" class="product-card">
           <router-link :to="`/GroupShop/product/${p.id}`" class="card-img-wrap">
-            <img :src="p.imageUrl" class="card-img" :alt="p.name" />
+            <img :src="resolveImageUrl(p.imageUrl)" class="card-img" :alt="p.name" />
           </router-link>
           <div class="card-info">
             <h6 class="fw-bold mb-1">{{ p.name }}</h6>
@@ -258,9 +309,16 @@ const nextSlide = () => {
             </div>
             <div class="d-flex justify-content-between align-items-center mt-2">
               <span class="fw-bold">團購價 ${{ formatCurrency(currentPriceOf(p)) }}</span>
-              <router-link :to="`/GroupShop/product/${p.id}`" class="btn btn-main btn-sm">
+              <router-link
+                v-if="!isReadOnly"
+                :to="`/GroupShop/product/${p.id}`"
+                class="btn btn-main btn-sm"
+              >
                 加入此團購
               </router-link>
+              <button v-else class="btn btn-main btn-sm" disabled title="管理員帳號僅供瀏覽，無法加入團購">
+                加入此團購
+              </button>
             </div>
           </div>
         </div>
@@ -281,7 +339,7 @@ const nextSlide = () => {
         <!-- v-for 把 completedProducts 陣列裡每一筆商品，重複產生一張卡片 -->
         <div v-for="p in completedProducts" :key="p.id" class="product-card">
           <router-link :to="`/GroupShop/product/${p.id}`" class="card-img-wrap">
-            <img :src="p.imageUrl" class="card-img" :alt="p.name" />
+            <img :src="resolveImageUrl(p.imageUrl)" class="card-img" :alt="p.name" />
           </router-link>
           <div class="card-info">
             <h6 class="fw-bold mb-1">{{ p.name }}</h6>
@@ -449,6 +507,10 @@ const nextSlide = () => {
 .btn-main:hover {
   background-color: var(--color-dark-hover);
   color: #fff;
+}
+.btn-main:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }
 
 /* ============ 輪播下方的關鍵字搜尋 ============ */
