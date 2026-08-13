@@ -2,7 +2,7 @@
 import AccountCard from './UserCard/AccountCard.vue'
 import AddressCard from './UserCard/AddressCard.vue'
 import ProfileCard from './UserCard/ProfileCard.vue'
-import oAuthCard from './UserCard/OAuthCard.vue'
+import oAuthCard from './UserCard/oAuthCard.vue'
 
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
