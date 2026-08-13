@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import api from '@/services/api'
-import { isValidAccount, isValidPassword, isValidPhone, isValidEmail } from '@/utils/UserValidator'
+import { isValidPassword, isValidPhone, isValidEmail } from '@/utils/UserValidator'
 
 const userData = reactive({
   userId: null,
@@ -12,49 +12,67 @@ const userData = reactive({
   countryCode: '',
   twoFactorEnabled: false,
 })
-const backupData = reactive({}) // 用來暫存原始資料
-const isEditing = ref(false)
 
-// 是否顯示修改密碼區塊
+const backupData = reactive({})
+
+const isEditing = ref(false)
 const isChangingPassword = ref(false)
 
-// 修改密碼表單
 const passwordData = reactive({
   currentPassword: '',
   newPassword: '',
   confirmPassword: '',
 })
 
+// ==============================
+// 取得目前登入會員資料
+// GET /api/User/me
+// ==============================
+
 async function getUserData() {
   try {
     const resp = await api.get('/User/me')
 
     Object.assign(userData, resp.data)
-
-    console.log('帳戶資料：', userData)
   } catch (error) {
     console.error('取得帳戶資料失敗：', error)
   }
 }
 
+// ==============================
+// 頁面載入
+// ==============================
+
 onMounted(() => {
   getUserData()
 })
 
+// ==============================
+// 進入編輯模式
+// ==============================
+
 const toggleEdit = () => {
-  // 進入編輯模式時，先備份原始資料
   Object.assign(backupData, userData)
+
   isEditing.value = true
 }
 
+// ==============================
+// 取消編輯
+// ==============================
+
 const cancel = () => {
-  // 還原原始資料
   Object.assign(userData, backupData)
+
   isEditing.value = false
 }
 
+// ==============================
+// 儲存帳戶資料
+// PUT /api/User/me
+// ==============================
+
 const save = async () => {
-  // 先檢查前端輸入格式
   const phoneError = isValidPhone(userData.phone)
   const emailError = isValidEmail(userData.email)
 
@@ -63,7 +81,6 @@ const save = async () => {
     return
   }
 
-  // 準備要傳給後端的資料
   const data = {
     username: userData.username,
     email: userData.email,
@@ -72,22 +89,54 @@ const save = async () => {
   }
 
   try {
-    // 呼叫後端 PUT /api/User/me
     await api.put('/User/me', data)
 
-    alert('資料修改成功')
+    // 儲存成功後更新備份
+    Object.assign(backupData, userData)
+
+    alert('帳戶資料修改成功')
 
     isEditing.value = false
   } catch (error) {
     console.error('修改帳戶資料失敗：', error)
-    console.log('後端錯誤內容：', error.response?.data)
+    console.error('後端錯誤內容：', error.response?.data)
 
-    alert('資料修改失敗')
+    alert(error.response?.data || '帳戶資料修改失敗')
   }
 }
 
+// ==============================
+// 清除密碼欄位
+// ==============================
+
+const clearPasswordForm = () => {
+  passwordData.currentPassword = ''
+  passwordData.newPassword = ''
+  passwordData.confirmPassword = ''
+}
+
+// ==============================
+// 取消修改密碼
+// ==============================
+
+const cancelChangePassword = () => {
+  clearPasswordForm()
+
+  isChangingPassword.value = false
+}
+
+// ==============================
+// 修改密碼
+// PUT /api/User/me/password
+// ==============================
+
 const changePassword = async () => {
-  // 驗證新密碼格式
+  // 防止空白
+  if (!passwordData.currentPassword) {
+    alert('請輸入目前密碼')
+    return
+  }
+
   const passwordError = isValidPassword(passwordData.newPassword)
 
   if (passwordError) {
@@ -95,7 +144,6 @@ const changePassword = async () => {
     return
   }
 
-  // 確認兩次新密碼是否相同
   if (passwordData.newPassword !== passwordData.confirmPassword) {
     alert('兩次輸入的新密碼不一致')
     return
@@ -111,127 +159,306 @@ const changePassword = async () => {
 
     alert('密碼修改成功')
 
-    // 清空密碼欄位
-    passwordData.currentPassword = ''
-    passwordData.newPassword = ''
-    passwordData.confirmPassword = ''
+    clearPasswordForm()
 
-    // 關閉修改密碼區塊
     isChangingPassword.value = false
   } catch (error) {
     console.error('修改密碼失敗：', error)
 
     if (error.response?.status === 400) {
       alert(error.response.data || '目前密碼錯誤')
-    } else {
-      alert('密碼修改失敗')
+      return
     }
+
+    alert('密碼修改失敗')
   }
 }
 </script>
 
 <template>
-  <div class="card p-4 shadow mb-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <h3 class="fw-bold mb-0">帳戶資料</h3>
+  <div class="user-card">
+    <!-- ==============================
+         Header
+    =============================== -->
+
+    <div class="user-card-header">
+      <div>
+        <p class="user-section-label">ACCOUNT</p>
+
+        <h2 class="user-card-title">帳戶資料</h2>
+
+        <p class="user-card-description">管理你的登入帳戶與基本聯絡資訊。</p>
+      </div>
+
+      <button v-if="!isEditing" type="button" class="user-btn user-btn-outline" @click="toggleEdit">
+        編輯資料
+      </button>
     </div>
 
+    <!-- ==============================
+         顯示模式
+    =============================== -->
+
     <div v-if="!isEditing">
-      <p><strong>帳號：</strong>{{ userData.account }}</p>
-      <p><strong>暱稱：</strong>{{ userData.username }}</p>
+      <div class="user-info-grid">
+        <!-- 帳號 -->
 
-      <p><strong>郵件：</strong>{{ userData.email }}</p>
-      <p><strong>電話：</strong>{{ userData.phone }}</p>
-      <button
-        v-if="!isEditing"
-        @click="toggleEdit"
-        class="btn btn-outline-dark"
-        style="border-radius: 0%"
-      >
-        編輯
-      </button>
+        <div class="user-info-item">
+          <span class="user-info-label"> 帳號 </span>
 
-      <hr class="my-4" />
-
-      <div>
-        <button
-          v-if="!isChangingPassword"
-          class="btn btn-outline-dark"
-          @click="isChangingPassword = true"
-        >
-          修改密碼
-        </button>
-
-        <div v-else>
-          <h5 class="fw-bold mb-3">修改密碼</h5>
-
-          <!-- 目前密碼 -->
-          <input
-            v-model="passwordData.currentPassword"
-            type="password"
-            class="form-control mb-2"
-            placeholder="目前密碼"
-          />
-
-          <!-- 新密碼 -->
-          <input
-            v-model="passwordData.newPassword"
-            type="password"
-            class="form-control mb-2"
-            placeholder="新密碼"
-          />
-
-          <span class="text-danger">
-            {{ isValidPassword(passwordData.newPassword) }}
+          <span class="user-info-value">
+            {{ userData.account || '未設定' }}
           </span>
+        </div>
 
-          <!-- 確認新密碼 -->
-          <input
-            v-model="passwordData.confirmPassword"
-            type="password"
-            class="form-control mt-2 mb-2"
-            placeholder="確認新密碼"
-          />
+        <!-- 暱稱 -->
 
-          <span
-            v-if="
-              passwordData.confirmPassword &&
-              passwordData.newPassword !== passwordData.confirmPassword
-            "
-            class="text-danger"
+        <div class="user-info-item">
+          <span class="user-info-label"> 暱稱 </span>
+
+          <span class="user-info-value">
+            {{ userData.username || '未設定' }}
+          </span>
+        </div>
+
+        <!-- Email -->
+
+        <div class="user-info-item">
+          <span class="user-info-label"> Email </span>
+
+          <span class="user-info-value">
+            {{ userData.email || '未設定' }}
+          </span>
+        </div>
+
+        <!-- 電話 -->
+
+        <div class="user-info-item">
+          <span class="user-info-label"> 電話 </span>
+
+          <span class="user-info-value">
+            {{ userData.phone || '未設定' }}
+          </span>
+        </div>
+      </div>
+
+      <!-- ==============================
+           修改密碼
+      =============================== -->
+
+      <div class="user-divider"></div>
+
+      <div class="password-section">
+        <div class="password-header">
+          <div>
+            <h3 class="password-title">登入密碼</h3>
+
+            <p class="password-description">建議定期更新密碼以保護帳戶安全。</p>
+          </div>
+
+          <button
+            v-if="!isChangingPassword"
+            type="button"
+            class="user-btn user-btn-secondary"
+            @click="isChangingPassword = true"
           >
-            兩次輸入的新密碼不一致
-          </span>
+            修改密碼
+          </button>
+        </div>
 
-          <div class="d-flex gap-2 mt-3">
-            <button class="btn btn-secondary flex-grow-1" @click="isChangingPassword = false">
+        <!-- 密碼修改表單 -->
+
+        <div v-if="isChangingPassword" class="password-form">
+          <div class="user-form-group">
+            <label class="user-form-label"> 目前密碼 </label>
+
+            <input
+              v-model="passwordData.currentPassword"
+              type="password"
+              class="form-control"
+              placeholder="請輸入目前密碼"
+            />
+          </div>
+
+          <div class="user-form-group">
+            <label class="user-form-label"> 新密碼 </label>
+
+            <input
+              v-model="passwordData.newPassword"
+              type="password"
+              class="form-control"
+              placeholder="請輸入新密碼"
+            />
+
+            <span v-if="passwordData.newPassword" class="validation-error">
+              {{ isValidPassword(passwordData.newPassword) }}
+            </span>
+          </div>
+
+          <div class="user-form-group">
+            <label class="user-form-label"> 確認新密碼 </label>
+
+            <input
+              v-model="passwordData.confirmPassword"
+              type="password"
+              class="form-control"
+              placeholder="請再次輸入新密碼"
+            />
+
+            <span
+              v-if="
+                passwordData.confirmPassword &&
+                passwordData.newPassword !== passwordData.confirmPassword
+              "
+              class="validation-error"
+            >
+              兩次輸入的新密碼不一致
+            </span>
+          </div>
+
+          <div class="user-actions">
+            <button type="button" class="user-btn user-btn-secondary" @click="cancelChangePassword">
               取消
             </button>
 
-            <button class="btn btn-primary flex-grow-1" @click="changePassword">確定修改</button>
+            <button type="button" class="user-btn user-btn-primary" @click="changePassword">
+              確定修改
+            </button>
           </div>
         </div>
       </div>
     </div>
 
-    <div v-else>
-      <input v-model="userData.account" class="form-control mb-2" placeholder="帳號" readonly />
-      <input v-model="userData.username" class="form-control mb-2" placeholder="暱稱" />
+    <!-- ==============================
+         編輯帳戶資料
+    =============================== -->
 
-      <input v-model="userData.email" type="email" class="form-control mb-2" placeholder="郵件" />
-      <span class="form text text-danger">{{ isValidEmail(userData.email) }}</span>
-      <input
-        v-model="userData.phone"
-        type="text"
-        maxlength="10"
-        class="form-control mb-2"
-        placeholder="電話"
-      />
-      <span class="form text text-danger">{{ isValidPhone(userData.phone) }}</span>
-      <div class="d-flex gap-2 mt-3">
-        <button @click="cancel" class="btn btn-secondary flex-grow-1">取消</button>
-        <button @click="save" class="btn btn-primary flex-grow-1">確定</button>
+    <div v-else>
+      <div class="user-form-grid">
+        <!-- 帳號 -->
+
+        <div class="user-form-group">
+          <label class="user-form-label"> 帳號 </label>
+
+          <input v-model="userData.account" type="text" class="form-control" readonly />
+
+          <p class="user-hint">帳號建立後無法修改</p>
+        </div>
+
+        <!-- 暱稱 -->
+
+        <div class="user-form-group">
+          <label class="user-form-label"> 暱稱 </label>
+
+          <input
+            v-model="userData.username"
+            type="text"
+            class="form-control"
+            placeholder="請輸入暱稱"
+          />
+        </div>
+
+        <!-- Email -->
+
+        <div class="user-form-group">
+          <label class="user-form-label"> Email </label>
+
+          <input
+            v-model="userData.email"
+            type="email"
+            class="form-control"
+            placeholder="請輸入 Email"
+          />
+
+          <span v-if="userData.email" class="validation-error">
+            {{ isValidEmail(userData.email) }}
+          </span>
+        </div>
+
+        <!-- 電話 -->
+
+        <div class="user-form-group">
+          <label class="user-form-label"> 電話 </label>
+
+          <input
+            v-model="userData.phone"
+            type="tel"
+            maxlength="10"
+            class="form-control"
+            placeholder="例如：0912345678"
+          />
+
+          <span v-if="userData.phone" class="validation-error">
+            {{ isValidPhone(userData.phone) }}
+          </span>
+        </div>
+      </div>
+
+      <!-- 編輯按鈕 -->
+
+      <div class="user-actions">
+        <button type="button" class="user-btn user-btn-secondary" @click="cancel">取消</button>
+
+        <button type="button" class="user-btn user-btn-primary" @click="save">儲存變更</button>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+/*
+  AccountCard 專屬樣式。
+  Card / Form / Button / Info Grid
+  已經交給 user-common.css。
+*/
+
+.password-section {
+  width: 100%;
+}
+
+.password-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.password-title {
+  margin: 0 0 5px;
+  color: #222222;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.password-description {
+  margin: 0;
+  color: #888888;
+  font-size: 13px;
+}
+
+.password-form {
+  max-width: 600px;
+  margin-top: 24px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.validation-error {
+  min-height: 16px;
+  color: #dc3545;
+  font-size: 12px;
+}
+
+@media (max-width: 576px) {
+  .password-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .password-header .user-btn {
+    width: 100%;
+  }
+}
+</style>
