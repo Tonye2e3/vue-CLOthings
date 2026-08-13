@@ -1,9 +1,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import axios from 'axios'
+import api from '@/services/api'
 
-const API_BASE = 'https://localhost:7255'
+const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
 const route = useRoute()
 const router = useRouter()
 
@@ -20,7 +20,7 @@ const selectedStatus = ref('public')
 const fetchPost = async () => {
   loading.value = true
   try {
-    const res = await axios.get(`${API_BASE}/api/CommunityPost/${route.params.id}`)
+    const res = await api.get(`/CommunityPost/${route.params.id}`)
     if (!res.data) {
       notFound.value = true
       return
@@ -37,7 +37,7 @@ const fetchPost = async () => {
 
 const fetchComments = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/api/PostComment/post/${route.params.id}`)
+    const res = await api.get(`/PostComment/post/${route.params.id}`)
     comments.value = res.data
   } catch (err) {
     console.error('讀取留言失敗：', err)
@@ -54,7 +54,7 @@ onMounted(() => {
 // 所以這裡照抄 post.value 現有的內容，只換掉 status 這一個欄位。
 const saveStatus = async () => {
   try {
-    await axios.put(`${API_BASE}/api/CommunityPost/${post.value.communityPostId}`, {
+    await api.put(`/CommunityPost/${post.value.communityPostId}`, {
       communityPostId: post.value.communityPostId,
       userId: post.value.userId,
       content: post.value.content,
@@ -81,7 +81,7 @@ const saveStatus = async () => {
 const deleteComment = async (comment) => {
   if (!confirm('確定要刪除這則留言嗎？')) return
   try {
-    await axios.delete(`${API_BASE}/api/PostComment/${comment.postCommentId}`)
+    await api.delete(`/PostComment/${comment.postCommentId}`)
   } catch (err) {
     console.error('刪除留言失敗：', err)
     alert('刪除失敗，請稍後再試一次！')
@@ -95,7 +95,7 @@ const deleteComment = async (comment) => {
 const deletePost = async () => {
   if (!confirm(`確定要刪除貼文編號 #${post.value.communityPostId} 嗎？刪除後資料無法復原，圖片、標記商品、留言等關聯紀錄都會一併刪除。`)) return
   try {
-    await axios.delete(`${API_BASE}/api/CommunityPost/${post.value.communityPostId}`)
+    await api.delete(`/CommunityPost/${post.value.communityPostId}`)
   } catch (err) {
     console.error('刪除貼文失敗：', err)
     alert('刪除失敗，請稍後再試一次！')
@@ -131,7 +131,7 @@ const statusLabel = (status) => {
 
         <!-- 原始貼文資訊（唯讀） -->
         <div class="admin-card">
-          <div class="section-head">貼文主體內容</div>
+          <div class="section-head">📌 貼文主體內容</div>
           <div class="meta-row">
             <div>
               <span class="meta-label">發布使用者</span>
@@ -152,13 +152,13 @@ const statusLabel = (status) => {
 
           <div class="field-label">貼文圖片：</div>
           <div class="image-row">
-            <img v-for="img in post.images" :key="img.postImageId" :src="`${API_BASE}${img.imageFileName}`" alt="貼文圖片" />
+            <img v-for="img in post.images" :key="img.postImageId" :src="`${IMAGE_BASE}${img.imageFileName}`" alt="貼文圖片" />
           </div>
         </div>
 
         <!-- 標記商品 -->
         <div class="admin-card" v-if="post.taggedProducts.length">
-          <div class="section-head section-head-cyan">標記商品</div>
+          <div class="section-head section-head-cyan">🏷 標記商品</div>
           <div>
             <span v-for="t in post.taggedProducts" :key="t.postTaggedProductId" class="tag-chip-big">{{ t.name }}</span>
           </div>
@@ -166,7 +166,7 @@ const statusLabel = (status) => {
 
         <!-- 管理者處置設定 -->
         <div class="admin-card">
-          <div class="section-head section-head-blue">管理者處置設定</div>
+          <div class="section-head section-head-blue">🛠 管理者處置設定</div>
           <label class="field-label">文章顯示狀態 (Status)</label>
           <select v-model="selectedStatus" class="status-select">
             <option value="public">public（公開顯示）</option>
@@ -177,21 +177,21 @@ const statusLabel = (status) => {
             說明：public 為前台正常公開；若有爭議需釐清請設為 check（審核中）；若確認違規請設為 hide（強制下架）。
           </p>
           <div class="admin-actions">
-            <button class="btn-save" @click="saveStatus">儲存變更</button>
-            <button class="btn-delete-big" @click="deletePost">刪除貼文</button>
+            <button class="btn-save" @click="saveStatus">💾 儲存變更</button>
+            <button class="btn-delete-big" @click="deletePost">🗑 刪除貼文</button>
             <router-link to="/admin/community/posts" class="btn-back">返回列表</router-link>
           </div>
         </div>
 
         <!-- 留言管理 -->
         <div class="admin-card">
-          <div class="section-head section-head-dark">貼文留言管理<span class="comment-count">共 {{ comments.length }} 則</span></div>
+          <div class="section-head section-head-dark">💬 貼文留言管理<span class="comment-count">共 {{ comments.length }} 則</span></div>
           <div v-if="!comments.length" class="admin-loading">目前沒有留言。</div>
           <div v-for="c in comments" :key="c.postCommentId" class="comment-row">
             <div class="comment-top">
               <router-link :to="`/community/profile/${c.userId}`">{{ c.user }}</router-link>
               <span class="comment-date">{{ new Date(c.commentDate).toLocaleString('zh-TW') }}</span>
-              <button class="btn-delete-comment" @click="deleteComment(c)">刪除留言</button>
+              <button class="btn-delete-comment" @click="deleteComment(c)">🗑 刪除留言</button>
             </div>
             <div class="comment-text">{{ c.commentText }}</div>
           </div>
@@ -203,7 +203,6 @@ const statusLabel = (status) => {
 </template>
 
 <style scoped>
-@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
 .admin-page{
   width:100%; min-height:100vh;

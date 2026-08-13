@@ -1,8 +1,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
+import api from '@/services/api'
 
-const API_BASE = 'https://localhost:7255'
+const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
 
 // posts：後台要管理的全部貼文，不管 status 是 public、hide 還是 check 都要看得到
 // （跟前台 CommunityView.vue 不一樣，前台通常只給使用者看 public 的）。
@@ -12,7 +12,7 @@ const loading = ref(true)
 const fetchPosts = async () => {
   loading.value = true
   try {
-    const res = await axios.get(`${API_BASE}/api/CommunityPost`)
+    const res = await api.get(`/CommunityPost`)
     posts.value = res.data
   } catch (err) {
     console.error('讀取貼文列表失敗：', err)
@@ -57,7 +57,7 @@ const deletePost = async (post) => {
   if (!confirm(`確定要刪除貼文編號 #${post.communityPostId} 嗎？刪除後資料無法復原，圖片、標記商品、留言等關聯紀錄都會一併刪除。`)) return
 
   try {
-    await axios.delete(`${API_BASE}/api/CommunityPost/${post.communityPostId}`)
+    await api.delete(`/CommunityPost/${post.communityPostId}`)
   } catch (err) {
     console.error('刪除貼文失敗：', err)
     alert('刪除失敗，請稍後再試一次！')
@@ -105,7 +105,7 @@ const deletePost = async (post) => {
               <td>
                 <img
                   v-if="post.images && post.images.length"
-                  :src="`${API_BASE}${post.images[0].imageFileName}`"
+                  :src="`${IMAGE_BASE}${post.images[0].imageFileName}`"
                   class="cell-thumb"
                   alt="貼文圖片"
                 />

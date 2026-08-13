@@ -74,7 +74,6 @@ function logout() {
         <RouterLink
           v-else
           :to="{ name: 'login' }"
-          v-if="!isGroupSection"
           class="icon-btn"
           aria-label="帳號"
         >

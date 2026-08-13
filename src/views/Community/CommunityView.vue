@@ -15,16 +15,40 @@
 // 就可以把這些變數「開放」給別的檔案 import 進去用，
 // 這樣兩個檔案就能共用同一份資料，而不是各自擁有一份自己的假資料。
 // ============================================================
-import { reactive } from 'vue'
-// axios：打 API 用的套件，這個 <script> 區塊要另外自己 import 一次，
-// 跟下面 <script setup> 那個 import axios 是各自獨立的，不會共用。
-import axios from 'axios'
+import { reactive, ref } from 'vue'
+// api：跟其他頁面共用同一個 axios 實例（src/services/api.js），
+// 這個實例會自動把登入後的 JWT token 帶進 Authorization header，
+// 跟直接 import axios from 'axios' 不一樣——那樣打 API 不會帶 token，
+// 登入後也一樣會被 [Authorize] 擋下來（401）。
+import api from '@/services/api'
+// useAuthStore：只「讀」登入狀態（有沒有登入），不會去改動共用的 authStore 本身。
+import { useAuthStore } from '@/stores/auth'
 
-// API_BASE：後端 API 專案的網址，跟下面 <script setup> 用的是同一個。
-const API_BASE = 'https://localhost:7255'
+// currentUserId：目前登入者真正的 userId。authStore 目前沒有存這個欄位
+// （只有 token/name/account/role），所以社群模組自己在這裡補：如果有登入，
+// 就打一次 GET /User/me（這支會從 JWT 解出使用者身份，回傳 userId），
+// 存進這個 ref，不去動共用的 authStore 或 LoginView.vue。
+// 沒登入的人，currentUserId 會維持 null——發文、留言、按讚這些動作原本就會被
+// 後端 [Authorize] 擋掉，所以 null 的情況下這些按鈕本來就打不通，是預期內的。
+export const currentUserId = ref(null)
+export const loadCurrentUserId = async () => {
+  const authStore = useAuthStore()
+  if (!authStore.isLoggedIn) {
+    currentUserId.value = null
+    return
+  }
+  try {
+    const res = await api.get('/User/me')
+    currentUserId.value = res.data.userId
+  } catch (err) {
+    console.error('讀取登入者 userId 失敗：', err)
+  }
+}
 
-// currentTestUserId：先用資料庫裡真的存在的測試帳號 id 頂著，等登入系統做好再換掉。
-const currentTestUserId = 1
+// IMAGE_BASE：圖片是靜態檔案（wwwroot/images/posts/xxx.jpg），走的不是 /api 這條路徑，
+// 不能直接用 api 服務的 baseURL（那個是 https://localhost:7255/api，多了 /api）。
+// 這裡把 VITE_API_URL 尾巴的 /api 拿掉，變成純網域，圖片網址才會組對。
+const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
 
 // reactive() 跟前面看到的 ref() 功能很像，也是讓 Vue 追蹤資料變化、
 // 資料一改畫面就自動更新。差別是 reactive() 通常用在「物件」或「陣列」上，
@@ -176,13 +200,13 @@ export const savedPosts = reactive([])
 // App.vue 或這個頁面掛載時呼叫一次，把 savedPosts 填成資料庫裡真正的收藏清單。
 export const loadSavedPosts = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/api/CommunityFavorite/user/${currentTestUserId}`)
+    const res = await api.get(`/CommunityFavorite/user/${currentUserId.value}`)
     savedPosts.splice(0, savedPosts.length) // 先清空，避免重複呼叫時舊資料疊加
     res.data.forEach(p => {
       savedPosts.push({
         communityPostId: p.communityPostId,
         content: p.content,
-        image: (p.images && p.images.length) ? `${API_BASE}${p.images[0].imageFileName}` : '',
+        image: (p.images && p.images.length) ? `${IMAGE_BASE}${p.images[0].imageFileName}` : '',
         likesCount: p.likesCount,
         commentsCount: p.commentsCount,
         tags: (p.taggedProducts || []).map(t => `#${t.name}`)
@@ -206,8 +230,8 @@ export const toggleSavePost = async (post) => {
   if (idx === -1) {
     // 還沒收藏過 → 打 POST 新增一筆 Community_Favorite 紀錄
     try {
-      await axios.post(`${API_BASE}/api/CommunityFavorite`, {
-        userId: currentTestUserId,
+      await api.post(`/CommunityFavorite`, {
+        userId: currentUserId.value,
         communityPostId: post.communityPostId
       })
     } catch (err) {
@@ -218,9 +242,9 @@ export const toggleSavePost = async (post) => {
   } else {
     // 已經收藏過了 → 先問後端這筆收藏紀錄的 id，再打 DELETE 刪掉
     try {
-      const res = await axios.get(`${API_BASE}/api/CommunityFavorite/post/${post.communityPostId}/user/${currentTestUserId}`)
+      const res = await api.get(`/CommunityFavorite/post/${post.communityPostId}/user/${currentUserId.value}`)
       if (res.data) {
-        await axios.delete(`${API_BASE}/api/CommunityFavorite/${res.data.communityFavoriteId}`)
+        await api.delete(`/CommunityFavorite/${res.data.communityFavoriteId}`)
       }
     } catch (err) {
       console.error('取消收藏失敗：', err)
@@ -238,7 +262,7 @@ export const toggleSavePost = async (post) => {
 import { ref, computed, onMounted, watch } from 'vue'
 
 // posts 已經在上面的 <script> 區塊宣告並 export，這裡同一個檔案內可以直接使用，不用再 import
-// axios、API_BASE 現在也移到上面那個 <script> 區塊宣告了（因為 loadSavedPosts 也需要用到），
+// api、currentUserId、IMAGE_BASE 現在也移到上面那個 <script> 區塊宣告了（因為 loadSavedPosts 也需要用到），
 // 這裡同樣不用再重複 import／宣告一次。
 
 // fetchPosts：向後端要「全部貼文」的資料，成功拿到之後取代掉原本寫死的假資料。
@@ -246,9 +270,9 @@ import { ref, computed, onMounted, watch } from 'vue'
 // （像是打 API 這種要等網路回應的操作）完成，再繼續往下執行，而不會卡住整個網頁。
 const fetchPosts = async () => {
   try {
-    // axios.get(網址)：對這個網址發送 GET 請求。
+    // api.get(網址)：對這個網址發送 GET 請求。
     // await：先暫停在這一行，等 API 真的回應了，才把結果存進 res，再往下執行。
-    const res = await axios.get(`${API_BASE}/api/CommunityPost`)
+    const res = await api.get(`/CommunityPost`)
 
     // res.data：axios 已經把後端回傳的 JSON 自動轉換成 JavaScript 的陣列／物件了，
     // 這裡直接可以用 .map(...) 這種陣列方法，不用自己再解析一次字串。
@@ -268,9 +292,9 @@ const fetchPosts = async () => {
         imageFileName: img.imageFileName,
         sortOrder: img.sortOrder,
         // imageFileName 本身已經帶路徑了（例如 "/images/posts/post01_1.jpg"），
-        // 不是單純的檔名，所以這裡直接接在 API_BASE 後面就好，
+        // 不是單純的檔名，所以這裡直接接在 IMAGE_BASE 後面就好，
         // 不用再自己加一段 /uploads/ 進去（之前那樣寫網址會多一層、變成錯的路徑）。
-        url: `${API_BASE}${img.imageFileName}`
+        url: `${IMAGE_BASE}${img.imageFileName}`
       })),
       likesCount: p.likesCount,
       commentsCount: p.commentsCount,
@@ -292,9 +316,13 @@ const fetchPosts = async () => {
 
 // onMounted：Vue 的生命週期鉤子，代表「這個元件的畫面第一次被畫出來、掛載到網頁上之後」
 // 要執行的動作。在這裡呼叫 fetchPosts，就是「頁面一打開，就馬上去後端要最新的貼文資料」。
-// 同時也呼叫 loadSavedPosts，把這個使用者收藏過的貼文清單一起讀回來。
-onMounted(() => {
+// fetchPosts 跟登入者是誰無關，可以直接平行呼叫；
+// loadSavedPosts、fetchCreators 都需要用到 currentUserId.value（收藏清單、追蹤狀態
+// 都是跟「我」綁定的），所以要先 await loadCurrentUserId() 確定 currentUserId 有值
+// 之後才呼叫，不然會在 currentUserId 還是 null 的時候就打出去，查到不對的資料。
+onMounted(async () => {
   fetchPosts()
+  await loadCurrentUserId()
   loadSavedPosts()
   fetchCreators()
 })
@@ -332,8 +360,8 @@ const creators = ref([])
 // 打的是 UserFollowController.cs 裡的 GET api/UserFollow/popular-creators。
 const fetchCreators = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/api/UserFollow/popular-creators`, {
-      params: { take: 3, followerId: currentTestUserId }
+    const res = await api.get(`/UserFollow/popular-creators`, {
+      params: { take: 3, followerId: currentUserId.value }
     })
     creators.value = res.data.map(c => ({
       id: c.userId, // 這個 id 現在是真的 userId，不再是這份清單自己編的假號碼了
@@ -483,7 +511,7 @@ watch([currentTab, searchQuery], () => {
 const toggleFollow = async (creator) => {
   if (creator.isFollowing) {
     try {
-      await axios.delete(`${API_BASE}/api/UserFollow/${creator.userFollowId}`)
+      await api.delete(`/UserFollow/${creator.userFollowId}`)
     } catch (err) {
       console.error('取消追蹤失敗：', err)
       return
@@ -492,8 +520,8 @@ const toggleFollow = async (creator) => {
     creator.userFollowId = null
   } else {
     try {
-      await axios.post(`${API_BASE}/api/UserFollow`, {
-        followerId: currentTestUserId,
+      await api.post(`/UserFollow`, {
+        followerId: currentUserId.value,
         followingId: creator.id
       })
     } catch (err) {
@@ -503,7 +531,7 @@ const toggleFollow = async (creator) => {
     creator.isFollowing = true
     // POST 沒有回傳新建紀錄的 id，重新問一次這位使用者的追蹤狀態，拿到真正的 userFollowId。
     try {
-      const statusRes = await axios.get(`${API_BASE}/api/UserFollow/follower/${currentTestUserId}/following/${creator.id}`)
+      const statusRes = await api.get(`/UserFollow/follower/${currentUserId.value}/following/${creator.id}`)
       creator.userFollowId = statusRes.data ? statusRes.data.userFollowId : null
     } catch (err) {
       console.error('讀取追蹤狀態失敗：', err)
