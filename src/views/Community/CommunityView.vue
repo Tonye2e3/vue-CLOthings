@@ -261,6 +261,10 @@ export const toggleSavePost = async (post) => {
 // ============================================================
 import { ref, computed, onMounted, watch } from 'vue'
 
+// authStore：只用來讀 isAdmin，決定要不要顯示「管理後台」入口按鈕。
+// useAuthStore 已經在上面那個 <script>（非 setup）區塊 import 過了，這裡直接呼叫就好。
+const authStore = useAuthStore()
+
 // posts 已經在上面的 <script> 區塊宣告並 export，這裡同一個檔案內可以直接使用，不用再 import
 // api、currentUserId、IMAGE_BASE 現在也移到上面那個 <script> 區塊宣告了（因為 loadSavedPosts 也需要用到），
 // 這裡同樣不用再重複 import／宣告一次。
@@ -611,9 +615,18 @@ const toggleFollow = async (creator) => {
           >追蹤中</button>
         </div>
 
-        <router-link to="/community/create" class="btn-share text-decoration-none">
-          ＋ 分享我的穿搭
-        </router-link>
+        <div class="d-flex align-items-center gap-2">
+          <!-- 管理後台入口：只有登入者是管理員才會出現。放在這裡（社群首頁）是因為
+               管理員帳號沒有自己的個人頁可以放這顆按鈕，但每個登入的人本來就會經過這頁。 -->
+          <router-link
+            v-if="authStore.isAdmin"
+            to="/admin/community/posts"
+            class="btn-admin-entry text-decoration-none"
+          >🛠 管理後台</router-link>
+          <router-link to="/community/create" class="btn-share text-decoration-none">
+            ＋ 分享我的穿搭
+          </router-link>
+        </div>
       </div>
 
       <!-- 主要內容區 -->
@@ -889,6 +902,14 @@ const toggleFollow = async (creator) => {
   transition:background .18s ease, transform .18s ease;
 }
 .btn-share:hover{ background:var(--plum-deep); transform:translateY(-1px); }
+
+.btn-admin-entry{
+  background:var(--ochre); color:#fff !important; border:none;
+  border-radius:999px; padding:.6rem 1.2rem; font-size:.88rem; font-weight:600;
+  display:inline-flex; align-items:center; gap:.4rem;
+  transition:opacity .18s ease;
+}
+.btn-admin-entry:hover{ opacity:.85; }
 
 /* ---------- 封面故事卡 ---------- */
 .feature-card{

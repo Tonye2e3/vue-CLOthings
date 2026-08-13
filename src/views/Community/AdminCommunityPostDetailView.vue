@@ -2,6 +2,9 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
 
 const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
 const route = useRoute()
@@ -44,7 +47,13 @@ const fetchComments = async () => {
   }
 }
 
+// 只有登入者是管理員才能看這頁，檢查完全寫在這個檔案自己裡面，不用改共用的 router-index.js。
 onMounted(() => {
+  if (!authStore.isLoggedIn || !authStore.isAdmin) {
+    alert('您沒有執行此操作的權限')
+    router.push('/')
+    return
+  }
   fetchPost()
   fetchComments()
 })

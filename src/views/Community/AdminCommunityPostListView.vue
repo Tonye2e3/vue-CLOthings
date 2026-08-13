@@ -1,6 +1,11 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import api from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
+
+const authStore = useAuthStore()
+const router = useRouter()
 
 const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
 
@@ -21,7 +26,16 @@ const fetchPosts = async () => {
   }
 }
 
-onMounted(fetchPosts)
+// 只有登入者是管理員才能看這頁，這個檢查完全寫在這個檔案自己裡面，
+// 不用改共用的 router-index.js（那個全域守衛之後要不要加，等問過隊友再說）。
+onMounted(() => {
+  if (!authStore.isLoggedIn || !authStore.isAdmin) {
+    alert('您沒有執行此操作的權限')
+    router.push('/')
+    return
+  }
+  fetchPosts()
+})
 
 // 分頁：跟 CommunityView.vue 的「載入更多」不同，這裡是傳統的頁碼分頁，
 // 跟你原本 MVC 後台的呈現方式一樣。

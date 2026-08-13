@@ -245,6 +245,7 @@ onMounted(async () => {
   fetchUserPosts()
   loadSavedPosts()
   fetchFollowCounts()
+  fetchPublicProfile()
   // await loadCurrentUserId()：這頁可能是使用者直接連進來的（沒先經過 CommunityView.vue），
   // currentUserId 這時候還是 null，要先確定拿到真正的 userId，下面比對
   // 「瀏覽的是不是自己」才會準——不然沒登入或還沒查完時，currentUserId.value 是 null，
@@ -262,6 +263,7 @@ onMounted(async () => {
 watch(() => route.params.userId, () => {
   fetchUserPosts()
   fetchFollowCounts()
+  fetchPublicProfile()
   if (viewedUserId.value !== currentUserId.value) {
     fetchFollowStatus()
   } else {
@@ -288,6 +290,21 @@ const myFollowId = ref(null)
 // 打的是 UserFollowController.cs 裡的 GET api/UserFollow/follower/{followerid}/following/{followingid}。
 // fetchFollowCounts：跟後端要「這個人的粉絲數／追蹤中數」，
 // 打的是 UserFollowController.cs 裡的 GET api/UserFollow/counts/{userid}。
+// fetchPublicProfile：跟後端要「這個人的公開基本資料」（暱稱、帳號、大頭貼、風格標籤、自我介紹），
+// 打的是 PublicUserProfileController.cs 裡的 GET api/PublicUserProfile/{userid}。
+const fetchPublicProfile = async () => {
+  try {
+    const res = await api.get(`/PublicUserProfile/${viewedUserId.value}`)
+    userProfile.value.name = res.data.username
+    userProfile.value.handle = `@${res.data.account}`
+    userProfile.value.avatar = res.data.avatar || userProfile.value.avatar
+    userProfile.value.bioTag = res.data.styleTag || ''
+    userProfile.value.bio = res.data.intro || ''
+  } catch (err) {
+    console.error('讀取公開個人資料失敗：', err)
+  }
+}
+
 const fetchFollowCounts = async () => {
   try {
     const res = await api.get(`/UserFollow/counts/${viewedUserId.value}`)
