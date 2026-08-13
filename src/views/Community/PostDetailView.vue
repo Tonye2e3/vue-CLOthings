@@ -255,10 +255,6 @@ const toggleSave = () => {
 // 「這套穿搭的商品」右側清單：直接用 post.taggedProducts（貼文作者真的搜尋、勾選過的商品），
 // 不再是另一份跟這篇貼文毫不相干的假資料。這樣畫面上只會出現作者自己標記過的東西，
 // 不會出現「使用者身上每一件都被當成我們家商品在賣」這種狀況。
-// totalTaggedPrice：把這篇貼文標記的所有商品價格加總，給「一鍵購買全套穿搭」按鈕顯示用。
-const totalTaggedPrice = computed(() =>
-  post.value.taggedProducts.reduce((sum, t) => sum + (t.price || 0), 0)
-)
 
 // 相似穿搭推薦：跟這篇貼文標記過同一個商品的其他貼文，先給空陣列，
 // 等 fetchSimilarPosts() 打完 API 才會有真正資料庫裡的貼文。
@@ -625,13 +621,13 @@ const addComment = async () => {
             <div class="product-list">
               <div v-for="item in post.taggedProducts" :key="item.postTaggedProductId" class="product-row">
                 <!--
-                  product-link：之後 productRoute 是真的商品頁網址時，可以換回
-                  <a :href="item.productRoute">，現在先用 <div> 不會跳轉。
+                  product-link：現在商品詳情頁路由確定是 /shop/product/:id 了，
+                  改回真正的 router-link，點圖片或名稱都會跳過去那件商品的頁面。
                   圖片是後端 TaggedProductDTO.Image 帶回來的檔名，實際檔案放在
                   wwwroot/images/product/ 底下，所以組網址要多接這段路徑，
                   跟貼文照片（wwwroot/images/posts/）用的資料夾不一樣。
                 -->
-                <div class="product-link">
+                <router-link :to="`/shop/product/${item.productId}`" class="product-link">
                   <img
                     v-if="item.image"
                     :src="`${IMAGE_BASE}/images/product/${item.image}`"
@@ -642,14 +638,9 @@ const addComment = async () => {
                     <p class="product-name">{{ item.name }}</p>
                     <p class="product-price">NT$ {{ item.price }}</p>
                   </div>
-                </div>
-                <button class="btn-cart">加入購物車</button>
+                </router-link>
               </div>
             </div>
-
-            <button class="btn-buy-all">
-              一鍵購買全套穿搭 · NT$ {{ totalTaggedPrice.toLocaleString() }}
-            </button>
           </div>
 
           <!-- 相似穿搭推薦：跟這篇貼文標記過同一個商品的其他貼文，點縮圖可以直接跳過去那篇貼文 -->
@@ -942,9 +933,9 @@ const addComment = async () => {
   padding:.55rem;
 }
 /*
-  product-link 把圖片跟文字包在一起排成一列（目前是 <div>，不是連結，
-  這幾行 color/text-decoration 先留著，之後如果換回 <a> 標籤，
-  樣式不用再調）；flex:1 讓它撐滿按鈕以外的空間，min-width:0 避免文字太長把版面撐壞。
+  product-link 把圖片跟文字包在一起排成一列，現在是真的 router-link（會跳轉到
+  /shop/product/:id），color/text-decoration 這兩行是為了讓連結看起來不像連結
+  （不變色、不加底線），維持跟其他文字一樣的視覺樣式。
 */
 .product-link{
   display:flex; align-items:center; gap:.7rem;
@@ -959,24 +950,6 @@ const addComment = async () => {
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .product-price{ font-size:.8rem; color:var(--ochre); font-weight:600; margin:0; }
-.btn-cart{
-  background:transparent; color:var(--ink);
-  border:1px solid var(--ink); border-radius:4px;
-  padding:.35rem .8rem; font-size:.74rem; white-space:nowrap;
-  transition:all .18s ease;
-  flex-shrink:0;
-}
-.btn-cart:hover{ background:var(--ink); color:var(--paper); }
-
-.btn-buy-all{
-  width:100%;
-  background:var(--ink); color:var(--paper);
-  border:none; border-radius:4px;
-  padding:.75rem; font-size:.88rem; font-weight:600;
-  transition:background .18s ease;
-}
-.btn-buy-all:hover{ background:var(--plum-deep); }
-
 .similar-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:.6rem; }
 .similar-thumb{
   display:block;
