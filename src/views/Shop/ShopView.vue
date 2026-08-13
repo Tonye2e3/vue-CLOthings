@@ -8,7 +8,6 @@ import CategoryShowcase from '@/components/home/CategoryShowcase.vue'
   <div class="uniqlo-home">
     <main>
       <HeroCarousel />
-      <CategoryShowcase />
       <ProductGrid />
     </main>
   </div>
