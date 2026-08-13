@@ -12,11 +12,18 @@ const favoriteStore = useFavoriteStore()
 const route = useRoute()
 const API_BASE = 'https://localhost:7255'
 
+function getImageUrl(fileName) {
+  if (!fileName) {
+    return 'https://placehold.co/300x400?text=No+Image'
+  }
+  return `${API_BASE}/images/product/${fileName}`
+}
+
 // 預覽圖區的假資料，之後用API抓
 const product = ref(null)
 
 // 按鈕區，user「目前選擇」的狀態
-const currentImage = ref(product.value.mainImage) //主圖的啦
+const currentImage = ref('') //主圖的啦
 const selectedColor = ref(null) //預設沒選顏色
 const selectedSize = ref(null) //預設沒選尺寸
 
@@ -36,6 +43,11 @@ onMounted(async () => {
     const id = route.params.id // 從網址拿 id（例如 /shop/product/5 → "5"）
     const response = await axios.get(`${API_BASE}/api/product/${id}`)
     product.value = response.data
+    // 資料來了之後，才設定主圖（用 images 的第一張）
+    if (product.value.images && product.value.images.length > 0) {
+      currentImage.value = getImageUrl(product.value.images[0])
+    }
+
     console.log('拿到的商品：', response.data) // 暫時看，測完刪
   } catch (error) {
     console.error('載入商品失敗：', error)
@@ -51,11 +63,11 @@ function toggleFavorite() {
   favoriteStore.toggleFavorite({
     productSpecificationId: selectedSpec.value.productSpecificationId,
     productId: product.value.productId,
-    productName: product.value.name,
+    productName: product.value.productName,
     price: product.value.price,
     color: selectedSpec.value.color,
     size: selectedSpec.value.size,
-    image: product.value.mainImage,
+    image: currentImage.value,
   })
 }
 
@@ -70,11 +82,11 @@ function addToCart() {
   cartStore.addItem({
     productSpecificationId: selectedSpec.value.productSpecificationId, // ★ 關鍵：帶正確的規格 id
     productId: product.value.productId,
-    productName: product.value.name,
+    productName: product.value.productName,
     price: product.value.price,
     color: selectedSpec.value.color,
     size: selectedSpec.value.size,
-    image: product.value.mainImage,
+    image: currentImage.value,
     quantity: 1,
     selected: true,
   })
@@ -98,12 +110,14 @@ function buyNow() {
 
 // 從規格組合中，取出所有「不重複的顏色」
 const colorOptions = computed(() => {
+  if (!product.value) return []
   const colors = product.value.specifications.map((spec) => spec.color)
   return [...new Set(colors)] // 去除重複
 })
 
 // 從規格組合中，取出所有「不重複的尺寸」
 const sizeOptions = computed(() => {
+  if (!product.value) return []
   const sizes = product.value.specifications.map((spec) => spec.size)
   return [...new Set(sizes)]
 })
@@ -138,13 +152,13 @@ const selectedSpec = computed(() => {
         <!-- 小圖列表，點擊切換大圖 -->
         <div class="gallery-smallpics">
           <button
-            v-for="(smallpic, index) in product.smallpics"
+            v-for="(img, index) in product.images"
             :key="index"
             class="smallpic-btn"
-            :class="{ active: currentImage === smallpic }"
-            @click="currentImage = smallpic"
+            :class="{ active: currentImage === getImageUrl(img) }"
+            @click="currentImage = getImageUrl(img)"
           >
-            <img :src="smallpic" alt="商品縮圖" />
+            <img :src="getImageUrl(img)" alt="商品縮圖" />
           </button>
         </div>
       </div>
@@ -152,17 +166,17 @@ const selectedSpec = computed(() => {
       <div class="product-info">
         <h1 class="info-title">商品資訊</h1>
 
-        <h2 class="info-name">{{ product.productName }} ｜ {{ product.subtitle }}</h2>
+        <h2 class="info-name">{{ product.productName }}</h2>
 
         <p class="info-meta">
           顏色：{{ selectedColor ?? '尚未選擇' }} / 尺寸：{{ selectedSize ?? '尚未選擇' }}
         </p>
 
-        <div class="info-tags">
+        <!-- <div class="info-tags">
           <span v-for="tag in product.tags" :key="tag" class="tag-badge">
             {{ tag }}
           </span>
-        </div>
+        </div> -->
         <p class="info-price">價格：NT$ {{ product.price.toLocaleString() }}</p>
 
         <!-- 按鈕區域，選顏色 -->
@@ -197,9 +211,6 @@ const selectedSpec = computed(() => {
           </div>
           <p class="option-hint">建議尺寸：M（依版型微修身）</p>
         </div>
-
-        <!-- ⚠️ 測試用，看反查有沒有成功，測完刪 -->
-        <p class="text-muted" style="font-size: 0.8rem">🧪 目前選中的規格：{{ selectedSpec }}</p>
 
         <!-- 按鈕區域，收藏、立即購買、加入購物車 -->
         <div class="action-buttons">
