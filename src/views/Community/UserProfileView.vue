@@ -97,7 +97,10 @@ const fetchUserPosts = async () => {
       images: post.images || [],
       likesCount: post.likesCount,
       commentsCount: post.commentsCount,
-      tags: post.taggedProducts.map(t => `#${t.name}`)
+      tags: post.taggedProducts.map(t => `#${t.name}`),
+      // taggedProducts：保留完整的原始標記商品清單（不是只有格式化過的 #名稱 字串），
+      // 編輯貼文改標記商品時要用到，卡片本身顯示還是繼續用上面那個 tags 就好。
+      taggedProducts: post.taggedProducts || []
     }))
     // 貼文數：直接用剛剛抓回來的貼文數量就好，不用另外多打一支 API 算，
     // 跟 CommunityPostController.cs 裡 LikesCount／CommentsCount 用 .Count() 算的道理一樣，
@@ -132,18 +135,56 @@ const deletePost = async (communityPostId) => {
 // 這樣才知道要在「哪一張」卡片底下顯示編輯表單。
 const editingPostId = ref(null)
 
+// availableProducts：可標記的商品清單，跟 CreatePostView.vue 是同一套邏輯，
+// 先給空陣列，等 fetchProducts() 打完 API 才會有真正資料庫裡的商品。
+const availableProducts = ref([])
+const fetchProducts = async () => {
+  try {
+    const res = await api.get('/Product')
+    availableProducts.value = res.data.map(p => ({
+      productId: p.productId,
+      name: p.productName
+    }))
+  } catch (err) {
+    console.error('讀取商品清單失敗：', err)
+  }
+}
+
+// productSearch：編輯表單裡「標記標籤商品」搜尋框打的文字。
+// 因為同一時間只會有一張卡片在編輯模式，全頁共用一份搜尋狀態就夠了。
+const productSearch = ref('')
+const filteredProducts = computed(() => {
+  const q = productSearch.value.trim().toLowerCase()
+  if (!q) return availableProducts.value
+  return availableProducts.value.filter(p => p.name.toLowerCase().includes(q))
+})
+
+// toggleEditProduct：點某個商品標籤時執行，已選就取消、未選就加入，跟
+// CreatePostView.vue 的 toggleProduct 是同一套邏輯，只是改在編輯表單上操作。
+const toggleEditProduct = (name) => {
+  const list = editForm.value.taggedProducts
+  const idx = list.indexOf(name)
+  if (idx === -1) {
+    list.push(name)
+  } else {
+    list.splice(idx, 1)
+  }
+}
+
 // editForm：編輯表單目前打的內容，對應 CommunityPostController.cs 的
-// PutCommunityPost 能改的欄位：content、status、images。
+// PutCommunityPost 能改的欄位：content、status、images、taggedProducts。
 // images 陣列裡每一筆是 { imageFileName, sortOrder, url, isNew }：
 // isNew 是 false 代表這張是「本來就有」的舊照片（imageFileName 是資料庫裡真的路徑）；
 // isNew 是 true 代表這張是「這次新選的」照片（imageFileName 先用檔案原始名稱佔位，
 // 等圖片上傳功能做好再換成真正存到伺服器後的路徑，跟 CreatePostView.vue 現在的做法一樣）。
-const editForm = ref({ content: '', status: 'public', images: [] })
+// taggedProducts 是商品名稱的字串陣列（跟 CreatePostView.vue 的 selectedProducts 同一種格式）。
+const editForm = ref({ content: '', status: 'public', images: [], taggedProducts: [] })
 
 // startEdit：按下「編輯貼文」時執行，把表單內容預先填成這篇貼文現在的資料，
 // 並把 editingPostId 設成這篇貼文的 id，畫面上就會展開編輯表單。
 const startEdit = (post) => {
   editingPostId.value = post.communityPostId
+  productSearch.value = '' // 每次打開編輯表單，搜尋框重設乾淨
   editForm.value = {
     content: post.content,
     status: post.status || 'public',
@@ -152,7 +193,8 @@ const startEdit = (post) => {
       sortOrder: img.sortOrder,
       url: `${IMAGE_BASE}${img.imageFileName}`,
       isNew: false
-    }))
+    })),
+    taggedProducts: (post.taggedProducts || []).map(t => t.name)
   }
 }
 
@@ -215,13 +257,25 @@ const saveEdit = async (post) => {
     sortOrder: idx + 1
   }))
 
+  // 把選中的商品名稱陣列，轉換成對應 Post_Tagged_Product 格式的物件陣列，
+  // 用 availableProducts.find(...) 找回這個名字對應的 productId，
+  // 跟 CreatePostView.vue 組 taggedProducts 的方式完全一樣。
+  const taggedProducts = editForm.value.taggedProducts.map(name => {
+    const matched = availableProducts.value.find(p => p.name === name)
+    return {
+      productId: matched ? matched.productId : null,
+      productRoute: null
+    }
+  })
+
   try {
     await api.put(`/CommunityPost/${post.communityPostId}`, {
       communityPostId: post.communityPostId,
       userId: post.userId,
       content: editForm.value.content,
       status: editForm.value.status,
-      images
+      images,
+      taggedProducts
     })
   } catch (err) {
     console.error('編輯貼文失敗：', err)
@@ -234,6 +288,13 @@ const saveEdit = async (post) => {
   post.status = editForm.value.status
   post.images = images
   post.image = images.length > 0 ? `${IMAGE_BASE}${images[0].imageFileName}` : ''
+  // 標記商品也要跟著更新畫面：tags（給卡片顯示用的 #名稱 字串）跟
+  // taggedProducts（保留原始格式，下次再編輯時要用）都要同步。
+  post.tags = editForm.value.taggedProducts.map(name => `#${name}`)
+  post.taggedProducts = editForm.value.taggedProducts.map(name => {
+    const matched = availableProducts.value.find(p => p.name === name)
+    return { name, productId: matched ? matched.productId : null, productRoute: null }
+  })
   editingPostId.value = null
 }
 
@@ -246,6 +307,7 @@ onMounted(async () => {
   loadSavedPosts()
   fetchFollowCounts()
   fetchPublicProfile()
+  fetchProducts() // 編輯貼文表單要用到，只有看自己的頁面才用得上，但先載入沒關係
   // await loadCurrentUserId()：這頁可能是使用者直接連進來的（沒先經過 CommunityView.vue），
   // currentUserId 這時候還是 null，要先確定拿到真正的 userId，下面比對
   // 「瀏覽的是不是自己」才會準——不然沒登入或還沒查完時，currentUserId.value 是 null，
@@ -515,6 +577,16 @@ const toggleFollow = async () => {
               這裡顯示的時候想拿掉 #。
             -->
             <span class="tag-label" v-if="post.tags[0]">{{ post.tags[0].replace('#', '') }}</span>
+            <!--
+              狀態徽章：只有在「看自己的頁面」才顯示——因為別人看不到你 hide/check 狀態的貼文
+              （後端已經擋掉了，別人的 userPosts 裡本來就不會有這些），所以這個徽章對別人來說
+              永遠不會出現，只有本人才看得到自己貼文目前是公開／隱藏／審核中。
+            -->
+            <span
+              v-if="viewedUserId === currentUserId && post.status !== 'public'"
+              class="post-status-badge"
+              :class="post.status === 'hide' ? 'badge-hide' : 'badge-check'"
+            >{{ post.status === 'hide' ? '隱藏' : '審核中' }}</span>
             <img :src="post.image" :alt="post.content" />
           </router-link>
 
@@ -565,6 +637,42 @@ const toggleFollow = async () => {
                 <p class="edit-photo-hint">
                   第一張會作為封面
                 </p>
+
+                <!-- 標記標籤商品：跟 CreatePostView.vue 是同一套搜尋/選取邏輯，只是改在編輯表單上操作 -->
+                <label class="edit-field-label">標記標籤商品</label>
+                <div class="edit-search-bar">
+                  <input
+                    type="text"
+                    v-model="productSearch"
+                    class="edit-search-input"
+                    placeholder="輸入商品名稱搜尋，例如：牛仔褲"
+                  />
+                  <button
+                    v-if="productSearch"
+                    type="button"
+                    class="edit-search-clear"
+                    @click="productSearch = ''"
+                  >✕</button>
+                </div>
+                <div class="tag-cloud">
+                  <button
+                    v-for="product in filteredProducts"
+                    :key="product.productId"
+                    type="button"
+                    class="tag-chip selectable"
+                    :class="{ active: editForm.taggedProducts.includes(product.name) }"
+                    @click="toggleEditProduct(product.name)"
+                  >#{{ product.name }}</button>
+                  <span v-if="filteredProducts.length === 0" class="tag-empty">
+                    找不到符合「{{ productSearch }}」的商品
+                  </span>
+                </div>
+                <div class="tag-preview" v-if="editForm.taggedProducts.length">
+                  <span v-for="name in editForm.taggedProducts" :key="name" class="tag-chip selected-chip">
+                    #{{ name }}
+                    <button type="button" class="chip-remove" @click="toggleEditProduct(name)">✕</button>
+                  </span>
+                </div>
 
                 <div class="edit-visibility">
                   <label><input type="radio" v-model="editForm.status" value="public" /> 公開</label>
@@ -822,6 +930,15 @@ const toggleFollow = async () => {
   border-color:transparent var(--plum-deep) transparent transparent;
 }
 
+.post-status-badge{
+  position:absolute; top:12px; right:12px; z-index:2;
+  color:#fff; font-size:.68rem; font-weight:700;
+  padding:.26rem .7rem; border-radius:999px;
+  box-shadow:0 2px 6px rgba(0,0,0,.2);
+}
+.post-status-badge.badge-hide{ background:var(--ink-soft); }
+.post-status-badge.badge-check{ background:var(--ochre); }
+
 .post-body{ padding:.95rem 1rem 1.1rem; }
 .post-title{
   font-family:'Noto Serif TC', serif;
@@ -901,6 +1018,33 @@ const toggleFollow = async () => {
 }
 .edit-thumb-add:hover{ border-color:var(--plum); color:var(--plum); }
 .edit-photo-hint{ font-size:.72rem; color:var(--ink-soft); margin:0; }
+
+.edit-field-label{ font-size:.8rem; font-weight:700; color:var(--ink); }
+.edit-search-bar{
+  display:flex; align-items:center; gap:.4rem;
+  border:1px solid var(--hairline); border-radius:4px;
+  padding:.4rem .7rem; background:var(--paper);
+}
+.edit-search-input{
+  flex:1; border:none; outline:none; font-size:.82rem; color:var(--ink); background:transparent;
+}
+.edit-search-clear{ background:none; border:none; color:var(--ink-soft); font-size:.75rem; }
+
+.tag-chip.selectable{
+  background:var(--paper); border:1px solid var(--hairline); color:var(--ink);
+  cursor:pointer; transition:all .18s ease;
+}
+.tag-chip.selectable:hover{ border-color:var(--plum); color:var(--plum); }
+.tag-chip.selectable.active{ background:var(--plum); border-color:var(--plum); color:#fff; }
+.tag-empty{ font-size:.76rem; color:var(--ink-soft); }
+
+.tag-preview{ display:flex; flex-wrap:wrap; gap:.4rem; }
+.tag-chip.selected-chip{
+  background:var(--plum); border:1px solid var(--plum); color:#fff;
+  display:inline-flex; align-items:center; gap:.35rem;
+}
+.chip-remove{ background:none; border:none; color:#fff; font-size:.68rem; line-height:1; opacity:.8; }
+.chip-remove:hover{ opacity:1; }
 .btn-cancel-edit{
   flex:1;
   background:transparent; color:var(--ink-soft);
