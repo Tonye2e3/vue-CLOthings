@@ -2,7 +2,7 @@
 import AccountCard from './UserCard/AccountCard.vue'
 import AddressCard from './UserCard/AddressCard.vue'
 import ProfileCard from './UserCard/ProfileCard.vue'
-import oAuthCard from './UserCard/OAuthCard.vue'
+import oAuthCard from './UserCard/oAuthCard.vue'
 
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
@@ -50,10 +50,12 @@ function logout() {
 
 .sidebar {
   position: fixed;
-  top: 100px; /* 可依實際 header 高度調整 */
+  top: 100px;
+  /* 可依實際 header 高度調整 */
   left: 350px;
   width: 160px;
-  height: 50%; /* 設定高度為 100% 以填滿整個視窗高度 */
+  height: 50%;
+  /* 設定高度為 100% 以填滿整個視窗高度 */
   padding: 20px;
   background-color: rgb(255, 255, 254);
   border: 1px solid #ccc;

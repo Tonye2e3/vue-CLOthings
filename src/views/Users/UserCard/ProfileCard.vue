@@ -2,6 +2,26 @@
 import { ref, reactive, onMounted } from 'vue'
 import api from '@/services/api'
 
+//取得頭像位置
+const apiBaseUrl = 'https://localhost:7255'
+function getAvatarUrl() {
+  if (!profileData.avatar) {
+    return ''
+  }
+
+  return `${apiBaseUrl}${profileData.avatar}`
+}
+
+function getEditingAvatarUrl() {
+  // 有選擇新頭像 → 顯示預覽
+  if (avatarPreviewUrl.value) {
+    return avatarPreviewUrl.value
+  }
+
+  // 沒有選新頭像 → 顯示原本頭像
+  return getAvatarUrl()
+}
+
 const profileData = reactive({
   firstName: '',
   lastName: '',
@@ -28,6 +48,11 @@ onMounted(() => {
 
 const backupData = reactive({}) // 暫存備份
 const isEditing = ref(false)
+// 暫存使用者新選擇的頭像檔案
+const selectedAvatarFile = ref(null)
+
+// 新頭像的前端預覽網址
+const avatarPreviewUrl = ref('')
 
 // 進入編輯模式
 const toggleEdit = () => {
@@ -37,22 +62,49 @@ const toggleEdit = () => {
 
 // 儲存
 const save = async () => {
-  const data = {
-    firstName: profileData.firstName,
-    lastName: profileData.lastName,
-    avatar: profileData.avatar || null,
-    gender: profileData.gender || null,
-    birthday: profileData.birthday || null,
-    styleTag: profileData.styleTag || null,
-    intro: profileData.intro || null,
-  }
-
   try {
+    // 1. 如果使用者有選擇新頭像
+    if (selectedAvatarFile.value) {
+      const formData = new FormData()
+
+      formData.append('file', selectedAvatarFile.value)
+
+      // 上傳頭像
+      const resp = await api.post(
+        '/UserProfile/me/avatar',
+        formData
+      )
+
+      // 更新後端回傳的頭像路徑
+      profileData.avatar = resp.data.avatar
+    }
+
+    // 2. 準備個人資料
+    const data = {
+      firstName: profileData.firstName,
+      lastName: profileData.lastName,
+      avatar: profileData.avatar || null,
+      gender: profileData.gender || null,
+      birthday: profileData.birthday || null,
+      styleTag: profileData.styleTag || null,
+      intro: profileData.intro || null,
+    }
+
+    // 3. 更新個人資料
     await api.put('/UserProfile/me', data)
+
+    // 4. 清除頭像暫存
+    selectedAvatarFile.value = null
+
+    if (avatarPreviewUrl.value) {
+      URL.revokeObjectURL(avatarPreviewUrl.value)
+      avatarPreviewUrl.value = ''
+    }
 
     alert('個人資料修改成功')
 
     isEditing.value = false
+
   } catch (error) {
     console.error('修改個人資料失敗：', error)
     alert('個人資料修改失敗')
@@ -61,20 +113,40 @@ const save = async () => {
 
 // 取消 → 還原備份
 const cancel = () => {
+  // 還原進入編輯前的資料
   Object.assign(profileData, backupData)
+
+  // 清除剛剛選擇但尚未上傳的圖片
+  selectedAvatarFile.value = null
+
+  // 清除瀏覽器產生的預覽網址
+  if (avatarPreviewUrl.value) {
+    URL.revokeObjectURL(avatarPreviewUrl.value)
+    avatarPreviewUrl.value = ''
+  }
+
   isEditing.value = false
 }
 
 // 處理頭像上傳
-const handleAvatarChange = (event) => {
+const handleAvatarChange = async (event) => {
   const file = event.target.files[0]
-  if (file) {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      profileData.avatar = e.target.result
-    }
-    reader.readAsDataURL(file)
+
+  if (!file) {
+    return
   }
+
+  // 暫存使用者選擇的檔案
+  selectedAvatarFile.value = file
+
+  // 如果之前已經產生過預覽 URL，先釋放
+  if (avatarPreviewUrl.value) {
+    URL.revokeObjectURL(avatarPreviewUrl.value)
+  }
+
+  // 產生本機預覽網址
+  avatarPreviewUrl.value = URL.createObjectURL(file)
+
 }
 </script>
 
@@ -100,13 +172,7 @@ const handleAvatarChange = (event) => {
 
       <p><strong>自我介紹：</strong>{{ profileData.intro }}</p>
       <div v-if="profileData.avatar" class="text-center mt-3">
-        <img
-          :src="profileData.avatar"
-          alt="大頭貼"
-          class="rounded-circle border"
-          width="120"
-          height="120"
-        />
+        <img :src="getAvatarUrl()" alt="大頭貼" class="rounded-circle border" width="120" height="120" />
       </div>
     </div>
 
@@ -126,20 +192,10 @@ const handleAvatarChange = (event) => {
 
       <input v-model="profileData.styleTag" class="form-control mb-2" placeholder="穿搭標籤" />
 
-      <textarea
-        v-model="profileData.intro"
-        class="form-control mb-2"
-        placeholder="自我介紹"
-      ></textarea>
+      <textarea v-model="profileData.intro" class="form-control mb-2" placeholder="自我介紹"></textarea>
       <div class="text-center mt-3">
-        <img
-          v-if="profileData.avatar"
-          :src="profileData.avatar"
-          alt="大頭貼"
-          class="rounded-circle border mb-2"
-          width="120"
-          height="120"
-        />
+        <img v-if="profileData.avatar || avatarPreviewUrl" :src="getEditingAvatarUrl()" alt="大頭貼"
+          class="rounded-circle border mb-2" width="120" height="120" />
         <input type="file" class="form-control" @change="handleAvatarChange" />
       </div>
       <div class="d-flex gap-2 mt-3">
