@@ -1,15 +1,14 @@
 <script setup>
 
-import { reactive, ref, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGroupCartStore } from '@/stores/groupCart'
-// 已成立訂單累計件數 store：算團購價、以及訂單送出後要累加件數
-import { useGroupCommittedStore } from '@/stores/groupCommitted'
+// 改成呼叫「建立付款」，不再直接呼叫 checkout（要先付款成功才會真的建立訂單）
+import { createPayment } from '@/api/groupShop'
 
 const route = useRoute()
 const router = useRouter()
 const cartStore = useGroupCartStore()
-const committedStore = useGroupCommittedStore()
 
 const navItems = [
   { label: '專案瀏覽', icon: 'user', to: '/GroupShop' },
@@ -20,36 +19,18 @@ const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : rout
 // 會員名稱：優先帶入登入後存下的會員資料，尚未登入則顯示預設值
 const memberName = ref(localStorage.getItem('memberName') || '會員')
 
-// 商品目錄
-const catalog = [
-  { id: 1, name: '團購短T', imageUrl: 'https://picsum.photos/seed/clo-shortT/400/300', listPrice: 340, tiers: [{ qty: 5, price: 306 }, { qty: 10, price: 221 }], currentCount: 12 },
-  { id: 2, name: '團購牛仔褲', imageUrl: 'https://picsum.photos/seed/clo-jeans/400/300', listPrice: 430, tiers: [{ qty: 10, price: 387 }, { qty: 20, price: 310 }], currentCount: 22 },
-  { id: 3, name: '團購洋裝', imageUrl: 'https://picsum.photos/seed/clo-dress/400/300', listPrice: 520, tiers: [{ qty: 10, price: 468 }, { qty: 15, price: 374 }], currentCount: 15 },
-  { id: 4, name: '團購針織外套', imageUrl: 'https://picsum.photos/seed/clo-knit-jacket/400/300', listPrice: 700, tiers: [{ qty: 10, price: 630 }, { qty: 15, price: 610 }], currentCount: 8 },
-  { id: 5, name: '團購百褶裙', imageUrl: 'https://picsum.photos/seed/clo-skirt/400/300', listPrice: 700, tiers: [{ qty: 10, price: 630 }, { qty: 15, price: 467 }], currentCount: 12 },
-  { id: 6, name: '團購托特包', imageUrl: 'https://picsum.photos/seed/clo-totebag/400/300', listPrice: 880, tiers: [{ qty: 15, price: 792 }, { qty: 25, price: 711 }], currentCount: 25 },
-  { id: 7, name: '團購後背包', imageUrl: 'https://picsum.photos/seed/clo-backpack/400/300', listPrice: 1060, tiers: [{ qty: 10, price: 954 }, { qty: 20, price: 727 }], currentCount: 5 },
-  { id: 8, name: '團購遮陽帽', imageUrl: 'https://picsum.photos/seed/clo-sunhat/400/300', listPrice: 1060, tiers: [{ qty: 10, price: 954 }, { qty: 20, price: 727 }], currentCount: 14 },
-  { id: 9, name: '團購針織帽', imageUrl: 'https://picsum.photos/seed/clo-beanie/400/300', listPrice: 1150, tiers: [{ qty: 10, price: 1035 }, { qty: 30, price: 909 }], currentCount: 9 }
-]
-// 依商品 id 從目錄中找出對應的商品資料
-const productOf = (id) => catalog.find(p => p.id === id)
+onMounted(() => {
+  cartStore.fetchCart()
+})
+
+// 目前登入會員的 userId（跟 groupCart.js 用同一套邏輯，之後接上真正登入流程後統一調整即可）
+const getUserId = () => Number(localStorage.getItem('userId')) || 1
 
 const cartItems = computed(() => cartStore.items)
 const cartCount = computed(() => cartItems.value.length)
 
-// 「基礎件數 + 已成立訂單件數 + 這筆購物車的件數」統一算出整批適用的團購價
-// 這裡跟其他頁面計算方式的差別：多加了 committedStore.committedQtyOf，確保之前已經送出的訂單件數也算進去
-const unitPriceOf = (item) => {
-  const product = productOf(item.id)
-  if (!product) return 0
-  const totalQty = product.currentCount + committedStore.committedQtyOf(item.id) + item.qty
-  let price = product.listPrice
-  for (const t of product.tiers) {
-    if (totalQty >= t.qty) price = t.price
-  }
-  return price
-}
+// 單價後端已經算好了，購物車裡的每一項本身就帶著 unitPrice，不用再自己查商品目錄算一次
+const unitPriceOf = (item) => item.unitPrice
 
 // 商品小計：每項「單價 x 數量」加總
 const subtotal = computed(() =>
@@ -72,61 +53,14 @@ const orderInfo = reactive({
 // 把數字格式化成千分位顯示（例如 1234 -> 1,234）
 const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
 
-// 訂單存放於 localStorage，與「我的團購訂單」頁共用同一份資料
-const ORDERS_KEY = 'cloOrders'
-
-// 讀取目前已存在的訂單清單，讀不到資料時回傳示範假資料（讓畫面一開始就有東西可以看）
-const readOrders = () => {
-  try {
-    const saved = JSON.parse(localStorage.getItem(ORDERS_KEY) || 'null')
-    if (Array.isArray(saved)) return saved
-  } catch {
-    // 讀取失敗則回退到示範假資料
-  }
-  // 與「我的團購訂單」頁的示範假資料
-  return [
-    {
-      id: 'GO2026052001',
-      productName: '時尚休閒連帽衛衣 (米白色)',
-      status: '進行中 (組團中)',
-      totalPrice: 1200,
-      orderDate: '2026/05/20',
-      shipName: '王小明'
-    },
-    {
-      id: 'GO2026041208',
-      productName: '復古格紋闊寬褲 (咖啡色)',
-      status: '已成團 (備貨中)',
-      totalPrice: 1485,
-      orderDate: '2026/04/12',
-      shipName: '王小明'
-    },
-    {
-      id: 'GO2026030103',
-      productName: '有機棉連帽衛衣 (墨綠)',
-      status: '已完成',
-      totalPrice: 1280,
-      orderDate: '2026/03/01',
-      shipName: '王小明'
-    }
-  ]
-}
-
-// 把 Date 物件格式化成「YYYY/MM/DD」字串
-const formatDate = (date) => {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0') // padStart(2,'0')：不足兩位數前面補 0
-  const d = String(date.getDate()).padStart(2, '0')      // 修好的地方：補回這一行，取出「日」的部分
-  return `${y}/${m}/${d}`
-}
-
 // 按下「返回購物車」時，跳回購物車頁面
 const backToCart = () => {
   router.push('/GroupShop/checkout')
 }
 
-// 按下「確認送出訂單」時執行的動作
-const handleSubmit = () => {
+// 按下「確認送出訂單」時執行的動作：改成先建立一筆「待付款」，再導去模擬付款頁，
+// 使用者在那邊按下「付款成功」之後，訂單才會真的被建立（後端 GroupPaymentController 負責）
+const handleSubmit = async () => {
   // 先檢查必填欄位有沒有填寫，沒填就跳出提示並中斷（return）
   if (!orderInfo.shipName || !orderInfo.shipPhone || !orderInfo.shipAddress) {
     alert('請完整填寫收件人姓名、電話與地址')
@@ -138,51 +72,28 @@ const handleSubmit = () => {
     return
   }
 
-  // 組成一筆新的訂單資料
-  const newOrder = {
-    id: 'GO' + Date.now(), // 用目前時間戳記當作訂單編號的一部分，確保不會重複
-    productName: cartItems.value.map(i => `${productOf(i.id)?.name ?? '商品'} x${i.qty}`).join('、'),
-    status: '進行中 (組團中)',
-    totalPrice: grandTotal.value,
-    orderDate: formatDate(new Date()),
-    shipName: orderInfo.shipName,
-    // 記錄這筆訂單實際包含哪些商品與件數，取消訂單時才能把對應件數從團購進度扣回去
-    items: cartItems.value.map(i => ({ id: i.id, qty: i.qty }))
+  try {
+    const result = await createPayment({
+      userId: getUserId(),
+      shipName: orderInfo.shipName,
+      shipPhone: orderInfo.shipPhone,
+      shipAddress: orderInfo.shipAddress,
+      pickupMethod: orderInfo.pickupMethod,
+      paymentMethod: orderInfo.paymentMethod
+    })
+
+    // 導去模擬付款頁，付款結果確認後才會真的建立訂單
+    router.push(`/GroupShop/pay/${result.paymentId}`)
+  } catch (err) {
+    // 後端檢查沒過（例如購物車是空的）會回傳錯誤訊息，直接顯示出來
+    alert(err.response?.data || '建立付款失敗，請稍後再試')
   }
-
-  // 把新訂單加到訂單清單「最前面」，並存回 localStorage
-  const orders = readOrders()
-  orders.unshift(newOrder)
-  localStorage.setItem(ORDERS_KEY, JSON.stringify(orders))
-
-  // 訂單成立後，這筆數量要永久累計進該商品的團購件數，即使購物車被清空也不會歸零
-  committedStore.add(cartItems.value.map(i => ({ id: i.id, qty: i.qty })))
-
-  alert('訂單已送出！即將轉至訂單列表頁面。')
-  cartStore.clear() // 訂單送出後清空購物車（改叫 store 的方法，而不是自己動手清 localStorage）
-  router.push('/GroupShop/orders')  // 跳轉到「我的團購訂單」頁面
 }
 </script>
 
 <template>
   <div class="clo-shell">
-    <!-- ============ 頁面最上方：會員名稱 + 購物車圖示 ============ -->
-    <header class="clo-header">
-      <div class="clo-user">
-        <span class="user-greet">你好，{{ memberName }}</span>
-        <router-link to="/GroupShop/checkout" class="cart-link">
-          <span class="cart-icon">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="9" cy="21" r="1"></circle>
-              <circle cx="20" cy="21" r="1"></circle>
-              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-            </svg>
-          </span>
-          <span class="cart-badge">{{ cartCount }}</span>
-        </router-link>
-      </div>
-    </header>
-
+    <!-- 購物車圖示改為右下角浮動按鈕，見頁面最下方 -->
     <div class="clo-body">
       <!-- ============ 左側選單 ============ -->
       <aside class="clo-sidebar">
@@ -270,6 +181,7 @@ const handleSubmit = () => {
                   <label class="form-label">付款方式</label>
                   <select v-model="orderInfo.paymentMethod" class="form-select">
                     <option value="信用卡付款">信用卡付款</option>
+                    <option value="線上支付">線上支付</option>
                     <option value="貨到付款">貨到付款</option>
                   </select>
                 </div>
@@ -284,7 +196,7 @@ const handleSubmit = () => {
               <div class="summary-body">
                 <!-- 逐一列出購物車裡每項商品的名稱、數量與小計金額 -->
                 <div v-for="item in cartItems" :key="item.id" class="d-flex justify-content-between small mb-2 summary-line">
-                  <span>{{ productOf(item.id)?.name }} x {{ item.qty }}</span>
+                  <span>{{ item.name }} x {{ item.qty }}</span>
                   <span>${{ formatCurrency(unitPriceOf(item) * item.qty) }}</span>
                 </div>
 
@@ -323,6 +235,16 @@ const handleSubmit = () => {
         </div>
       </main>
     </div>
+
+    <!-- ============ 浮動購物車按鈕（右下角，點擊直接跳到購物車畫面） ============ -->
+    <router-link to="/GroupShop/checkout" class="floating-cart" aria-label="前往購物車">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="9" cy="21" r="1"></circle>
+        <circle cx="20" cy="21" r="1"></circle>
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+      </svg>
+      <span v-if="cartCount > 0" class="cart-badge">{{ cartCount }}</span>
+    </router-link>
   </div>
 </template>
 <style scoped>
@@ -433,37 +355,29 @@ const handleSubmit = () => {
   background-color: var(--color-border-input);
 }
 
-.clo-header {
+.floating-cart {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background-color: var(--color-text);
+  color: #fff;
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding: 14px 28px;
-  background-color: #fff;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.clo-user {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-.user-greet {
-  font-size: 0.9rem;
-  white-space: nowrap;
-}
-.cart-link {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  color: var(--color-text);
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(74, 62, 61, 0.3);
   text-decoration: none;
+  z-index: 100;
+}
+.floating-cart:hover {
+  background-color: var(--color-dark-hover);
 }
 .cart-badge {
   position: absolute;
-  top: -6px;
-  right: -10px;
+  top: -4px;
+  right: -6px;
   background-color: var(--color-accent);
   color: #fff;
   font-size: 0.65rem;

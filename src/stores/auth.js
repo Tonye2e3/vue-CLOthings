@@ -25,7 +25,7 @@ export const useAuthStore = defineStore(
     }
 
     const isLoggedIn = computed(() => token.value !== '')
-    const isAdmin = computed(() => role.value === 'admin')
+    const isAdmin = computed(() => role.value === 'Admin' || role.value === 'SuperAdmin')
 
     return {
       token,

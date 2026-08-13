@@ -1,16 +1,15 @@
 <script setup>
 
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 
-//這一頁拿購物車數量顯示在 header
+// 這一頁拿購物車數量顯示在 header
 import { useGroupCartStore } from '@/stores/groupCart'
-//調整累積數量及編輯數量、取消訂單
-import { useGroupCommittedStore } from '@/stores/groupCommitted'
+// 訂單相關 API：查詢、取消、編輯
+import { getGroupOrders, getGroupOrderDetail, cancelGroupOrder, editGroupOrder, createCustomerService, getCustomerServiceByOrder } from '@/api/groupShop'
 
 const route = useRoute()
 const cartStore = useGroupCartStore()
-const committedStore = useGroupCommittedStore()
 
 const navItems = [
   { label: '專案瀏覽', icon: 'user', to: '/GroupShop' },
@@ -23,71 +22,30 @@ const memberName = ref(localStorage.getItem('memberName') || '會員')
 // 購物車商品數量
 const cartCount = computed(() => cartStore.items.length)
 
-// 商品目錄：編輯訂單、調整數量時要對照商品名稱與團購階層價格，需與其他頁面資料一致
-const catalog = [
-  { id: 1, name: '團購短T', listPrice: 340, tiers: [{ qty: 5, price: 306 }, { qty: 10, price: 221 }], currentCount: 12 },
-  { id: 2, name: '團購牛仔褲', listPrice: 430, tiers: [{ qty: 10, price: 387 }, { qty: 20, price: 310 }], currentCount: 22 },
-  { id: 3, name: '團購洋裝', listPrice: 520, tiers: [{ qty: 10, price: 468 }, { qty: 15, price: 374 }], currentCount: 15 },
-  { id: 4, name: '團購針織外套', listPrice: 700, tiers: [{ qty: 10, price: 630 }, { qty: 15, price: 610 }], currentCount: 8 },
-  { id: 5, name: '團購百褶裙', listPrice: 700, tiers: [{ qty: 10, price: 630 }, { qty: 15, price: 467 }], currentCount: 12 },
-  { id: 6, name: '團購托特包', listPrice: 880, tiers: [{ qty: 15, price: 792 }, { qty: 25, price: 711 }], currentCount: 25 },
-  { id: 7, name: '團購後背包', listPrice: 1060, tiers: [{ qty: 10, price: 954 }, { qty: 20, price: 727 }], currentCount: 5 },
-  { id: 8, name: '團購遮陽帽', listPrice: 1060, tiers: [{ qty: 10, price: 954 }, { qty: 20, price: 727 }], currentCount: 14 },
-  { id: 9, name: '團購針織帽', listPrice: 1150, tiers: [{ qty: 10, price: 1035 }, { qty: 30, price: 909 }], currentCount: 9 }
-]
-// 依商品 id 從目錄中找出對應的商品資料
-const productOf = (id) => catalog.find(p => p.id === id)
+// 目前登入會員的 userId
+const getUserId = () => Number(localStorage.getItem('userId')) || 1
 
-// 訂單存放於 localStorage，結帳頁送出訂單後會寫入這裡，第一次載入沒有資料時先放示範假資料
-const ORDERS_KEY = 'cloOrders'
+// 訂單清單：改成向後端拿真正的資料，不再存 localStorage
+// 欄位對應後端 GroupOrderListDTO，這裡把 groupOrderId 轉成 id，template 才不用改
+const myOrders = reactive([])
 
-// 示範用的假訂單資料，只有在使用者「完全還沒有下過任何訂單」時才會顯示
-const defaultOrders = [
-  {
-    id: 'GO2026052001',
-    productName: '時尚休閒連帽衛衣 (米白色)',
-    status: '進行中 (組團中)',
-    totalPrice: 1200,
-    orderDate: '2026/05/20',
-    shipName: '王小明'
-  },
-  {
-    id: 'GO2026041208',
-    productName: '復古格紋闊寬褲 (咖啡色)',
-    status: '已成團 (備貨中)',
-    totalPrice: 1485,
-    orderDate: '2026/04/12',
-    shipName: '王小明'
-  },
-  {
-    id: 'GO2026030103',
-    productName: '有機棉連帽衛衣 (墨綠)',
-    status: '已完成',
-    totalPrice: 1280,
-    orderDate: '2026/03/01',
-    shipName: '王小明'
-  }
-]
-
-// 讀取訂單清單：讀不到資料（例如第一次使用）時，就把示範假資料存進 localStorage 並回傳
-const readOrders = () => {
-  try {
-    const saved = JSON.parse(localStorage.getItem(ORDERS_KEY) || 'null')
-    if (Array.isArray(saved)) return saved
-  } catch {
-    // 讀取失敗則回退到示範假資料
-  }
-  localStorage.setItem(ORDERS_KEY, JSON.stringify(defaultOrders))
-  return defaultOrders
+const loadOrders = async () => {
+  const rows = await getGroupOrders(getUserId())
+  const mapped = rows.map(r => ({
+    id: r.groupOrderId,
+    productName: r.productName,
+    status: r.status,
+    totalPrice: r.totalPrice,
+    orderDate: r.orderDate,
+    shipName: r.shipName
+  }))
+  myOrders.splice(0, myOrders.length, ...mapped)
 }
 
-// 用 reactive 讓訂單清單變成響應式資料
-const myOrders = reactive(readOrders())
-
-// 任何訂單狀態變更（取消／編輯）都同步寫回 localStorage
-watch(myOrders, () => {
-  localStorage.setItem(ORDERS_KEY, JSON.stringify(myOrders))
-}, { deep: true })
+onMounted(() => {
+  cartStore.fetchCart()
+  loadOrders()
+})
 
 // 依訂單狀態文字，回傳對應的徽章（badge）顏色 class，方便在畫面上用不同顏色標示不同狀態
 const getBadgeClass = (status) => {
@@ -98,24 +56,22 @@ const getBadgeClass = (status) => {
   return 'bg-secondary'
 }
 
-// 按下「取消」按鈕時執行的動作
-const cancelOrder = (id) => {
+// 按下「取消」按鈕時執行的動作：改成呼叫後端取消 API
+// 後端取消訂單後，商品頁的「已訂購件數」會依「非已取消」訂單重新加總，自動同步復原，
+// 不用像以前那樣另外呼叫 committedStore.subtract
+const cancelOrder = async (id) => {
   const order = myOrders.find(o => o.id === id)
   if (!order) return
-  if (order.status.includes('已取消')) return // 避免重複取消，重複扣減件數
+  if (order.status.includes('已取消')) return // 避免重複取消
 
+  await cancelGroupOrder(id)
   order.status = '已取消'
-
-  // 把這筆訂單當初累計進去的件數扣回來，商品頁的「已訂購件數」與團購價才會同步復原
-  if (Array.isArray(order.items) && order.items.length) {
-    committedStore.subtract(order.items)
-  }
 }
 
 // ---- 以下是「編輯訂單」Modal 相關的狀態與方法 ----
 
-const showEditModal = ref(false)  
-const editingOrderId = ref('')    // 記錄目前正在編輯的是哪一筆訂單
+const showEditModal = ref(false)
+const editingOrderId = ref(null) // 記錄目前正在編輯的是哪一筆訂單
 
 // 編輯表單的資料：收件人姓名 + 每個品項的數量
 const editForm = reactive({
@@ -123,18 +79,20 @@ const editForm = reactive({
   items: []
 })
 
-// 按下「編輯」按鈕時執行的動作：把該筆訂單的資料帶進表單，並打開 Modal
-const openEditModal = (id) => {
+// 按下「編輯」按鈕時執行的動作：跟後端要這筆訂單的詳細內容，帶進表單並打開 Modal
+const openEditModal = async (id) => {
   const order = myOrders.find(o => o.id === id)
   if (!order) return
   if (order.status.includes('已取消')) return // 已取消的訂單不能再編輯
 
-  editingOrderId.value = order.id
-  editForm.shipName = order.shipName
-  editForm.items = (order.items || []).map(i => ({
-    id: i.id,
-    name: productOf(i.id)?.name ?? '商品',
-    qty: i.qty
+  const detail = await getGroupOrderDetail(id)
+
+  editingOrderId.value = id
+  editForm.shipName = detail.shipName
+  editForm.items = detail.items.map(i => ({
+    id: i.groupProductId,
+    name: i.productName,
+    qty: i.quantity
   }))
   showEditModal.value = true
 }
@@ -144,8 +102,9 @@ const closeEditModal = () => {
   showEditModal.value = false
 }
 
-// 按下 Modal 裡的「儲存」時執行的動作
-const saveEdit = () => {
+// 按下 Modal 裡的「儲存」時執行的動作：改成呼叫後端編輯 API，
+// 團購價、運費怎麼重算都交給後端處理，前端不用再自己算一次
+const saveEdit = async () => {
   const order = myOrders.find(o => o.id === editingOrderId.value)
   if (!order) return
 
@@ -158,62 +117,73 @@ const saveEdit = () => {
     return
   }
 
-  // 算出每個品項「新數量 - 舊數量」的差，套用到已成立件數 store，
-  editForm.items.forEach(newItem => {
-    const oldItem = (order.items || []).find(i => i.id === newItem.id)
-    const oldQty = oldItem ? oldItem.qty : 0
-    const delta = newItem.qty - oldQty
-    if (delta > 0) committedStore.add([{ id: newItem.id, qty: delta }])
-    else if (delta < 0) committedStore.subtract([{ id: newItem.id, qty: -delta }])
+  const updated = await editGroupOrder(editingOrderId.value, {
+    shipName: editForm.shipName.trim(),
+    items: editForm.items.map(i => ({ groupProductId: i.id, quantity: i.qty }))
   })
 
-  // 用更新後的已成立件數，比照結帳頁的算法，重新算每個品項現在應該套用的團購價
-  let subtotal = 0
-  editForm.items.forEach(newItem => {
-    const product = productOf(newItem.id)
-    if (!product) return
-    const totalQty = product.currentCount + committedStore.committedQtyOf(newItem.id)
-    let price = product.listPrice
-    for (const t of product.tiers) {
-      if (totalQty >= t.qty) price = t.price
-    }
-    subtotal += price * newItem.qty
-  })
-  // 滿 $1,000 免運，未滿則加收運費 $60，跟結帳頁的規則一致
-  const freight = subtotal >= 1000 ? 0 : 60
-
-  // 把算好的結果寫回這筆訂單
-  order.shipName = editForm.shipName.trim()
-  order.items = editForm.items.map(i => ({ id: i.id, qty: i.qty }))
-  order.productName = editForm.items.map(i => `${i.name} x${i.qty}`).join('、')
-  order.totalPrice = subtotal + freight
+  // 把後端算好的結果寫回這筆訂單
+  order.shipName = updated.shipName
+  order.productName = updated.productName
+  order.totalPrice = updated.totalPrice
 
   showEditModal.value = false
 }
 
 // 把數字格式化成千分位顯示（例如 1234 -> 1,234）
 const formatCurrency = (amount) => new Intl.NumberFormat('zh-TW').format(amount)
+
+// ---- 以下是「聯絡客服」Modal 相關的狀態與方法 ----
+
+const showServiceModal = ref(false)
+const activeServiceOrderId = ref(null)
+const serviceRecords = ref([]) // 這筆訂單之前送過的客服紀錄
+
+const serviceForm = reactive({
+  name: localStorage.getItem('memberName') || '',
+  email: '',
+  phone: '',
+  title: '',
+  content: ''
+})
+
+// 按下「聯絡客服」時執行的動作：打開 Modal 並帶出這筆訂單過去的客服紀錄
+const openServiceModal = async (id) => {
+  activeServiceOrderId.value = id
+  serviceForm.title = ''
+  serviceForm.content = ''
+  serviceRecords.value = await getCustomerServiceByOrder(id)
+  showServiceModal.value = true
+}
+
+const closeServiceModal = () => {
+  showServiceModal.value = false
+}
+
+// 按下「送出」時執行的動作：呼叫後端新增一筆客服紀錄，成功後加進畫面上的清單
+const submitService = async () => {
+  if (!serviceForm.title.trim() || !serviceForm.content.trim()) {
+    alert('請填寫標題與內容')
+    return
+  }
+
+  const saved = await createCustomerService(activeServiceOrderId.value, {
+    name: serviceForm.name,
+    email: serviceForm.email,
+    phone: serviceForm.phone,
+    title: serviceForm.title.trim(),
+    content: serviceForm.content.trim()
+  })
+
+  serviceRecords.value.push(saved)
+  serviceForm.title = ''
+  serviceForm.content = ''
+}
 </script>
 
 <template>
   <div class="clo-shell">
-    <!-- ============ 頁面最上方：會員名稱 + 購物車圖示 ============ -->
-    <header class="clo-header">
-      <div class="clo-user">
-        <span class="user-greet">你好，{{ memberName }}</span>
-        <router-link to="/GroupShop/checkout" class="cart-link">
-          <span class="cart-icon">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="9" cy="21" r="1"></circle>
-              <circle cx="20" cy="21" r="1"></circle>
-              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-            </svg>
-          </span>
-          <span class="cart-badge">{{ cartCount }}</span>
-        </router-link>
-      </div>
-    </header>
-
+    <!-- 購物車圖示改為右下角浮動按鈕，見頁面最下方 -->
     <div class="clo-body">
       <!-- ============ 左側選單 ============ -->
       <aside class="clo-sidebar">
@@ -304,6 +274,10 @@ const formatCurrency = (amount) => new Intl.NumberFormat('zh-TW').format(amount)
                     :disabled="order.status.includes('已取消')"
                     @click="cancelOrder(order.id)"
                   >取消</button>
+                  <button
+                    class="service-btn"
+                    @click="openServiceModal(order.id)"
+                  >聯絡客服</button>
                 </div>
               </td>
             </tr>
@@ -358,27 +332,95 @@ const formatCurrency = (amount) => new Intl.NumberFormat('zh-TW').format(amount)
         </div>
       </div>
     </div>
+
+    <!-- ============ 聯絡客服 Modal ============ -->
+    <div v-if="showServiceModal" class="modal-backdrop fade show"></div>
+    <div
+      v-if="showServiceModal"
+      class="modal fade show d-block"
+      tabindex="-1"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title fw-bold mb-0">聯絡客服 #{{ activeServiceOrderId }}</h5>
+            <button type="button" class="btn-close" aria-label="Close" @click="closeServiceModal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row g-2 mb-2">
+              <div class="col">
+                <label class="form-label small">姓名</label>
+                <input type="text" class="form-control form-control-sm" v-model="serviceForm.name" />
+              </div>
+              <div class="col">
+                <label class="form-label small">Email</label>
+                <input type="email" class="form-control form-control-sm" v-model="serviceForm.email" />
+              </div>
+              <div class="col">
+                <label class="form-label small">電話</label>
+                <input type="tel" class="form-control form-control-sm" v-model="serviceForm.phone" />
+              </div>
+            </div>
+            <div class="mb-2">
+              <label class="form-label small">標題</label>
+              <input type="text" class="form-control" v-model="serviceForm.title" placeholder="請簡短描述問題" />
+            </div>
+            <div class="mb-3">
+              <label class="form-label small">內容</label>
+              <textarea class="form-control" rows="3" v-model="serviceForm.content" placeholder="請詳細描述您的問題"></textarea>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm mb-3" @click="submitService">送出</button>
+
+            <hr />
+            <p class="small fw-bold mb-2">過去的客服紀錄</p>
+            <p v-if="serviceRecords.length === 0" class="small text-muted">目前沒有客服紀錄</p>
+            <div v-for="r in serviceRecords" :key="r.groupCustomerServiceId" class="service-record-row">
+              <p class="small fw-bold mb-1">{{ r.title }}</p>
+              <p class="small text-muted mb-0">{{ r.content }}</p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" @click="closeServiceModal">關閉</button>
+          </div>
+        </div>
+      </div>
+    </div>
       </main>
     </div>
+
+    <!-- ============ 浮動購物車按鈕（右下角，點擊直接跳到購物車畫面） ============ -->
+    <router-link to="/GroupShop/checkout" class="floating-cart" aria-label="前往購物車">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="9" cy="21" r="1"></circle>
+        <circle cx="20" cy="21" r="1"></circle>
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+      </svg>
+      <span v-if="cartCount > 0" class="cart-badge">{{ cartCount }}</span>
+    </router-link>
   </div>
 </template>
 
 <style scoped>
 /* 以下都是外觀樣式（顏色、間距、排版），跟訂單邏輯無關，可以先不用管 */
 
-/* 把重複用到的顏色集中定義成變數，之後要改主題色只要改這裡，不用每個地方都找一次 */
 .clo-shell {
-  --color-text: #4a3e3d;         /* 主要文字色（深咖啡） */
-  --color-text-muted: #6e5f5c;   /* 次要文字色（淺咖啡） */
-  --color-accent: #b87352;       /* 強調色（按鈕、標籤） */
-  --color-danger: #b8524f;       /* 警示色文字（取消按鈕） */
-  --color-danger-border: #d8887f; /* 警示色邊框（取消按鈕） */
-  --color-danger-bg: #fbeceb;    /* 警示色底（取消按鈕 hover） */
-  --color-bg-page: #f8f5f0;      /* 頁面底色 */
-  --color-border: #e6dccf;       /* 淺邊框線 */
-  --color-border-input: #d8c3b5; /* 輸入框邊框 */
-  --color-hover-bg: #f1e7de;     /* 滑鼠移過去的底色 */
-  --color-active-bg: #ebdcd0;    /* 選單被選中的底色 */
+  --color-text: #4a3e3d;
+  --color-text-muted: #6e5f5c;
+  --color-accent: #b87352;
+  --color-danger: #b8524f;
+  --color-danger-border: #d8887f;
+  --color-danger-bg: #fbeceb;
+  --color-bg-page: #f8f5f0;
+  --color-border: #e6dccf;
+  --color-border-input: #d8c3b5;
+  --color-hover-bg: #f1e7de;
+  --color-active-bg: #ebdcd0;
+  --color-dark-hover: #362d2c; /* 補回：.floating-cart:hover 有用到，原本沒定義會失效 */
+
+  --shadow-float: 0 4px 12px rgba(74, 62, 61, 0.3);
+  --radius-full: 999px;
 
   min-height: 100vh;
   background-color: var(--color-bg-page);
@@ -406,50 +448,56 @@ table tbody td {
   gap: 6px;
 }
 
-.cancel-btn {
-  border: 1px solid var(--color-danger-border);
+/* 三個按鈕外觀骨架一樣（底色、字級、字重、padding、圓角、游標），只有邊框色/文字色不同 */
+.cancel-btn,
+.edit-btn,
+.service-btn {
   background-color: #fff;
-  color: var(--color-danger);
   font-size: 0.8rem;
   font-weight: 600;
   padding: 5px 12px;
   border-radius: 6px;
   cursor: pointer;
+}
+
+.cancel-btn {
+  border: 1px solid var(--color-danger-border);
+  color: var(--color-danger);
 }
 .cancel-btn:hover {
   background-color: var(--color-danger-bg);
 }
 
-.edit-btn {
+/* edit-btn 跟 service-btn 邊框色、hover 底色都一樣，只有文字色不同 */
+.edit-btn,
+.service-btn {
   border: 1px solid var(--color-border-input);
-  background-color: #fff;
-  color: var(--color-text);
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 5px 12px;
-  border-radius: 6px;
-  cursor: pointer;
 }
-.edit-btn:hover {
+.edit-btn:hover,
+.service-btn:hover {
   background-color: var(--color-hover-bg);
 }
+.edit-btn { color: var(--color-text); }
+.service-btn { color: var(--color-text-muted); }
+
+/* disabled 狀態 edit-btn / cancel-btn 完全一樣，合併成一組 */
 .edit-btn:disabled,
 .cancel-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-.edit-btn:disabled:hover {
-  background-color: #fff;
-}
+.edit-btn:disabled:hover,
 .cancel-btn:disabled:hover {
   background-color: #fff;
 }
 
-/* 編輯訂單 Modal 內，每個商品品項一列 */
+/* 服務紀錄列跟編輯品項列樣式相同，合併 */
+.service-record-row,
 .edit-item-row {
   padding: 8px 0;
   border-bottom: 1px solid var(--color-hover-bg);
 }
+.service-record-row:last-child,
 .edit-item-row:last-child {
   border-bottom: none;
 }
@@ -458,44 +506,36 @@ table tbody td {
   text-align: center;
 }
 
-.clo-header {
+.floating-cart {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-text);
+  color: #fff;
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding: 14px 28px;
-  background-color: #fff;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.clo-user {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-.user-greet {
-  font-size: 0.9rem;
-  white-space: nowrap;
-}
-.cart-link {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  color: var(--color-text);
+  justify-content: center;
+  box-shadow: var(--shadow-float);
   text-decoration: none;
+  z-index: 100;
+}
+.floating-cart:hover {
+  background-color: var(--color-dark-hover);
 }
 .cart-badge {
   position: absolute;
-  top: -6px;
-  right: -10px;
+  top: -4px;
+  right: -6px;
   background-color: var(--color-accent);
   color: #fff;
   font-size: 0.65rem;
   font-weight: 700;
   min-width: 18px;
   height: 18px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
