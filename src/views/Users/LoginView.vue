@@ -1,4 +1,6 @@
 <script setup>
+import IconGoogle from '@/components/icons/iconGoogle.vue'
+import IconLineColorful from '@/components/icons/IconLineColorful.vue'
 import { isValidAccount, isValidPassword } from '@/utils/UserValidator'
 import { ref } from 'vue'
 
@@ -9,34 +11,51 @@ import api from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 const authStore = useAuthStore()
 
-import { useRouter } from 'vue-router'
-import IconGoogle from '@/components/icons/iconGoogle.vue'
-import IconLineColorful from '@/components/icons/IconLineColorful.vue'
+import { useRouter, useRoute } from 'vue-router'
 const router = useRouter()
+const route = useRoute()
 
 async function login() {
   const data = {
     account: account.value,
     password: password.value,
   }
-  // 模擬後端回傳的假資料
-  const fakeResp = {
-    data: {
-      token: 'fake-jwt-token-123',
-      user: {
-        id: 1,
-        name: '測試用戶',
-        role: 'admin',
-      },
-    },
-    status: 200,
+  try {
+    const resp = await api.post('/User/login', data)
+    console.log('登入結果', resp)
+    console.log('Pinia 登入資料', authStore)
+
+    authStore.setAuth(resp.data)
+
+    //測試get me功能
+    // const meResp = await api.get('/User/me')
+    // console.log('目前使用者：', meResp.data)
+
+    alert('登入成功')
+    router.push(route.query.redirect || '/')
+  } catch (error) {
+    if (error.response?.status === 401) {
+      alert('帳號或密碼錯誤')
+    } else {
+      alert('伺服器錯誤，請稍後再試')
+    }
   }
 
+  // // 模擬後端回傳的假資料
+  // const fakeResp = {
+  //   data: {
+  //        token: 'fake-jwt-token-123',
+  //        name: '測試用戶',
+  //        account: 'test001',
+  //        role: 'admin'
+  //   },
+  //   status: 200,
+  // }
   // 模擬成功登入流程
-  authStore.setAuth(fakeResp.data)
-  alert('登入成功 (假資料)')
-  router.push({ name: 'home' })
-  console.log('登入結果', fakeResp)
+  // authStore.setAuth(fakeResp.data)
+  // alert('登入成功 (假資料)')
+  // router.push({ name: 'home' })
+  // console.log('登入結果', fakeResp)
 }
 </script>
 
