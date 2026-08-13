@@ -35,14 +35,6 @@ function getImageUrl(fileName) {
     return 'https://placehold.co/300x400?text=No+Image'
   }
 
-  // 暫時加這段來偵查，測完刪
-  console.log('我選的分類 id:', selectedCategoryId.value, '型別:', typeof selectedCategoryId.value)
-  console.log(
-    '商品們的分類 id:',
-    products.value.map((p) => p.productCategoryId),
-  )
-  console.log('第一個商品分類 id 的型別:', typeof products.value[0]?.productCategoryId)
-
   return `${API_BASE}/images/product/${fileName}`
 }
 

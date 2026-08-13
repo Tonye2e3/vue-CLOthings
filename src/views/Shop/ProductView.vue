@@ -1,5 +1,7 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import axios from 'axios'
 import Review from '@/components/Shop/ProductReview.vue'
 import Post from '@/components/Shop/ProductPost.vue'
 import { useCartStore } from '@/stores/ShopCart'
@@ -7,32 +9,11 @@ import { useFavoriteStore } from '@/stores/ShopFavorite'
 
 const cartStore = useCartStore()
 const favoriteStore = useFavoriteStore()
+const route = useRoute()
+const API_BASE = 'https://localhost:7255'
 
 // 預覽圖區的假資料，之後用API抓
-const product = ref({
-  productId: 10,
-  name: '土星獨角獸',
-  subtitle: '洋裝',
-  price: 17999,
-  tags: ['新品', '限時免運'],
-  description: '精緻留白與細線條，呈現高質感選品',
-  mainImage: '/src/assets/Shop/土星獨角獸.jpeg',
-  smallpics: [
-    '/src/assets/Shop/土星獨角獸.jpeg',
-    '/src/assets/Shop/性別模糊.jpeg',
-    '/src/assets/Shop/粉色綠藻頭.jpeg',
-    '/src/assets/Shop/粉紅派大星.jpeg',
-    '/src/assets/Shop/藍色妖姬.jpeg',
-  ],
-  specifications: [
-    { productSpecificationId: 101, color: '杏色', size: 'S', inventory: 50 },
-    { productSpecificationId: 102, color: '杏色', size: 'M', inventory: 30 },
-    { productSpecificationId: 103, color: '杏色', size: 'L', inventory: 15 },
-    { productSpecificationId: 104, color: '黑色', size: 'S', inventory: 20 },
-    { productSpecificationId: 105, color: '黑色', size: 'M', inventory: 0 },
-    { productSpecificationId: 106, color: '黑色', size: 'L', inventory: 8 },
-  ],
-})
+const product = ref(null)
 
 // 按鈕區，user「目前選擇」的狀態
 const currentImage = ref(product.value.mainImage) //主圖的啦
@@ -49,6 +30,18 @@ const isCurrentFavorite = computed(() => {
   // 問收藏 store：這個 productSpecificationId 在收藏清單裡嗎？
   return favoriteStore.isFavorite(selectedSpec.value.productSpecificationId)
 })
+
+onMounted(async () => {
+  try {
+    const id = route.params.id // 從網址拿 id（例如 /shop/product/5 → "5"）
+    const response = await axios.get(`${API_BASE}/api/product/${id}`)
+    product.value = response.data
+    console.log('拿到的商品：', response.data) // 暫時看，測完刪
+  } catch (error) {
+    console.error('載入商品失敗：', error)
+  }
+})
+
 //切換收藏狀態
 function toggleFavorite() {
   if (!selectedColor.value || !selectedSize.value) {
@@ -130,101 +123,106 @@ const selectedSpec = computed(() => {
 
 <!-- =========================================================== -->
 <template>
-  <div class="product-page">
-    <!-- 預覽圖區 -->
-    <div class="product-gallery">
-      <!-- 大圖 -->
-      <div class="gallery-main">
-        <img :src="currentImage" alt="商品圖片" />
-      </div>
+  <!-- 資料還沒來 → 顯示載入中 -->
+  <div v-if="!product" class="loading">載入中...</div>
+  <!-- 資料來了 → 才顯示商品內容 -->
+  <div v-else>
+    <div class="product-page">
+      <!-- 預覽圖區 -->
+      <div class="product-gallery">
+        <!-- 大圖 -->
+        <div class="gallery-main">
+          <img :src="currentImage" alt="商品圖片" />
+        </div>
 
-      <!-- 小圖列表，點擊切換大圖 -->
-      <div class="gallery-smallpics">
-        <button
-          v-for="(smallpic, index) in product.smallpics"
-          :key="index"
-          class="smallpic-btn"
-          :class="{ active: currentImage === smallpic }"
-          @click="currentImage = smallpic"
-        >
-          <img :src="smallpic" alt="商品縮圖" />
-        </button>
-      </div>
-    </div>
-    <!-- 商品資訊區 -->
-    <div class="product-info">
-      <h1 class="info-title">商品資訊</h1>
-
-      <h2 class="info-name">{{ product.name }} ｜ {{ product.subtitle }}</h2>
-
-      <p class="info-meta">
-        顏色：{{ selectedColor ?? '尚未選擇' }} / 尺寸：{{ selectedSize ?? '尚未選擇' }}
-      </p>
-
-      <div class="info-tags">
-        <span v-for="tag in product.tags" :key="tag" class="tag-badge">
-          {{ tag }}
-        </span>
-      </div>
-      <p class="info-price">價格：NT$ {{ product.price.toLocaleString() }}</p>
-
-      <!-- 按鈕區域，選顏色 -->
-      <div class="option-group">
-        <p class="option-label">顏色</p>
-        <div class="option-list">
+        <!-- 小圖列表，點擊切換大圖 -->
+        <div class="gallery-smallpics">
           <button
-            v-for="color in colorOptions"
-            :key="color"
-            class="option-btn"
-            :class="{ selected: selectedColor === color }"
-            @click="selectedColor = color"
+            v-for="(smallpic, index) in product.smallpics"
+            :key="index"
+            class="smallpic-btn"
+            :class="{ active: currentImage === smallpic }"
+            @click="currentImage = smallpic"
           >
-            {{ color }}
+            <img :src="smallpic" alt="商品縮圖" />
           </button>
         </div>
       </div>
+      <!-- 商品資訊區 -->
+      <div class="product-info">
+        <h1 class="info-title">商品資訊</h1>
 
-      <!-- 按鈕區域，選尺寸 -->
-      <div class="option-group">
-        <p class="option-label">尺寸</p>
-        <div class="option-list">
-          <button
-            v-for="size in sizeOptions"
-            :key="size"
-            class="option-btn"
-            :class="{ selected: selectedSize === size }"
-            @click="selectedSize = size"
-          >
-            {{ size }}
-          </button>
+        <h2 class="info-name">{{ product.productName }} ｜ {{ product.subtitle }}</h2>
+
+        <p class="info-meta">
+          顏色：{{ selectedColor ?? '尚未選擇' }} / 尺寸：{{ selectedSize ?? '尚未選擇' }}
+        </p>
+
+        <div class="info-tags">
+          <span v-for="tag in product.tags" :key="tag" class="tag-badge">
+            {{ tag }}
+          </span>
         </div>
-        <p class="option-hint">建議尺寸：M（依版型微修身）</p>
-      </div>
+        <p class="info-price">價格：NT$ {{ product.price.toLocaleString() }}</p>
 
-      <!-- ⚠️ 測試用，看反查有沒有成功，測完刪 -->
-      <p class="text-muted" style="font-size: 0.8rem">🧪 目前選中的規格：{{ selectedSpec }}</p>
+        <!-- 按鈕區域，選顏色 -->
+        <div class="option-group">
+          <p class="option-label">顏色</p>
+          <div class="option-list">
+            <button
+              v-for="color in colorOptions"
+              :key="color"
+              class="option-btn"
+              :class="{ selected: selectedColor === color }"
+              @click="selectedColor = color"
+            >
+              {{ color }}
+            </button>
+          </div>
+        </div>
 
-      <!-- 按鈕區域，收藏、立即購買、加入購物車 -->
-      <div class="action-buttons">
-        <button class="btn-favorite" @click="toggleFavorite">
-          收藏 <span v-if="isCurrentFavorite">❤️</span><span v-else>🤍</span>
-        </button>
+        <!-- 按鈕區域，選尺寸 -->
+        <div class="option-group">
+          <p class="option-label">尺寸</p>
+          <div class="option-list">
+            <button
+              v-for="size in sizeOptions"
+              :key="size"
+              class="option-btn"
+              :class="{ selected: selectedSize === size }"
+              @click="selectedSize = size"
+            >
+              {{ size }}
+            </button>
+          </div>
+          <p class="option-hint">建議尺寸：M（依版型微修身）</p>
+        </div>
 
-        <button class="btn-buy-now" @click="buyNow">立即購買</button>
+        <!-- ⚠️ 測試用，看反查有沒有成功，測完刪 -->
+        <p class="text-muted" style="font-size: 0.8rem">🧪 目前選中的規格：{{ selectedSpec }}</p>
 
-        <button class="btn-add-cart" @click="addToCart">加入購物車</button>
+        <!-- 按鈕區域，收藏、立即購買、加入購物車 -->
+        <div class="action-buttons">
+          <button class="btn-favorite" @click="toggleFavorite">
+            收藏 <span v-if="isCurrentFavorite">❤️</span><span v-else>🤍</span>
+          </button>
+
+          <button class="btn-buy-now" @click="buyNow">立即購買</button>
+
+          <button class="btn-add-cart" @click="addToCart">加入購物車</button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- 使用者評價 -->
-  <div>
-    <Review />
-  </div>
+    <!-- 使用者評價 -->
+    <div>
+      <Review />
+    </div>
 
-  <!-- 跟商品有關的穿搭靈感 -->
-  <div>
-    <Post />
+    <!-- 跟商品有關的穿搭靈感 -->
+    <div>
+      <Post />
+    </div>
   </div>
 </template>
 
