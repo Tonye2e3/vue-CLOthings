@@ -10,8 +10,9 @@ import { ref, onMounted, watch, computed } from 'vue'
 // useRoute：讀取網址上的動態參數，router/index.js 裡這個頁面對應的路由是
 // path: '/community/profile/:userId'，要用 useRoute() 才能拿到 :userId 那段的值。
 import { useRoute } from 'vue-router'
-// axios：打 API 用的套件，跟 CommunityView.vue、PostDetailView.vue 裡用的是同一套。
-import axios from 'axios'
+// api：跟其他頁面共用同一個 axios 實例（src/services/api.js），會自動把登入後的 JWT
+// token 帶進 Authorization header，跟直接 import axios from 'axios' 不一樣。
+import api from '@/services/api'
 
 // 收藏功能共用資料（跟 PostDetailView.vue 共用同一份收藏清單，直接 import 那個檔案）
 // savedPosts：使用者收藏的所有貼文，格式對照 Community_Favorite + Community_Post：
@@ -20,18 +21,17 @@ import axios from 'axios'
 // 跟 CommunityView.vue 自己 <template> 要另外重複宣告一份不一樣——
 // 因為這裡是「別的檔案」透過 import 拿到它，並不是同一個 SFC 裡的 <script setup>／<template>
 // 那種限制，所以可以直接在這個檔案的 <template> 裡正常使用。
-import { savedPosts, loadSavedPosts, formatCount } from '@/views/Community/CommunityView.vue'
+import { savedPosts, loadSavedPosts, formatCount, currentUserId, loadCurrentUserId } from '@/views/Community/CommunityView.vue'
 
-// API_BASE：後端 API 專案的網址，跟 CommunityView.vue、PostDetailView.vue 裡用的是同一個。
-const API_BASE = 'https://localhost:7255'
+// IMAGE_BASE：圖片是靜態檔案，走的不是 /api 這條路徑，不能直接用 api 服務的
+// baseURL（那個含 /api）。這裡把 VITE_API_URL 尾巴的 /api 拿掉，變成純網域。
+const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
 
 const route = useRoute()
 
-// currentTestUserId：目前登入的測試帳號 id，跟 CreatePostView.vue、PostDetailView.vue
-// 用的是同一個測試帳號。之後接上真的登入系統，這裡要換成登入者真正的 user_id。
+// currentUserId：目前登入者真正的 userId，跟 CommunityView.vue 共用同一份（import 進來的）。
 // 這個是「我是誰」，跟下面的 viewedUserId（「我正在看誰的頁面」）是兩回事——
 // 只有兩者相等時，才代表「我正在看自己的頁面」，編輯／刪除貼文才該出現。
-const currentTestUserId = 1
 
 // viewedUserId：現在看的是哪個使用者的個人頁，從網址上的 :userId 讀出來。
 // 網址上的參數本身是字串（例如 "3"），這裡用 Number(...) 轉成數字，
@@ -80,7 +80,7 @@ const userPosts = ref([])
 // 打的是 CommunityPostController.cs 裡新增的 GET api/CommunityPost/user/{userid}。
 const fetchUserPosts = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/api/CommunityPost/user/${viewedUserId.value}`)
+    const res = await api.get(`/CommunityPost/user/${viewedUserId.value}`)
     // 後端回傳的格式（CommunityPostDTO）跟這頁 template 原本期待的格式不太一樣，
     // 這裡把它轉成 template 需要的形狀：content、image（取第一張圖）、likesCount、
     // commentsCount、tags（把 taggedProducts 陣列轉成 '#商品名稱' 字串陣列）。
@@ -90,7 +90,7 @@ const fetchUserPosts = async () => {
       status: post.status,
       content: post.content,
       image: post.images && post.images.length > 0
-        ? `${API_BASE}${post.images[0].imageFileName}`
+        ? `${IMAGE_BASE}${post.images[0].imageFileName}`
         : '',
       // images：保留完整的原始圖片清單（不是只有第一張），編輯貼文換照片時要用到，
       // 卡片本身的縮圖顯示還是繼續用上面那個扁平的 image 欄位就好。
@@ -116,7 +116,7 @@ const deletePost = async (communityPostId) => {
   if (!confirm('確定要刪除這篇貼文嗎？刪除後就無法恢復。')) return
 
   try {
-    await axios.delete(`${API_BASE}/api/CommunityPost/${communityPostId}`)
+    await api.delete(`/CommunityPost/${communityPostId}`)
   } catch (err) {
     console.error('刪除貼文失敗：', err)
     alert('刪除失敗，請稍後再試一次！')
@@ -150,7 +150,7 @@ const startEdit = (post) => {
     images: (post.images || []).map(img => ({
       imageFileName: img.imageFileName,
       sortOrder: img.sortOrder,
-      url: `${API_BASE}${img.imageFileName}`,
+      url: `${IMAGE_BASE}${img.imageFileName}`,
       isNew: false
     }))
   }
@@ -193,7 +193,7 @@ const saveEdit = async (post) => {
     newImages.forEach(img => formData.append('files', img.file))
 
     try {
-      const uploadRes = await axios.post(`${API_BASE}/api/CommunityPost/upload-images`, formData, {
+      const uploadRes = await api.post(`/CommunityPost/upload-images`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
       // uploadRes.data 的順序跟 newImages 送出的順序是對應的，
@@ -216,7 +216,7 @@ const saveEdit = async (post) => {
   }))
 
   try {
-    await axios.put(`${API_BASE}/api/CommunityPost/${post.communityPostId}`, {
+    await api.put(`/CommunityPost/${post.communityPostId}`, {
       communityPostId: post.communityPostId,
       userId: post.userId,
       content: editForm.value.content,
@@ -233,7 +233,7 @@ const saveEdit = async (post) => {
   post.content = editForm.value.content
   post.status = editForm.value.status
   post.images = images
-  post.image = images.length > 0 ? `${API_BASE}${images[0].imageFileName}` : ''
+  post.image = images.length > 0 ? `${IMAGE_BASE}${images[0].imageFileName}` : ''
   editingPostId.value = null
 }
 
@@ -241,12 +241,17 @@ const saveEdit = async (post) => {
 // 跟 PostDetailView.vue 抓單篇貼文的邏輯是一樣的模式。
 // 也順便呼叫 loadSavedPosts，避免使用者是直接連進這頁（沒先經過 CommunityView.vue），
 // 導致收藏頁籤看起來是空的。
-onMounted(() => {
+onMounted(async () => {
   fetchUserPosts()
   loadSavedPosts()
   fetchFollowCounts()
-  // 只有「瀏覽的不是自己」時才需要問追蹤狀態，自己不能追蹤自己。
-  if (viewedUserId.value !== currentTestUserId) {
+  fetchPublicProfile()
+  // await loadCurrentUserId()：這頁可能是使用者直接連進來的（沒先經過 CommunityView.vue），
+  // currentUserId 這時候還是 null，要先確定拿到真正的 userId，下面比對
+  // 「瀏覽的是不是自己」才會準——不然沒登入或還沒查完時，currentUserId.value 是 null，
+  // viewedUserId 不可能等於 null，會誤判成「不是自己」而多打一次不必要的查詢。
+  await loadCurrentUserId()
+  if (viewedUserId.value !== currentUserId.value) {
     fetchFollowStatus()
   }
 })
@@ -258,7 +263,8 @@ onMounted(() => {
 watch(() => route.params.userId, () => {
   fetchUserPosts()
   fetchFollowCounts()
-  if (viewedUserId.value !== currentTestUserId) {
+  fetchPublicProfile()
+  if (viewedUserId.value !== currentUserId.value) {
     fetchFollowStatus()
   } else {
     // 換到看自己的頁面時，重設狀態，避免殘留上一個人的追蹤紀錄 id
@@ -284,9 +290,24 @@ const myFollowId = ref(null)
 // 打的是 UserFollowController.cs 裡的 GET api/UserFollow/follower/{followerid}/following/{followingid}。
 // fetchFollowCounts：跟後端要「這個人的粉絲數／追蹤中數」，
 // 打的是 UserFollowController.cs 裡的 GET api/UserFollow/counts/{userid}。
+// fetchPublicProfile：跟後端要「這個人的公開基本資料」（暱稱、帳號、大頭貼、風格標籤、自我介紹），
+// 打的是 PublicUserProfileController.cs 裡的 GET api/PublicUserProfile/{userid}。
+const fetchPublicProfile = async () => {
+  try {
+    const res = await api.get(`/PublicUserProfile/${viewedUserId.value}`)
+    userProfile.value.name = res.data.username
+    userProfile.value.handle = `@${res.data.account}`
+    userProfile.value.avatar = res.data.avatar || userProfile.value.avatar
+    userProfile.value.bioTag = res.data.styleTag || ''
+    userProfile.value.bio = res.data.intro || ''
+  } catch (err) {
+    console.error('讀取公開個人資料失敗：', err)
+  }
+}
+
 const fetchFollowCounts = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/api/UserFollow/counts/${viewedUserId.value}`)
+    const res = await api.get(`/UserFollow/counts/${viewedUserId.value}`)
     userProfile.value.followersCount = res.data.followersCount
     userProfile.value.followingCount = res.data.followingCount
   } catch (err) {
@@ -296,7 +317,7 @@ const fetchFollowCounts = async () => {
 
 const fetchFollowStatus = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/api/UserFollow/follower/${currentTestUserId}/following/${viewedUserId.value}`)
+    const res = await api.get(`/UserFollow/follower/${currentUserId.value}/following/${viewedUserId.value}`)
     if (res.data) {
       userProfile.value.isFollowing = true
       myFollowId.value = res.data.userFollowId
@@ -314,7 +335,7 @@ const toggleFollow = async () => {
   if (userProfile.value.isFollowing) {
     // 目前是「已追蹤」狀態 → 這次是要取消追蹤 → 打 DELETE，刪掉 myFollowId 那筆紀錄
     try {
-      await axios.delete(`${API_BASE}/api/UserFollow/${myFollowId.value}`)
+      await api.delete(`/UserFollow/${myFollowId.value}`)
     } catch (err) {
       console.error('取消追蹤失敗：', err)
       return // 失敗就不要動畫面上的狀態，維持「已追蹤」原樣
@@ -324,8 +345,8 @@ const toggleFollow = async () => {
   } else {
     // 目前是「還沒追蹤」狀態 → 這次是要追蹤 → 打 POST 新增一筆 User_Follow 紀錄
     try {
-      await axios.post(`${API_BASE}/api/UserFollow`, {
-        followerId: currentTestUserId,
+      await api.post(`/UserFollow`, {
+        followerId: currentUserId.value,
         followingId: viewedUserId.value
       })
     } catch (err) {
@@ -393,7 +414,7 @@ const toggleFollow = async () => {
               </div>
 
               <!-- 只有瀏覽「別人」的個人頁才顯示追蹤／訊息按鈕；瀏覽自己的頁面不會出現這排按鈕 -->
-              <div class="action-group" v-if="viewedUserId !== currentTestUserId">
+              <div class="action-group" v-if="viewedUserId !== currentUserId">
                 <button
                   class="btn-follow-main"
                   :class="{ following: userProfile.isFollowing }"
@@ -515,11 +536,11 @@ const toggleFollow = async () => {
 
             <!--
               編輯／刪除貼文：只有在「穿搭作品」這個頁籤（自己發的貼文）才會出現，收藏牆那邊不會有；
-              另外還要 viewedUserId === currentTestUserId 才顯示——也就是「現在瀏覽的這個人」
+              另外還要 viewedUserId === currentUserId 才顯示——也就是「現在瀏覽的這個人」
               跟「目前登入的我」是同一個人，才代表這是「我自己的」貼文，才能編輯／刪除。
               瀏覽別人的個人頁時，這整塊（包含編輯表單本身）完全不會出現。
             -->
-            <template v-if="viewedUserId === currentTestUserId">
+            <template v-if="viewedUserId === currentUserId">
               <div v-if="editingPostId === post.communityPostId" class="edit-form">
                 <textarea v-model="editForm.content" class="edit-textarea" rows="3"></textarea>
 

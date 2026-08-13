@@ -5,15 +5,16 @@ import { ref, computed, onMounted, watch } from 'vue'
 // path: '/community/post/:id'，所以網址上 :id 那一段的值，
 // 就是這篇貼文的 communityPostId，要用 useRoute() 才能拿到。
 import { useRoute } from 'vue-router'
-// axios：打 API 用的套件，跟 CommunityView.vue 裡用的是同一套。
-import axios from 'axios'
+// api：跟其他頁面共用同一個 axios 實例（src/services/api.js），會自動把登入後的 JWT
+// token 帶進 Authorization header，跟直接 import axios from 'axios' 不一樣。
+import api from '@/services/api'
 
 // 收藏功能共用資料（跟 UserProfileView.vue 共用同一份收藏清單，直接 import 那個檔案）
 // savedPosts：目前所有收藏的貼文清單（雖然這裡沒有直接用到它本身，
 // 但 isPostSaved 內部會去讀它，所以還是要 import 進來）
 // isPostSaved：檢查某篇貼文有沒有被收藏
 // toggleSavePost：切換某篇貼文的收藏狀態（收藏／取消收藏）
-import { isPostSaved, toggleSavePost } from '@/views/Community/CommunityView.vue'
+import { isPostSaved, toggleSavePost, currentUserId, loadCurrentUserId } from '@/views/Community/CommunityView.vue'
 
 
 // 使用 import 引入本地 src/assets 下的圖片
@@ -23,12 +24,12 @@ import { isPostSaved, toggleSavePost } from '@/views/Community/CommunityView.vue
 // 最後會變成一個瀏覽器看得懂的圖片網址，可以直接給 <img :src="..."> 用。
 import postImage from '@/assets/Postimage/post2.jpg'
 
-// API_BASE：後端 API 專案的網址，跟 CommunityView.vue 裡用的是同一個。
-const API_BASE = 'https://localhost:7255'
+// IMAGE_BASE：圖片是靜態檔案，走的不是 /api 這條路徑，不能直接用 api 服務的
+// baseURL（那個含 /api）。這裡把 VITE_API_URL 尾巴的 /api 拿掉，變成純網域。
+const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
 
-// currentTestUserId：先用資料庫裡真的存在的測試帳號 id 頂著，跟 CreatePostView.vue 目前的做法一樣。
-// TODO: 之後接上真的登入系統，這裡要換成登入者的 user_id。
-const currentTestUserId = 1
+// currentUserId：目前登入者真正的 userId，跟 CommunityView.vue 共用同一份（import 進來的），
+// 不用自己再打一次 /User/me。
 
 // route：呼叫 useRoute() 拿到「目前網址」的資訊物件。
 const route = useRoute()
@@ -82,7 +83,7 @@ const fetchPost = async () => {
   // （例如網址是 /community/post/3，這裡拿到的就是 "3"）。
   const id = route.params.id
   try {
-    const res = await axios.get(`${API_BASE}/api/CommunityPost/${id}`)
+    const res = await api.get(`/CommunityPost/${id}`)
 
     // 這支 API 找不到資料時，後端是回傳 null（不是觸發 404 錯誤），
     // 所以要自己檢查 res.data 是不是 null，不能只靠 try/catch 判斷。
@@ -105,8 +106,8 @@ const fetchPost = async () => {
             imageFileName: img.imageFileName,
             sortOrder: img.sortOrder,
             // imageFileName 本身已經帶路徑了（例如 "/images/posts/post01_1.jpg"），
-            // 直接接在 API_BASE 後面組成完整網址，跟 CommunityView.vue 的做法一樣。
-            url: `${API_BASE}${img.imageFileName}`
+            // 直接接在 IMAGE_BASE 後面組成完整網址，跟 CommunityView.vue 的做法一樣。
+            url: `${IMAGE_BASE}${img.imageFileName}`
           }))
         : [{ postImageId: null, imageFileName: null, sortOrder: 1, url: postImage }], // 完全沒有圖片時的保底畫面
       content: p.content,
@@ -136,7 +137,7 @@ const myLikeId = ref(null)
 // 打的是 PostLikeController.cs 裡的 GET api/PostLike/post/{communitypostid}/user/{userid}。
 const fetchLikeStatus = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/api/PostLike/post/${route.params.id}/user/${currentTestUserId}`)
+    const res = await api.get(`/PostLike/post/${route.params.id}/user/${currentUserId.value}`)
     if (res.data) {
       post.value.isLiked = true
       myLikeId.value = res.data.postLikesId
@@ -151,7 +152,11 @@ const fetchLikeStatus = async () => {
 
 // onMounted：頁面一打開，就照網址上的 id 去後端要這篇貼文的完整資料、留言、
 // 這個使用者按讚過沒有，還有跟這篇貼文標記過同一個商品的相似穿搭推薦。
-onMounted(() => {
+// 先 await loadCurrentUserId()：這頁可能是使用者直接連進來的（沒先經過
+// CommunityView.vue），currentUserId 這時候還是 null，要先確定拿到真正的
+// userId，fetchPost（裡面會問追蹤狀態）、fetchLikeStatus 才能查到對的人。
+onMounted(async () => {
+  await loadCurrentUserId()
   fetchPost()
   fetchComments()
   fetchLikeStatus()
@@ -199,7 +204,7 @@ const toggleLike = async () => {
   if (post.value.isLiked) {
     // 目前是「已按讚」狀態 → 這次是要取消讚 → 打 DELETE，刪掉 myLikeId 那筆紀錄
     try {
-      await axios.delete(`${API_BASE}/api/PostLike/${myLikeId.value}`)
+      await api.delete(`/PostLike/${myLikeId.value}`)
     } catch (err) {
       console.error('取消讚失敗：', err)
       return // 失敗就不要動畫面上的狀態，維持「已按讚」原樣
@@ -210,9 +215,9 @@ const toggleLike = async () => {
   } else {
     // 目前是「還沒按讚」狀態 → 這次是要按讚 → 打 POST 新增一筆 Post_Like 紀錄
     try {
-      await axios.post(`${API_BASE}/api/PostLike`, {
+      await api.post(`/PostLike`, {
         communityPostId: post.value.communityPostId,
-        userId: currentTestUserId
+        userId: currentUserId.value
       })
     } catch (err) {
       console.error('按讚失敗：', err)
@@ -262,10 +267,10 @@ const similarPosts = ref([])
 // fetchSimilarPosts：打 CommunityPostController.cs 裡的 GET api/CommunityPost/similar/{communitypostid}。
 const fetchSimilarPosts = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/api/CommunityPost/similar/${route.params.id}`)
+    const res = await api.get(`/CommunityPost/similar/${route.params.id}`)
     similarPosts.value = res.data.map(p => ({
       communityPostId: p.communityPostId,
-      image: (p.images && p.images.length) ? `${API_BASE}${p.images[0].imageFileName}` : postImage
+      image: (p.images && p.images.length) ? `${IMAGE_BASE}${p.images[0].imageFileName}` : postImage
     }))
   } catch (err) {
     console.error('讀取相似穿搭推薦失敗：', err)
@@ -310,7 +315,7 @@ const cancelReply = () => {
 // 打的是 PostCommentController.cs 裡的 GET api/PostComment/post/{communitypostid}。
 const fetchComments = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/api/PostComment/post/${route.params.id}`)
+    const res = await api.get(`/PostComment/post/${route.params.id}`)
     comments.value = res.data
   } catch (err) {
     console.error('讀取留言失敗：', err)
@@ -328,7 +333,7 @@ const myFollowId = ref(null)
 // 打的是 UserFollowController.cs 裡的 GET api/UserFollow/follower/{followerid}/following/{followingid}。
 const fetchFollowStatus = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/api/UserFollow/follower/${currentTestUserId}/following/${post.value.userId}`)
+    const res = await api.get(`/UserFollow/follower/${currentUserId.value}/following/${post.value.userId}`)
     if (res.data) {
       post.value.isFollowing = true
       myFollowId.value = res.data.userFollowId
@@ -346,7 +351,7 @@ const toggleFollow = async () => {
   if (post.value.isFollowing) {
     // 目前是「已追蹤」狀態 → 這次是要取消追蹤 → 打 DELETE，刪掉 myFollowId 那筆紀錄
     try {
-      await axios.delete(`${API_BASE}/api/UserFollow/${myFollowId.value}`)
+      await api.delete(`/UserFollow/${myFollowId.value}`)
     } catch (err) {
       console.error('取消追蹤失敗：', err)
       return // 失敗就不要動畫面上的狀態，維持「已追蹤」原樣
@@ -356,8 +361,8 @@ const toggleFollow = async () => {
   } else {
     // 目前是「還沒追蹤」狀態 → 這次是要追蹤 → 打 POST 新增一筆 User_Follow 紀錄
     try {
-      await axios.post(`${API_BASE}/api/UserFollow`, {
-        followerId: currentTestUserId,
+      await api.post(`/UserFollow`, {
+        followerId: currentUserId.value,
         followingId: post.value.userId
       })
     } catch (err) {
@@ -378,12 +383,12 @@ const addComment = async () => {
   if (!newComment.value.trim()) return
 
   try {
-    await axios.post(`${API_BASE}/api/PostComment`, {
+    await api.post(`/PostComment`, {
       // replyingTo 有值代表現在是在回覆某一則留言，parentCommentId 就帶那則留言的 id；
       // 沒有值（一般發新留言）就帶 null。
       parentCommentId: replyingTo.value ? replyingTo.value.postCommentId : null,
       communityPostId: post.value.communityPostId,
-      userId: currentTestUserId, // 先用測試帳號頂著，跟 CreatePostView.vue 一致
+      userId: currentUserId.value,
       commentText: newComment.value
     })
   } catch (err) {
@@ -622,10 +627,17 @@ const addComment = async () => {
                 <!--
                   product-link：之後 productRoute 是真的商品頁網址時，可以換回
                   <a :href="item.productRoute">，現在先用 <div> 不會跳轉。
-                  目前 Product 表沒有圖片欄位（圖片是另一張 ProductImg 表，還沒接），
-                  所以先不顯示縮圖，只顯示名稱、價格。
+                  圖片是後端 TaggedProductDTO.Image 帶回來的檔名，實際檔案放在
+                  wwwroot/images/product/ 底下，所以組網址要多接這段路徑，
+                  跟貼文照片（wwwroot/images/posts/）用的資料夾不一樣。
                 -->
                 <div class="product-link">
+                  <img
+                    v-if="item.image"
+                    :src="`${IMAGE_BASE}/images/product/${item.image}`"
+                    class="product-thumb"
+                    alt="product"
+                  />
                   <div class="product-info">
                     <p class="product-name">{{ item.name }}</p>
                     <p class="product-price">NT$ {{ item.price }}</p>
