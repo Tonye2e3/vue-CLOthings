@@ -23,13 +23,48 @@ const router = createRouter({
     //Shop 在註解之間新增個人使用的路由 名字自行修改
     {
       path: '/shop/shop',
-      name: 'Shop',
+      name: 'shop',
       component: () => import('../views/Shop/ShopView.vue'),
+    },
+    {
+      path: '/shop/favorite',
+      name: 'favorite',
+      component: () => import('../views/Shop/ShopFavoriteView.vue'),
     },
     {
       path: '/shop/product',
       name: 'product',
       component: () => import('../views/Shop/ProductView.vue'),
+    },
+    {
+      path: '/shop/cart',
+      name: 'cart',
+      component: () => import('../views/Shop/ShopCartView.vue'),
+    },
+    {
+      path: '/shop/orders',
+      name: 'orders',
+      component: () => import('../views/Shop/ShopOrdersView.vue'),
+    },
+    {
+      path: '/shop/orders/:id',
+      name: 'orderDetail',
+      component: () => import('../views/Shop/ShopOrderDetailView.vue'),
+    },
+    {
+      path: '/shop/checkout',
+      name: 'checkout',
+      component: () => import('../views/Shop/ShopCheckoutView.vue'),
+    },
+    {
+      path: '/shop/return/:id',
+      name: 'return',
+      component: () => import('../views/Shop/ShopReturnView.vue'),
+    },
+    {
+      path: '/shop/service',
+      name: 'service',
+      component: () => import('../views/Shop/ShopServiceView.vue'),
     },
 
     //GroupShop 在註解之間新增個人使用的路由 名字自行修改

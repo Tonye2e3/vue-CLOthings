@@ -11,8 +11,9 @@ import App from './App.vue'
 import router from './router'
 
 const app = createApp(App)
-
-const pinia = createPinia()
+const pinia = createPinia() // 先建立 pinia
+pinia.use(piniaPluginPersistedstate) // 讓 pinia 使用持久化套件
+app.use(pinia) // 再把 pinia 給 app 用
 
 pinia.use(piniaPluginPersistedstate)
 

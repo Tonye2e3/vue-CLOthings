@@ -18,6 +18,7 @@ const communityPosts = ref([
     image: '/img/community-3.jpg',
   },
 ])
+
 </script>
 
 <template>
@@ -30,7 +31,8 @@ const communityPosts = ref([
     <div class="community-grid">
       <div v-for="post in communityPosts" :key="post.handle" class="community-card">
         <div class="community-image">
-          <img :src="post.image" alt="貼文圖片" />
+          <span class="placeholder-label">貼文圖片</span>
+          <!-- <img :src="post.image" alt="貼文圖片" /> -->
         </div>
         <p class="community-handle">{{ post.handle }}</p>
         <p class="community-caption">{{ post.caption }}</p>
@@ -66,10 +68,13 @@ const communityPosts = ref([
 }
 
 .community-image {
+  display: flex;
   width: 100%;
   aspect-ratio: 1 / 1;
   background: #e5e5e5;
   overflow: hidden;
+  justify-content: center;
+  align-items: center;
 }
 
 .community-image img {

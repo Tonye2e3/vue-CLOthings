@@ -2,9 +2,15 @@
 import { ref, computed } from 'vue'
 import Review from '@/components/Shop/ProductReview.vue'
 import Post from '@/components/Shop/ProductPost.vue'
+import { useCartStore } from '@/stores/ShopCart'
+import { useFavoriteStore } from '@/stores/ShopFavorite'
+
+const cartStore = useCartStore()
+const favoriteStore = useFavoriteStore()
 
 // 預覽圖區的假資料，之後用API抓
 const product = ref({
+  productId: 10,
   name: '土星獨角獸',
   subtitle: '洋裝',
   price: 17999,
@@ -18,8 +24,14 @@ const product = ref({
     '/src/assets/Shop/粉紅派大星.jpeg',
     '/src/assets/Shop/藍色妖姬.jpeg',
   ],
-  colors: ['color1', 'color2', 'color3', 'color4'],
-  sizes: ['S', 'M', 'L', 'XL'],
+  specifications: [
+    { productSpecificationId: 101, color: '杏色', size: 'S', inventory: 50 },
+    { productSpecificationId: 102, color: '杏色', size: 'M', inventory: 30 },
+    { productSpecificationId: 103, color: '杏色', size: 'L', inventory: 15 },
+    { productSpecificationId: 104, color: '黑色', size: 'S', inventory: 20 },
+    { productSpecificationId: 105, color: '黑色', size: 'M', inventory: 0 },
+    { productSpecificationId: 106, color: '黑色', size: 'L', inventory: 8 },
+  ],
 })
 
 // 按鈕區，user「目前選擇」的狀態
@@ -28,14 +40,30 @@ const selectedColor = ref(null) //預設沒選顏色
 const selectedSize = ref(null) //預設沒選尺寸
 
 //==== 按鈕區，收藏、加入購物車、立即結帳====
-const isFavorite = ref(false) //收藏狀態，TF看有沒有被收藏
+// 當前選的規格，有沒有在收藏裡？（去問收藏 store）
+const isCurrentFavorite = computed(() => {
+  // 還沒選規格，就當作沒收藏
+  if (!selectedSpec.value) {
+    return false
+  }
+  // 問收藏 store：這個 productSpecificationId 在收藏清單裡嗎？
+  return favoriteStore.isFavorite(selectedSpec.value.productSpecificationId)
+})
 //切換收藏狀態
 function toggleFavorite() {
-  if (isFavorite.value === true) {
-    isFavorite.value = false
-  } else {
-    isFavorite.value = true
+  if (!selectedColor.value || !selectedSize.value) {
+    alert('請先選擇顏色和尺寸')
+    return
   }
+  favoriteStore.toggleFavorite({
+    productSpecificationId: selectedSpec.value.productSpecificationId,
+    productId: product.value.productId,
+    productName: product.value.name,
+    price: product.value.price,
+    color: selectedSpec.value.color,
+    size: selectedSpec.value.size,
+    image: product.value.mainImage,
+  })
 }
 
 // 加入購物車
@@ -45,12 +73,17 @@ function addToCart() {
     alert('請選擇顏色和尺寸')
     return
   }
-  //測試用
-  console.log('加入購物車：', {
-    name: product.value.name,
-    color: selectedColor.value,
-    size: selectedSize.value,
+  // 用反查到的 selectedSpec，組合成購物車商品
+  cartStore.addItem({
+    productSpecificationId: selectedSpec.value.productSpecificationId, // ★ 關鍵：帶正確的規格 id
+    productId: product.value.productId,
+    productName: product.value.name,
     price: product.value.price,
+    color: selectedSpec.value.color,
+    size: selectedSpec.value.size,
+    image: product.value.mainImage,
+    quantity: 1,
+    selected: true,
   })
 
   alert('已加入購物車！')
@@ -69,6 +102,30 @@ function buyNow() {
     size: selectedSize.value,
   })
 }
+
+// 從規格組合中，取出所有「不重複的顏色」
+const colorOptions = computed(() => {
+  const colors = product.value.specifications.map((spec) => spec.color)
+  return [...new Set(colors)] // 去除重複
+})
+
+// 從規格組合中，取出所有「不重複的尺寸」
+const sizeOptions = computed(() => {
+  const sizes = product.value.specifications.map((spec) => spec.size)
+  return [...new Set(sizes)]
+})
+
+// 根據使用者選的顏色+尺寸，反查出對應的「完整規格」（含 id、庫存）
+const selectedSpec = computed(() => {
+  // 還沒選齊顏色和尺寸，就回傳 null
+  if (!selectedColor.value || !selectedSize.value) {
+    return null
+  }
+  // 從組合陣列裡，找出「顏色和尺寸都符合」的那一筆
+  return product.value.specifications.find(
+    (spec) => spec.color === selectedColor.value && spec.size === selectedSize.value,
+  )
+})
 </script>
 
 <!-- =========================================================== -->
@@ -116,7 +173,7 @@ function buyNow() {
         <p class="option-label">顏色</p>
         <div class="option-list">
           <button
-            v-for="color in product.colors"
+            v-for="color in colorOptions"
             :key="color"
             class="option-btn"
             :class="{ selected: selectedColor === color }"
@@ -132,7 +189,7 @@ function buyNow() {
         <p class="option-label">尺寸</p>
         <div class="option-list">
           <button
-            v-for="size in product.sizes"
+            v-for="size in sizeOptions"
             :key="size"
             class="option-btn"
             :class="{ selected: selectedSize === size }"
@@ -144,10 +201,13 @@ function buyNow() {
         <p class="option-hint">建議尺寸：M（依版型微修身）</p>
       </div>
 
+      <!-- ⚠️ 測試用，看反查有沒有成功，測完刪 -->
+      <p class="text-muted" style="font-size: 0.8rem">🧪 目前選中的規格：{{ selectedSpec }}</p>
+
       <!-- 按鈕區域，收藏、立即購買、加入購物車 -->
       <div class="action-buttons">
         <button class="btn-favorite" @click="toggleFavorite">
-          收藏 <span v-if="isFavorite">❤️</span><span v-else>🤍</span>
+          收藏 <span v-if="isCurrentFavorite">❤️</span><span v-else>🤍</span>
         </button>
 
         <button class="btn-buy-now" @click="buyNow">立即購買</button>
