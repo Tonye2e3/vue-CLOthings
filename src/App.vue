@@ -80,7 +80,12 @@ function logout() {
         >
           <IconUser />
         </RouterLink>
-        <RouterLink :to="{ name: 'cart' }" class="icon-btn" aria-label="購物車">
+        <RouterLink
+          v-if="!isGroupSection"
+          :to="{ name: 'cart' }"
+          class="icon-btn"
+          aria-label="購物車"
+        >
           <IconCart />
         </RouterLink>
       </div>
