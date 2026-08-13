@@ -577,6 +577,16 @@ const toggleFollow = async () => {
               這裡顯示的時候想拿掉 #。
             -->
             <span class="tag-label" v-if="post.tags[0]">{{ post.tags[0].replace('#', '') }}</span>
+            <!--
+              狀態徽章：只有在「看自己的頁面」才顯示——因為別人看不到你 hide/check 狀態的貼文
+              （後端已經擋掉了，別人的 userPosts 裡本來就不會有這些），所以這個徽章對別人來說
+              永遠不會出現，只有本人才看得到自己貼文目前是公開／隱藏／審核中。
+            -->
+            <span
+              v-if="viewedUserId === currentUserId && post.status !== 'public'"
+              class="post-status-badge"
+              :class="post.status === 'hide' ? 'badge-hide' : 'badge-check'"
+            >{{ post.status === 'hide' ? '隱藏' : '審核中' }}</span>
             <img :src="post.image" :alt="post.content" />
           </router-link>
 
@@ -919,6 +929,15 @@ const toggleFollow = async () => {
   border-width:0 6px 6px 0; border-style:solid;
   border-color:transparent var(--plum-deep) transparent transparent;
 }
+
+.post-status-badge{
+  position:absolute; top:12px; right:12px; z-index:2;
+  color:#fff; font-size:.68rem; font-weight:700;
+  padding:.26rem .7rem; border-radius:999px;
+  box-shadow:0 2px 6px rgba(0,0,0,.2);
+}
+.post-status-badge.badge-hide{ background:var(--ink-soft); }
+.post-status-badge.badge-check{ background:var(--ochre); }
 
 .post-body{ padding:.95rem 1rem 1.1rem; }
 .post-title{
