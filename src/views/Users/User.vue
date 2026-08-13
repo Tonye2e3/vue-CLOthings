@@ -1,13 +1,94 @@
 <script setup>
-import AccountCard from './Card/AccountCard.vue'
-import AddressCard from './Card/AddressCard.vue'
-import ProfileCard from './Card/ProfileCard.vue'
+import AccountCard from './UserCard/AccountCard.vue'
+import AddressCard from './UserCard/AddressCard.vue'
+import ProfileCard from './UserCard/ProfileCard.vue'
+import oAuthCard from './UserCard/OAuthCard.vue'
+
+import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
+
+const authStore = useAuthStore()
+const router = useRouter()
+
+function logout() {
+  authStore.clearAuth()
+  router.push({ name: 'login' })
+}
 </script>
 
 <template>
-  <div class="container mt-5" style="width: 800px; margin: auto">
-    <AccountCard />
-    <ProfileCard />
-    <AddressCard />
+  <div class="row">
+    <!-- 左側固定導覽列 -->
+    <nav class="col-12 col-md-3 sidebar list-group mb-3 mb-md-0">
+      <ul>
+        <li><a href="#account">帳戶資料</a></li>
+        <li><a href="#profile">個人資料</a></li>
+        <li><a href="#address">收件資料</a></li>
+        <li><a href="#oauth">第三方登入</a></li>
+        <li>
+          <button type="button" class="logout-btn" @click="logout">登出</button>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- 右側主要內容 -->
+    <div class="col-12 col-md-9 content-area">
+      <AccountCard id="account" />
+      <ProfileCard id="profile" />
+      <AddressCard id="address" />
+      <oAuthCard id="oauth" />
+    </div>
   </div>
 </template>
+
+<style scoped>
+.content-area {
+  margin-left: 220px;
+  margin-top: 50px;
+  width: 800px;
+}
+
+.sidebar {
+  position: fixed;
+  top: 100px; /* 可依實際 header 高度調整 */
+  left: 350px;
+  width: 160px;
+  height: 50%; /* 設定高度為 100% 以填滿整個視窗高度 */
+  padding: 20px;
+  background-color: rgb(255, 255, 254);
+  border: 1px solid #ccc;
+  border-radius: 0.375rem;
+}
+
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+}
+
+.sidebar li {
+  margin-bottom: 15px;
+}
+
+.sidebar a {
+  text-decoration: none;
+  color: #333;
+  font-weight: 500;
+}
+
+.sidebar a:hover {
+  color: #007bff;
+}
+
+.logout-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #dc3545;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.logout-btn:hover {
+  color: #b02a37;
+}
+</style>

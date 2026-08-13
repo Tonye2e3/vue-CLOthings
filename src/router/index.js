@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -21,39 +22,79 @@ const router = createRouter({
 
     //Shop 在註解之間新增個人使用的路由 名字自行修改
     {
-      path: '/shop/sample',
-      name: 'Shop',
-      component: () => import('../views/Shop/SampleView.vue'),
+      path: '/shop/shop',
+      name: 'shop',
+      component: () => import('../views/Shop/ShopView.vue'),
+    },
+    {
+      path: '/shop/favorite',
+      name: 'favorite',
+      component: () => import('../views/Shop/ShopFavoriteView.vue'),
+    },
+    {
+      path: '/shop/product',
+      name: 'product',
+      component: () => import('../views/Shop/ProductView.vue'),
+    },
+    {
+      path: '/shop/cart',
+      name: 'cart',
+      component: () => import('../views/Shop/ShopCartView.vue'),
+    },
+    {
+      path: '/shop/orders',
+      name: 'orders',
+      component: () => import('../views/Shop/ShopOrdersView.vue'),
+    },
+    {
+      path: '/shop/orders/:id',
+      name: 'orderDetail',
+      component: () => import('../views/Shop/ShopOrderDetailView.vue'),
+    },
+    {
+      path: '/shop/checkout',
+      name: 'checkout',
+      component: () => import('../views/Shop/ShopCheckoutView.vue'),
+    },
+    {
+      path: '/shop/return/:id',
+      name: 'return',
+      component: () => import('../views/Shop/ShopReturnView.vue'),
+    },
+    {
+      path: '/shop/service',
+      name: 'service',
+      component: () => import('../views/Shop/ShopServiceView.vue'),
     },
 
     //GroupShop 在註解之間新增個人使用的路由 名字自行修改
-   //GroupShop 在註解之間新增個人使用的路由 名字自行修改
-{
-  path: '/GroupShop',
-  name: 'GroupProducts',
-  component: () => import('../views/GroupShop/GroupProductsView.vue'),
-},
-{
-  path: '/GroupShop/product/:id',
-  name: 'GroupProductDetail',
-  component: () => import('../views/GroupShop/GroupProductDetail.vue'),
-},
-{
-  path: '/GroupShop/checkout',
-  name: 'GroupCart',
-  component: () => import('../views/GroupShop/GroupCartView.vue'),
-},
-{
-  path: '/GroupShop/orders',
-  name: 'GroupOrders',
-  component: () => import('../views/GroupShop/GroupOrdersView.vue'),
-},
-{
-  path: '/GroupShop/checkout/confirm',
-  name: 'GroupCheckout',
-  component: () => import('../views/GroupShop/GroupCheckoutView.vue'),
-},
-// 模擬付款頁：結帳送出後會先跳到這裡，付款結果確認後才會真的建立訂單
+    //GroupShop 在註解之間新增個人使用的路由 名字自行修改
+    {
+      path: '/GroupShop',
+      name: 'GroupProducts',
+      component: () => import('../views/GroupShop/GroupProductsView.vue'),
+    },
+    {
+      path: '/GroupShop/product/:id',
+      name: 'GroupProductDetail',
+      component: () => import('../views/GroupShop/GroupProductDetail.vue'),
+    },
+    {
+      path: '/GroupShop/checkout',
+      name: 'GroupCart',
+      component: () => import('../views/GroupShop/GroupCartView.vue'),
+    },
+    {
+      path: '/GroupShop/orders',
+      name: 'GroupOrders',
+      component: () => import('../views/GroupShop/GroupOrdersView.vue'),
+    },
+    {
+      path: '/GroupShop/checkout/confirm',
+      name: 'GroupCheckout',
+      component: () => import('../views/GroupShop/GroupCheckoutView.vue'),
+    },
+    // 模擬付款頁：結帳送出後會先跳到這裡，付款結果確認後才會真的建立訂單
     {
       path: '/GroupShop/pay/:paymentId',
       name: 'GroupFakePayment',
@@ -71,10 +112,9 @@ const router = createRouter({
       component: () => import('../views/GroupShop/GroupOrderAdminView.vue'),
     },
 
-
     //Community 在註解之間新增個人使用的路由 名字自行修改
     {
-      path: '/community/profile',
+      path: '/community/profile/:userId',
       name: 'CommunityUserProfile',
       component: () => import('@/views/Community/UserProfileView.vue'),
     },
@@ -93,6 +133,17 @@ const router = createRouter({
       name: 'PostDetail',
       component: () => import('@/views/Community/PostDetailView.vue'),
     },
+    // 社群後台管理（管理者用，不是給一般使用者看的）
+    {
+      path: '/admin/community/posts',
+      name: 'AdminCommunityPostList',
+      component: () => import('@/views/Community/AdminCommunityPostListView.vue'),
+    },
+    {
+      path: '/admin/community/posts/:id',
+      name: 'AdminCommunityPostDetail',
+      component: () => import('@/views/Community/AdminCommunityPostDetailView.vue'),
+    },
 
     //User 在註解之間新增個人使用的路由 名字自行修改
     {
@@ -107,7 +158,7 @@ const router = createRouter({
     },
     {
       path: '/user',
-      meta: { requireMember: false },
+      meta: { requiresAuth: true },
       children: [
         {
           path: 'user',
@@ -117,6 +168,21 @@ const router = createRouter({
       ],
     },
   ],
+})
+
+// 路由守衛
+router.beforeEach((to) => {
+  const authStore = useAuthStore()
+
+  // 要進入的頁面需要登入，而且目前沒有登入
+  if (to.meta.requiresAuth && !authStore.isLoggedIn) {
+    return {
+      name: 'login',
+      query: {
+        redirect: to.fullPath,
+      },
+    }
+  }
 })
 
 export default router
