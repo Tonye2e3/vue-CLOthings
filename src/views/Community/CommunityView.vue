@@ -63,19 +63,6 @@ export const currentUser = {
   avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily'
 }
 
-// 假資料的發布時間改成「相對現在往前推 N 天」，而不是寫死未來日期。
-// 這樣不管使用者電腦當下實際日期是哪一天，假資料永遠會比「剛剛發布」的新貼文舊，
-// 「最新」分頁排序時，新發的貼文才會保證排在最上面。
-//
-// 這一行是「箭頭函式」的寫法：(n) => { ... } 的意思是
-// 「定義一個函式，它需要一個叫做 n 的輸入值，然後回傳後面算出來的結果」。
-// Date.now()：拿到「現在」的時間（用電腦看得懂的數字格式）。
-// n * 24 * 60 * 60 * 1000：把「n 天」換算成「n 天總共有幾毫秒」
-// （1 天 = 24 小時 = 24*60 分鐘 = 24*60*60 秒 = 24*60*60*1000 毫秒）。
-// 用「現在的時間」減掉「n 天份的毫秒數」，就會得到「n 天前的時間」。
-// .toISOString()：把時間轉換成一種國際通用的文字格式，方便存起來、之後比較大小。
-const daysAgo = (n) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString()
-
 // formatCount：把純數字（例如 1200）轉成「1.2k」這種縮寫格式，只給畫面顯示用。
 // 之後接上真的 API 時，後端 likesCount／commentsCount 會是用
 // SELECT COUNT(*) FROM Post_Likes WHERE post_id = ... 這種方式算出來的「純數字」，
@@ -92,89 +79,19 @@ export const formatCount = (n) => {
 
 // posts：全站所有貼文的清單，這是一個陣列，每個元素都是一篇貼文的資料物件。
 // 一樣用 export 開放給 CreatePostView.vue 使用。
+// 先給空陣列，等 fetchPosts() 打完 API 才會有真正資料庫裡的貼文——
+// 如果 API 打不通，畫面就是空清單，不會混進假資料。
 //
 // 欄位對照資料庫（Community_Post + Post_Images + Post_Tagged_Products）：
 // communityPostId      對應 post_id
 // userId      對應 user_id（真正串 API 後，user 顯示資訊會是後端 join Users 表回傳的）
 // content     對應 content（資料庫只有一個欄位，所以原本拆開的 title/desc 合併成一個）
 // postDate    對應 post_date
-// status      對應 status（貼文狀態，例如 'published' 已發布）
+// status      對應 status（貼文狀態，例如 'public' 公開、'hide' 隱藏）
 // images      對應 Post_Images 這張表（一篇貼文可以有多張圖，依 sortOrder 排序）
-// likesCount / commentsCount   之後會是後端算好的 COUNT(*) 數字，這裡先存純數字
-// taggedProducts   對應 Post_Tagged_Products（productId、productRoute 是資料庫真的欄位；
-//                   name 是「假設」後端會順便 join 商品名稱回傳，方便畫面直接顯示）
-export const posts = reactive([
-  {
-    communityPostId: 1,
-    userId: 1,
-    user: { name: 'Amy_穿搭日記', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Amy' },
-    content: '秋季奶茶色系穿搭，寬褲+針織的溫柔搭配。用奶茶色打底，寬褲修飾比例，針織外套增加層次，走在街上也很有電影感。',
-    postDate: daysAgo(2), // 呼叫剛剛定義的函式，代表「2 天前發布的」
-    status: 'published',
-    images: [
-      { postImageId: 101, imageFileName: 'outfit-cream-knit.jpg', sortOrder: 1, url: 'https://picsum.photos/seed/outfit-cream-knit/900/720' }
-    ],
-    likesCount: 1200,
-    commentsCount: 89,
-    taggedProducts: [{ postTaggedProductId: 1, productId: 3, productRoute: '/shop/product/3', name: '羊毛混紡針織外套' }]
-  },
-  {
-    communityPostId: 2,
-    userId: 2,
-    user: { name: 'Kevin.style', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Kevin' },
-    content: '極簡工裝風｜大地色機能外套通勤也好看。極簡工裝風，大地色機能外套通勤也好看，口袋設計實用又有型。',
-    postDate: daysAgo(4),
-    status: 'published',
-    images: [
-      { postImageId: 102, imageFileName: 'outfit-utility-jacket.jpg', sortOrder: 1, url: 'https://picsum.photos/seed/outfit-utility-jacket/700/560' }
-    ],
-    likesCount: 856,
-    commentsCount: 42,
-    taggedProducts: [{ postTaggedProductId: 2, productId: 1, productRoute: '/shop/product/1', name: '經典圓領短T' }]
-  },
-  {
-    communityPostId: 3,
-    userId: 3,
-    user: { name: '小雨 rainy', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Rainy' },
-    content: '約會小心機｜法式碎花洋裝配藤編包 🌸。約會小心機，法式碎花洋裝配藤編包，甜而不膩剛剛好。',
-    postDate: daysAgo(1),
-    status: 'published',
-    images: [
-      { postImageId: 103, imageFileName: 'outfit-floral-dress.jpg', sortOrder: 1, url: 'https://picsum.photos/seed/outfit-floral-dress/700/560' }
-    ],
-    likesCount: 2400,
-    commentsCount: 158,
-    taggedProducts: [{ postTaggedProductId: 3, productId: 2, productRoute: '/shop/product/2', name: '法式碎花洋裝' }]
-  },
-  {
-    communityPostId: 4,
-    userId: 4,
-    user: { name: 'Leo_urban', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Leo' },
-    content: '街頭機能風｜背心＋工裝褲率性感。機能背心＋工裝褲，街頭感十足，鞋款選厚底增加率性。',
-    postDate: daysAgo(5),
-    status: 'published',
-    images: [
-      { postImageId: 104, imageFileName: 'outfit-street-utility.jpg', sortOrder: 1, url: 'https://picsum.photos/seed/outfit-street-utility/700/560' }
-    ],
-    likesCount: 631,
-    commentsCount: 27,
-    taggedProducts: [{ postTaggedProductId: 4, productId: 4, productRoute: '/shop/product/4', name: '修身牛仔褲' }]
-  },
-  {
-    communityPostId: 5,
-    userId: 5,
-    user: { name: 'Mia.wardrobe', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mia' },
-    content: '極簡膠囊衣櫥｜五件單品排列組合穿一週。挑五件百搭基本款互相搭配，減法生活從衣櫃開始，出門前不再猶豫要穿什麼。',
-    postDate: daysAgo(3),
-    status: 'published',
-    images: [
-      { postImageId: 105, imageFileName: 'outfit-capsule-wardrobe.jpg', sortOrder: 1, url: 'https://picsum.photos/seed/outfit-capsule-wardrobe/700/560' }
-    ],
-    likesCount: 1100,
-    commentsCount: 54,
-    taggedProducts: [{ postTaggedProductId: 5, productId: 5, productRoute: '/shop/product/5', name: '百褶及膝裙' }]
-  }
-])
+// likesCount / commentsCount   後端算好的 COUNT(*) 數字，這裡存純數字
+// taggedProducts   對應 Post_Tagged_Products
+export const posts = reactive([])
 
 // addPost：一個函式，作用是「把一篇新貼文加到 posts 清單的最前面」。
 // CreatePostView.vue 裡使用者按「確認發布」的時候，就會呼叫這個函式。
@@ -313,7 +230,8 @@ const fetchPosts = async () => {
     posts.splice(0, posts.length, ...apiPosts)
   } catch (err) {
     // 如果打 API 失敗（後端沒開、網址打錯、CORS 設定問題...），
-    // 先在瀏覽器主控台印出錯誤內容方便除錯，畫面就繼續顯示原本的假資料，不會整頁空白。
+    // 先在瀏覽器主控台印出錯誤內容方便除錯。posts 維持空陣列，畫面會顯示空清單，
+    // 不會混進假資料——這是刻意的決定，寧可看到空白也不要顯示不是真的資料。
     console.error('讀取貼文列表失敗：', err)
   }
 }
@@ -562,7 +480,7 @@ const toggleFollow = async (creator) => {
           </div>
         </div>
 
-        <!-- 搜尋列：可搜尋穿搭標籤、單品或用戶 -->
+        <!-- 搜尋列：可搜尋穿搭標籤、標籤或用戶 -->
         <div class="search-bar">
           <svg class="search-icon" viewBox="0 0 24 24" fill="none">
             <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
@@ -578,7 +496,7 @@ const toggleFollow = async (creator) => {
             type="text"
             v-model="searchQuery"
             class="search-input"
-            placeholder="搜尋穿搭、單品或用戶..."
+            placeholder="搜尋穿搭、標籤或用戶..."
           />
           <!--
             v-if="searchQuery"：只有搜尋框裡有文字的時候，才顯示這個「清除」按鈕。
@@ -664,7 +582,6 @@ const toggleFollow = async (creator) => {
               <div class="stat-row">
                 <span>♥ {{ formatCount(featurePost.likesCount) }}</span>
                 <span>💬 {{ formatCount(featurePost.commentsCount) }}</span>
-                <a href="#" class="link-out">查看單品 →</a>
               </div>
             </div>
           </div>
@@ -678,7 +595,7 @@ const toggleFollow = async (creator) => {
             就改顯示 currentTabCopy.empty 這個針對目前分頁寫好的提示文字。
           -->
           <div class="empty-state" v-if="filteredPosts.length === 0">
-            {{ isSearching ? `找不到符合「${searchQuery}」的穿搭、單品或用戶，換個關鍵字試試。` : currentTabCopy.empty }}
+            {{ isSearching ? `找不到符合「${searchQuery}」的穿搭、標籤或用戶，換個關鍵字試試。` : currentTabCopy.empty }}
           </div>
 
           <!--
