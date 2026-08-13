@@ -1,14 +1,8 @@
 // 「團購購物車」的 Pinia store。
-// 跟原本的版本差別：原本是直接把 items 存在 localStorage，現在改成呼叫後端 API，
-// items 裡的內容（包含團購價 unitPrice）都是後端算好回傳的，前端不用再自己算一次。
+// UserId 不再由前端決定：登入狀態統一用 useAuthStore()，
+// 購物車內容也一律由後端依 JWT 判斷是誰的，前端只需要呼叫 API、不用再自己組 userId。
 import { defineStore } from 'pinia'
 import { getGroupCart, addToGroupCart, updateGroupCartQty, removeGroupCartItem, clearGroupCart } from '@/api/groupShop'
-
-// 目前登入會員的 userId：先沿用你們登入後存 memberName 的做法，
-// 這裡假設登入時也會把 userId 存進 localStorage（'userId'）。
-// TODO：如果你們登入流程還沒有存 userId，記得在登入成功那一步加上
-// localStorage.setItem('userId', 回傳的會員 id)
-const getUserId = () => Number(localStorage.getItem('userId')) || 1
 
 export const useGroupCartStore = defineStore('groupCart', {
   state: () => ({
@@ -29,9 +23,9 @@ export const useGroupCartStore = defineStore('groupCart', {
       return item.unitPrice
     },
 
-    // 從後端把目前購物車內容抓下來，蓋掉本地的 items
+    // 從後端把目前登入者的購物車內容抓下來，蓋掉本地的 items
     async fetchCart() {
-      const rows = await getGroupCart(getUserId())
+      const rows = await getGroupCart()
       this.items = rows.map(r => ({
         groupCartId: r.groupCartId,
         id: r.groupProductId,
@@ -49,7 +43,6 @@ export const useGroupCartStore = defineStore('groupCart', {
     // 後端會自動判斷購物車裡有沒有這個商品：有的話數量 +1，沒有的話新增一筆
     async addItem(product) {
       const saved = await addToGroupCart({
-        userId: getUserId(),
         groupProductId: product.id,
         quantity: 1
       })
@@ -91,7 +84,7 @@ export const useGroupCartStore = defineStore('groupCart', {
 
     // 清空購物車（結帳成功後會用到）
     async clear() {
-      await clearGroupCart(getUserId())
+      await clearGroupCart()
       this.items = []
     }
   }
