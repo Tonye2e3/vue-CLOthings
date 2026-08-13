@@ -1,5 +1,12 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+// useRoute：Vue Router 提供的功能，讓我們可以在 <script> 裡面讀到「目前網址」的資訊，
+// 例如網址上帶的動態參數。router/index.js 裡這個頁面對應的路由是
+// path: '/community/post/:id'，所以網址上 :id 那一段的值，
+// 就是這篇貼文的 communityPostId，要用 useRoute() 才能拿到。
+import { useRoute } from 'vue-router'
+// axios：打 API 用的套件，跟 CommunityView.vue 裡用的是同一套。
+import axios from 'axios'
 
 // 收藏功能共用資料（跟 UserProfileView.vue 共用同一份收藏清單，直接 import 那個檔案）
 // savedPosts：目前所有收藏的貼文清單（雖然這裡沒有直接用到它本身，
@@ -16,37 +23,166 @@ import { isPostSaved, toggleSavePost } from '@/views/Community/CommunityView.vue
 // 最後會變成一個瀏覽器看得懂的圖片網址，可以直接給 <img :src="..."> 用。
 import postImage from '@/assets/Postimage/post2.jpg'
 
+// API_BASE：後端 API 專案的網址，跟 CommunityView.vue 裡用的是同一個。
+const API_BASE = 'https://localhost:7255'
+
+// currentTestUserId：先用資料庫裡真的存在的測試帳號 id 頂著，跟 CreatePostView.vue 目前的做法一樣。
+// TODO: 之後接上真的登入系統，這裡要換成登入者的 user_id。
+const currentTestUserId = 1
+
+// route：呼叫 useRoute() 拿到「目前網址」的資訊物件。
+const route = useRoute()
+
 // 貼文詳細資料
 // 這是一個很大的物件，裡面用「巢狀」的方式（物件裡面還有物件、陣列）
 // 裝著這篇貼文需要的所有資訊。
+// 先放一份「載入中」用的預設假資料，避免 API 還沒回來之前畫面整個空白、報錯。
 const post = ref({
-  id: 8842,
+  communityPostId: null,
+  userId: null,
   user: {
-    name: 'Emily_穿搭日記',
+    name: '載入中...',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily',
-    time: '2 小時前',
-    location: '台北'
+    location: ''
   },
   isFollowing: false,
-  // 指向剛才 import 的本地圖片變數
-  imageUrl: postImage,
-  content: '今天走簡約韓系風格，這套針織上衣與打褶寬褲質感超好，版型顯瘦又舒服，很適合秋天約會或上班～ 全身都可以直接在下方點擊購買！',
-  commentsCount: 86,
-  isLiked: false, // 「我」有沒有按讚
-  // 這裡本來有個 isSaved 存「我」有沒有收藏，現在改成從共用的收藏清單
-  // （savedPosts，在 CommunityView.vue 裡）即時判斷，不用自己在這裡另外存一份，
-  // 這樣才不會發生「這裡顯示已收藏，但 UserProfileView 收藏頁籤卻沒有」這種兩邊資料兜不起來的情況。
-  //
-  // taggedProducts：這篇貼文標記的商品。原本這裡還有 x、y 兩個欄位，
-  // 是拿來把標籤定位在照片上的百分比座標，但資料庫其實沒有存這兩個欄位
-  // （資料庫存的是 productRoute，商品連結），所以拿掉 x/y，
-  // 改成把標記商品顯示在貼文文字下方的一排標籤，而不是浮在照片上。
-  // 這裡的 id 會跟下面 products 清單裡的 id 對應，用來找出對應商品的連結。
-  taggedProducts: [
-    { id: 101, name: '針織上衣' },
-    { id: 102, name: '高腰寬褲' },
-    { id: 103, name: '托特包' }
-  ]
+  postDate: new Date().toISOString(),
+  status: 'published',
+  images: [
+    { postImageId: null, imageFileName: null, sortOrder: 1, url: postImage }
+  ],
+  content: '',
+  commentsCount: 0,
+  isLiked: false,
+  taggedProducts: []
+})
+
+// notFound：如果這個 id 在資料庫裡根本找不到對應的貼文，用這個來控制畫面顯示「找不到這篇貼文」。
+const notFound = ref(false)
+
+// currentImageIndex：主圖輪播現在顯示 post.images 裡的第幾張（從 0 開始算）。
+// 每次換到新的一篇貼文時要記得歸零，不然會出現「這篇貼文明明只有 1 張圖，
+// 卻想顯示上一篇貼文停在的第 3 張」這種指到不存在的索引的情況。
+const currentImageIndex = ref(0)
+
+// prevImage／nextImage：按輪播箭頭時執行。
+// % post.value.images.length：取餘數，讓索引超過最後一張時自動繞回第一張，
+// 索引小於 0 時（在第一張按「上一張」）也用同樣的算法繞到最後一張。
+const prevImage = () => {
+  const len = post.value.images.length
+  currentImageIndex.value = (currentImageIndex.value - 1 + len) % len
+}
+const nextImage = () => {
+  const len = post.value.images.length
+  currentImageIndex.value = (currentImageIndex.value + 1) % len
+}
+
+const fetchPost = async () => {
+  // route.params.id：讀出網址上 :id 這段動態參數的值，是字串型別
+  // （例如網址是 /community/post/3，這裡拿到的就是 "3"）。
+  const id = route.params.id
+  try {
+    const res = await axios.get(`${API_BASE}/api/CommunityPost/${id}`)
+
+    // 這支 API 找不到資料時，後端是回傳 null（不是觸發 404 錯誤），
+    // 所以要自己檢查 res.data 是不是 null，不能只靠 try/catch 判斷。
+    if (!res.data) {
+      notFound.value = true
+      return
+    }
+
+    const p = res.data
+    post.value = {
+      communityPostId: p.communityPostId,
+      userId: p.userId,
+      user: p.user || { name: '未知使用者', avatar: '', location: '' },
+      isFollowing: false, // 先給預設值，實際有沒有追蹤過由下面 fetchFollowStatus() 另外去問後端才知道
+      postDate: p.postDate,
+      status: p.status,
+      images: (p.images && p.images.length)
+        ? p.images.map(img => ({
+            postImageId: img.postImageId,
+            imageFileName: img.imageFileName,
+            sortOrder: img.sortOrder,
+            // imageFileName 本身已經帶路徑了（例如 "/images/posts/post01_1.jpg"），
+            // 直接接在 API_BASE 後面組成完整網址，跟 CommunityView.vue 的做法一樣。
+            url: `${API_BASE}${img.imageFileName}`
+          }))
+        : [{ postImageId: null, imageFileName: null, sortOrder: 1, url: postImage }], // 完全沒有圖片時的保底畫面
+      content: p.content,
+      commentsCount: p.commentsCount ?? 0,
+      isLiked: false, // 先給預設值，實際有沒有按過讚由下面 fetchLikeStatus() 另外去問後端才知道
+      taggedProducts: p.taggedProducts || []
+    }
+    // 讚數也要跟著這篇貼文真正的數字重設，不能繼續用寫死的 1248。
+    // ?? 0：如果 p.likesCount 是 undefined 或 null，就用 0 代替，
+    // 避免後端這個欄位漏帶或叫別的名字時，讓 likesNumber 變成 undefined 把整頁弄壞。
+    likesNumber.value = p.likesCount ?? 0
+
+    // fetchFollowStatus 要用到 post.value.userId，一定要等上面 post.value 設定完才能呼叫，
+    // 不能跟 fetchPost() 平行呼叫（那樣 userId 還是初始值 null，會查到錯的人）。
+    fetchFollowStatus()
+  } catch (err) {
+    console.error('讀取貼文詳細資料失敗：', err)
+    notFound.value = true
+  }
+}
+
+// myLikeId：如果目前這個使用者已經對這篇貼文按過讚，這裡存那筆 Post_Like 紀錄的 postLikesId，
+// 之後要取消讚（DELETE）要靠這個 id 才能刪對紀錄。還沒按過讚就是 null。
+const myLikeId = ref(null)
+
+// fetchLikeStatus：問後端「這個使用者有沒有幫這篇貼文按過讚」，
+// 打的是 PostLikeController.cs 裡的 GET api/PostLike/post/{communitypostid}/user/{userid}。
+const fetchLikeStatus = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/api/PostLike/post/${route.params.id}/user/${currentTestUserId}`)
+    if (res.data) {
+      post.value.isLiked = true
+      myLikeId.value = res.data.postLikesId
+    } else {
+      post.value.isLiked = false
+      myLikeId.value = null
+    }
+  } catch (err) {
+    console.error('讀取按讚狀態失敗：', err)
+  }
+}
+
+// onMounted：頁面一打開，就照網址上的 id 去後端要這篇貼文的完整資料、留言、
+// 這個使用者按讚過沒有，還有跟這篇貼文標記過同一個商品的相似穿搭推薦。
+onMounted(() => {
+  fetchPost()
+  fetchComments()
+  fetchLikeStatus()
+  fetchSimilarPosts()
+})
+
+// watch：監看網址上的 :id 這個參數。
+// 因為從「這篇貼文詳細頁」點連結跳到「另一篇貼文詳細頁」時，
+// Vue Router 會重複使用同一個元件（不會整個重新建立），
+// 所以 onMounted 不會再執行第二次，畫面資料就不會跟著新的 id 換。
+// 這裡另外監看 route.params.id，只要它變了（換了一篇貼文），
+// 就重新打一次全部的 API，資料才會真的換成新那篇的內容。
+watch(() => route.params.id, () => {
+  notFound.value = false
+  newComment.value = '' // 清空還沒送出的留言草稿，避免帶到別篇貼文底下去
+  replyingTo.value = null // 取消原本在回覆的狀態，避免對新貼文的留言用到舊貼文的 parentCommentId
+  currentImageIndex.value = 0 // 換到新貼文時輪播歸零，從第一張開始顯示
+  fetchPost()
+  fetchComments()
+  fetchLikeStatus()
+  fetchSimilarPosts()
+})
+
+// postTimeAgo：把 post.postDate 這個正式時間，轉換成「N 小時前」這種給人看的相對時間文字。
+// 之後接上真的 API，這個計算方式不用變，只是 postDate 會是後端真正回傳的發文時間。
+const postTimeAgo = computed(() => {
+  const diffMs = Date.now() - new Date(post.value.postDate).getTime()
+  const diffHours = Math.round(diffMs / (60 * 60 * 1000))
+  if (diffHours < 1) return '剛剛'
+  if (diffHours < 24) return `${diffHours} 小時前`
+  return `${Math.round(diffHours / 24)} 天前`
 })
 
 // 按讚數改用數字追蹤，方便按讚時 +1、取消時 -1；畫面顯示再轉成千分位字串
@@ -58,105 +194,208 @@ const likesNumber = ref(1248) // 對應原本的 '1,248'
 // 自動幫數字加上千分位逗號。
 const likesDisplay = computed(() => likesNumber.value.toLocaleString())
 
-// toggleLike：按下愛心按鈕時執行。
-const toggleLike = () => {
-  post.value.isLiked = !post.value.isLiked // 先把「有沒有按讚」的狀態反過來
-  // 如果現在是「已按讚」狀態，就 +1；如果是「取消讚」，就 -1
-  // 條件 ? A : B 這種寫法叫三元運算子：條件成立回傳 A，不成立回傳 B。
-  likesNumber.value += post.value.isLiked ? 1 : -1
+// toggleLike：按下愛心按鈕時執行。改成 async，因為裡面要 await 打 API。
+const toggleLike = async () => {
+  if (post.value.isLiked) {
+    // 目前是「已按讚」狀態 → 這次是要取消讚 → 打 DELETE，刪掉 myLikeId 那筆紀錄
+    try {
+      await axios.delete(`${API_BASE}/api/PostLike/${myLikeId.value}`)
+    } catch (err) {
+      console.error('取消讚失敗：', err)
+      return // 失敗就不要動畫面上的狀態，維持「已按讚」原樣
+    }
+    post.value.isLiked = false
+    myLikeId.value = null
+    likesNumber.value -= 1
+  } else {
+    // 目前是「還沒按讚」狀態 → 這次是要按讚 → 打 POST 新增一筆 Post_Like 紀錄
+    try {
+      await axios.post(`${API_BASE}/api/PostLike`, {
+        communityPostId: post.value.communityPostId,
+        userId: currentTestUserId
+      })
+    } catch (err) {
+      console.error('按讚失敗：', err)
+      return
+    }
+    // POST 只會回傳成功與否，不會回傳剛剛新增那筆紀錄的 id，
+    // 所以要重新問一次後端才知道 myLikeId 是多少（之後要取消讚會用到），跟留言那邊的做法一樣。
+    await fetchLikeStatus()
+    likesNumber.value += 1
+  }
 }
 
 // isSaved：這篇貼文現在有沒有被收藏。
 // 用 computed 從共用的收藏清單即時判斷（呼叫 CommunityView.vue 提供的 isPostSaved），
 // 而不是自己在這裡存一份 true/false，這樣不管使用者是從哪個頁面把貼文收藏／取消收藏，
 // 這裡都會自動顯示正確的狀態。
-const isSaved = computed(() => isPostSaved(post.value.id))
+const isSaved = computed(() => isPostSaved(post.value.communityPostId))
 
 // toggleSave：按下收藏按鈕時執行。
 const toggleSave = () => {
   // 把這篇貼文整理成 UserProfileView.vue 收藏牆看得懂的格式
-  // （欄位名稱要對得上：id、title、image、likes、comments、tags），
-  // 再呼叫 toggleSavePost 去新增或移除。
+  // （欄位名稱對照 Community_Favorite + Community_Post：communityPostId、content、image、
+  // likesCount、commentsCount、tags），再呼叫 toggleSavePost 去新增或移除。
   toggleSavePost({
-    id: post.value.id,
-    title: post.value.content,
-    image: post.value.imageUrl,
-    likes: likesDisplay.value,
-    comments: post.value.commentsCount,
+    communityPostId: post.value.communityPostId,
+    content: post.value.content,
+    image: post.value.images[0]?.url,
+    likesCount: likesNumber.value,
+    commentsCount: post.value.commentsCount,
     // .map(...)：把 taggedProducts 陣列裡每個標記物件，轉換成 "#商品名" 這種字串格式
     tags: post.value.taggedProducts.map(t => `#${t.name}`)
   })
 }
 
-// 這套穿搭的商品清單（右側欄要顯示的可購買商品）
-// productRoute：對應資料庫裡的商品連結欄位，點商品圖片／名稱會導去這個網址。
-const products = ref([
-  {
-    id: 101,
-    name: '奶油白V領針織上衣',
-    price: '690',
-    image: 'https://i.pinimg.com/1200x/dc/94/75/dc9475c6d350370bcf6c471e3ee6d6fb.jpg',
-    productRoute: '/shop/product/101'
-  },
-  {
-    id: 102,
-    name: '高腰垂墜寬褲 (卡其)',
-    price: '890',
-    image: 'https://i.pinimg.com/1200x/f3/dd/f4/f3ddf4c34ff005240958bddb9a8080d0.jpg',
-    productRoute: '/shop/product/102'
-  },
-  {
-    id: 103,
-    name: '復古麻編單肩托特包',
-    price: '680',
-    image: 'https://i.pinimg.com/736x/f2/cf/7b/f2cf7b273ca7445dce8800f855051f93.jpg',
-    productRoute: '/shop/product/103'
-  }
-])
+// 「這套穿搭的商品」右側清單：直接用 post.taggedProducts（貼文作者真的搜尋、勾選過的商品），
+// 不再是另一份跟這篇貼文毫不相干的假資料。這樣畫面上只會出現作者自己標記過的東西，
+// 不會出現「使用者身上每一件都被當成我們家商品在賣」這種狀況。
+// totalTaggedPrice：把這篇貼文標記的所有商品價格加總，給「一鍵購買全套穿搭」按鈕顯示用。
+const totalTaggedPrice = computed(() =>
+  post.value.taggedProducts.reduce((sum, t) => sum + (t.price || 0), 0)
+)
 
-// findProductRoute：拿貼文標記商品的 id，去 products 清單裡找同一個 id 的商品，
-// 回傳它的 productRoute。找不到（例如標記了一個已下架的商品）就回傳 '#'，
-// 這樣連結還是有東西可以點，不會整個報錯。
-const findProductRoute = (productId) => {
-  const matched = products.value.find(p => p.id === productId)
-  return matched ? matched.productRoute : '#'
+// 相似穿搭推薦：跟這篇貼文標記過同一個商品的其他貼文，先給空陣列，
+// 等 fetchSimilarPosts() 打完 API 才會有真正資料庫裡的貼文。
+const similarPosts = ref([])
+
+// fetchSimilarPosts：打 CommunityPostController.cs 裡的 GET api/CommunityPost/similar/{communitypostid}。
+const fetchSimilarPosts = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/api/CommunityPost/similar/${route.params.id}`)
+    similarPosts.value = res.data.map(p => ({
+      communityPostId: p.communityPostId,
+      image: (p.images && p.images.length) ? `${API_BASE}${p.images[0].imageFileName}` : postImage
+    }))
+  } catch (err) {
+    console.error('讀取相似穿搭推薦失敗：', err)
+  }
 }
 
-// 相似穿搭推薦
-const similarPosts = ref([
-  { id: 1, image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80' },
-  { id: 2, image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=300&auto=format&fit=crop&q=80' },
-  { id: 3, image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=300&auto=format&fit=crop&q=80' }
-])
+// 留言列表：等 fetchComments() 打完 API 才會有資料，先給空陣列避免顯示假留言。
+// 欄位對照 Post_Comment 表：postCommentId、parentCommentId（回覆留言用，parentCommentId
+// 有值代表這則是在回覆某一則留言）、commentText、commentDate，user／avatar 是後端 join User 表組出來的。
+const comments = ref([])
 
-// 留言列表：一開始先放兩筆假留言當範例
-const comments = ref([
-  { id: 1, user: '小美', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=May', text: '這套超好看！請問褲子是什麼顏色？' },
-  { id: 2, user: '阿圓', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jerry', text: '已收藏~等發薪就下單 !!!' }
-])
+// groupedComments：把後端回來的「一維陣列」，依 parentCommentId 整理成
+// 「主留言 + 底下往內縮的回覆」這種巢狀結構，跟 IG 留言區的呈現方式一樣。
+// parentCommentId 是 null（或沒有值）的是主留言，parentCommentId 指到誰，
+// 就代表這則是在回覆那一則留言。
+const groupedComments = computed(() => {
+  const topLevel = comments.value.filter(c => !c.parentCommentId)
+  return topLevel.map(c => ({
+    ...c,
+    replies: comments.value
+      .filter(r => r.parentCommentId === c.postCommentId)
+      // 回覆本身照留言時間「舊到新」排，符合對話的閱讀順序（跟主留言新到舊的排序方向相反）
+      .sort((a, b) => new Date(a.commentDate) - new Date(b.commentDate))
+  }))
+})
+
+// replyingTo：目前正在回覆哪一則留言。null 代表現在是要發「新的主留言」，
+// 有值的話代表輸入框上面會出現「回覆 @xxx」的提示，送出時會帶上 parentCommentId。
+const replyingTo = ref(null)
+
+// startReply：點某則留言的「回覆」按鈕時執行，把輸入框切換成「回覆這則留言」的模式。
+const startReply = (comment) => {
+  replyingTo.value = comment
+}
+
+// cancelReply：取消回覆，輸入框切回「發新留言」的模式。
+const cancelReply = () => {
+  replyingTo.value = null
+}
+
+// fetchComments：跟後端要「這篇貼文底下的所有留言」，
+// 打的是 PostCommentController.cs 裡的 GET api/PostComment/post/{communitypostid}。
+const fetchComments = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/api/PostComment/post/${route.params.id}`)
+    comments.value = res.data
+  } catch (err) {
+    console.error('讀取留言失敗：', err)
+  }
+}
 
 // newComment：跟留言輸入框做雙向綁定，存使用者「正在打字、還沒送出」的留言內容
 const newComment = ref('')
 
-const toggleFollow = () => {
-  post.value.isFollowing = !post.value.isFollowing
+// myFollowId：如果目前這個測試帳號已經追蹤這篇貼文的作者，這裡存那筆 User_Follow 紀錄的
+// userFollowId，之後要取消追蹤（DELETE）要靠這個 id 才能刪對紀錄。還沒追蹤就是 null。
+const myFollowId = ref(null)
+
+// fetchFollowStatus：問後端「這個測試帳號有沒有追蹤這篇貼文的作者」，
+// 打的是 UserFollowController.cs 裡的 GET api/UserFollow/follower/{followerid}/following/{followingid}。
+const fetchFollowStatus = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/api/UserFollow/follower/${currentTestUserId}/following/${post.value.userId}`)
+    if (res.data) {
+      post.value.isFollowing = true
+      myFollowId.value = res.data.userFollowId
+    } else {
+      post.value.isFollowing = false
+      myFollowId.value = null
+    }
+  } catch (err) {
+    console.error('讀取追蹤狀態失敗：', err)
+  }
+}
+
+// toggleFollow：按下「＋ 追蹤」按鈕時執行。改成 async，因為裡面要 await 打 API。
+const toggleFollow = async () => {
+  if (post.value.isFollowing) {
+    // 目前是「已追蹤」狀態 → 這次是要取消追蹤 → 打 DELETE，刪掉 myFollowId 那筆紀錄
+    try {
+      await axios.delete(`${API_BASE}/api/UserFollow/${myFollowId.value}`)
+    } catch (err) {
+      console.error('取消追蹤失敗：', err)
+      return // 失敗就不要動畫面上的狀態，維持「已追蹤」原樣
+    }
+    post.value.isFollowing = false
+    myFollowId.value = null
+  } else {
+    // 目前是「還沒追蹤」狀態 → 這次是要追蹤 → 打 POST 新增一筆 User_Follow 紀錄
+    try {
+      await axios.post(`${API_BASE}/api/UserFollow`, {
+        followerId: currentTestUserId,
+        followingId: post.value.userId
+      })
+    } catch (err) {
+      console.error('追蹤失敗：', err)
+      return
+    }
+    // POST 只會回傳成功與否，不會回傳剛剛新增那筆紀錄的 id，
+    // 所以要重新問一次後端才知道 myFollowId 是多少（之後要取消追蹤會用到），跟按讚那邊的做法一樣。
+    await fetchFollowStatus()
+  }
 }
 
 // addComment：按下「送出」按鈕或在輸入框按 Enter 時執行。
-const addComment = () => {
+// 改成 async，因為裡面要 await 打 API。
+const addComment = async () => {
   // .trim()：去掉文字前後的空白。如果去掉空白後是空字串，代表使用者其實沒打字，
   // 直接 return（提早結束函式），不新增這則空白留言。
   if (!newComment.value.trim()) return
-  // .unshift(...)：把一筆新留言加到 comments 陣列的「最前面」
-  // （原本用的是 .push()，加到最後面；改成 .unshift() 之後，
-  // 剛送出的留言就會排在留言列表最上方，最新的留言最先被看到）。
-  comments.value.unshift({
-    id: Date.now(), // 用目前時間當作這則留言的唯一編號
-    user: '我', // 這裡先寫死成「我」，之後接上真正的登入系統可以換成真實使用者名稱
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Me',
-    text: newComment.value
-  })
+
+  try {
+    await axios.post(`${API_BASE}/api/PostComment`, {
+      // replyingTo 有值代表現在是在回覆某一則留言，parentCommentId 就帶那則留言的 id；
+      // 沒有值（一般發新留言）就帶 null。
+      parentCommentId: replyingTo.value ? replyingTo.value.postCommentId : null,
+      communityPostId: post.value.communityPostId,
+      userId: currentTestUserId, // 先用測試帳號頂著，跟 CreatePostView.vue 一致
+      commentText: newComment.value
+    })
+  } catch (err) {
+    console.error('送出留言失敗：', err)
+    alert('留言失敗，請稍後再試一次！')
+    return
+  }
+
   newComment.value = '' // 送出後把輸入框清空，方便使用者繼續打下一則留言
+  replyingTo.value = null // 送出後回到「發新留言」模式，不用使用者自己按取消
+  post.value.commentsCount += 1 // 留言數 +1，跟按讚數那邊 likesNumber 的處理方式一樣，先讓畫面立刻反應
+  fetchComments() // 重新跟後端要一次留言列表，這樣剛送出的留言才會有資料庫真正給的 postCommentId、commentDate、user、avatar
 }
 </script>
 
@@ -175,7 +414,16 @@ const addComment = () => {
       -->
       <router-link to="/community" class="back-pill">← 返回社群</router-link>
 
-      <div class="row g-4">
+      <!--
+        notFound：如果網址上的 id 在資料庫裡找不到對應的貼文（例如網址被亂改、
+        或貼文已經被刪除），就顯示這個提示，不要繼續顯示「載入中...」那份假資料。
+      -->
+      <div v-if="notFound" class="not-found-state">
+        <p>找不到這篇貼文，可能已經被刪除，或網址不正確。</p>
+        <router-link to="/community" class="back-pill">← 返回社群</router-link>
+      </div>
+
+      <div class="row g-4" v-else>
 
         <!-- 左側：貼文主體區 (大圖、內文、互動、留言) -->
         <div class="col-12 col-lg-8">
@@ -185,16 +433,16 @@ const addComment = () => {
             <div class="author-bar">
               <!--
                 把大頭貼跟名字包進 <router-link>，讓它可以點擊跳轉。
-                to="/community/profile"：這是我們專案裡「個人檔案頁」(UserProfileView.vue) 對應的網址，
-                跟 CommunityView.vue 側欄「熱門穿搭達人」點頭像時用的是同一個網址，
-                點下去就會切換到 UserProfileView.vue 那個頁面。
+                :to="`/community/profile/${post.userId}`"：帶上這篇貼文真正的發文者 userId，
+                點下去會跳到那個人的個人檔案頁（UserProfileView.vue），不同貼文的作者會連到不同網址。
                 class="text-decoration-none"：Bootstrap 的工具 class，把 <a> 連結預設的底線拿掉。
               -->
-              <router-link to="/community/profile" class="author-info text-decoration-none">
+              <router-link :to="`/community/profile/${post.userId}`" class="author-info text-decoration-none">
                 <img :src="post.user.avatar" class="author-avatar" alt="avatar" />
                 <div>
                   <h6 class="author-name">{{ post.user.name }}</h6>
-                  <small class="author-meta">{{ post.user.time }} · {{ post.user.location }}</small>
+                  <!-- postTimeAgo：上面 script 用 postDate 算出來的「N 小時前」文字 -->
+                  <small class="author-meta">{{ postTimeAgo }} · {{ post.user.location }}</small>
                 </div>
               </router-link>
               <button
@@ -206,10 +454,40 @@ const addComment = () => {
               </button>
             </div>
 
-            <!-- 主圖（拿掉了浮在照片上的定位標籤，因為資料庫沒有存座標） -->
+            <!-- 主圖：改成可以左右切換的輪播，顯示 CreatePostView.vue 上傳時選的每一張照片，
+                 不再固定只顯示第一張。currentImageIndex 記錄現在顯示第幾張（從 0 開始）。 -->
             <div class="post-media">
               <span class="tag-label" v-if="post.taggedProducts[0]">封面故事</span>
-              <img :src="post.imageUrl" class="post-image" alt="post image" />
+              <img :src="post.images[currentImageIndex]?.url" class="post-image" alt="post image" />
+
+              <!-- 上一張／下一張箭頭：只有超過 1 張照片才顯示，不然單張照片也會出現沒意義的箭頭 -->
+              <template v-if="post.images.length > 1">
+                <button class="media-arrow media-arrow-prev" @click="prevImage">‹</button>
+                <button class="media-arrow media-arrow-next" @click="nextImage">›</button>
+                <!-- 圓點指示器：點某個點可以直接跳到那張照片，目前顯示的那個點會反白 -->
+                <div class="media-dots">
+                  <button
+                    v-for="(img, idx) in post.images"
+                    :key="idx"
+                    class="media-dot"
+                    :class="{ active: idx === currentImageIndex }"
+                    @click="currentImageIndex = idx"
+                  ></button>
+                </div>
+              </template>
+            </div>
+
+            <!-- 縮圖列：跟輪播是同一份 post.images，點縮圖也能直接跳到那張，主圖跟縮圖列點法互通 -->
+            <div class="post-thumb-row" v-if="post.images.length > 1">
+              <button
+                v-for="(img, idx) in post.images"
+                :key="idx"
+                class="post-thumb-item"
+                :class="{ active: idx === currentImageIndex }"
+                @click="currentImageIndex = idx"
+              >
+                <img :src="img.url" alt="縮圖" />
+              </button>
             </div>
 
             <!-- 按讚/分享/收藏 動作列 -->
@@ -259,15 +537,14 @@ const addComment = () => {
               productRoute 目前只是假的路徑（例如 /shop/product/101），
               真的點下去會導到不存在的頁面，demo 階段先不要讓它跳轉，
               只保留視覺樣式（看起來像標籤）。之後商城的商品頁做好、
-              productRoute 是真的網址時，把 <span> 換回 <a :href="findProductRoute(tag.id)">
-              就可以了，findProductRoute 這個函式邏輯已經寫好、留著沒動。
+              productRoute 是真的網址時，把 <span> 換回 <a :href="tag.productRoute">就可以了。
             -->
             <div class="tagged-products" v-if="post.taggedProducts.length">
               <span class="tagged-label">標記商品</span>
               <div class="tag-cloud">
                 <span
                   v-for="tag in post.taggedProducts"
-                  :key="tag.id"
+                  :key="tag.postTaggedProductId"
                   class="tag-chip"
                 >#{{ tag.name }}</span>
               </div>
@@ -280,13 +557,35 @@ const addComment = () => {
               </div>
 
               <div class="comments-list">
-                <div v-for="c in comments" :key="c.id" class="comment-row">
-                  <img :src="c.avatar" class="comment-avatar" alt="avatar" />
-                  <div class="comment-bubble">
-                    <span class="comment-user">{{ c.user }}</span>
-                    <span>{{ c.text }}</span>
+                <!-- v-for="c in groupedComments"：只跑主留言，每則主留言底下再跑一次 c.replies 畫出它的回覆 -->
+                <div v-for="c in groupedComments" :key="c.postCommentId" class="comment-thread">
+                  <div class="comment-row">
+                    <img :src="c.avatar" class="comment-avatar" alt="avatar" />
+                    <div class="comment-bubble">
+                      <span class="comment-user">{{ c.user }}</span>
+                      <span>{{ c.commentText }}</span>
+                      <button class="btn-reply" @click="startReply(c)">回覆</button>
+                      <!-- 有人回覆過這則留言時，顯示「已回覆 N 則」，跟 IG 一樣讓人知道底下有討論 -->
+                      <span v-if="c.replies.length" class="reply-count">已回覆 {{ c.replies.length }} 則</span>
+                    </div>
+                  </div>
+
+                  <!-- 回覆列表：往內縮排（class="comment-reply"），跟 IG 留言底下的回覆呈現方式一樣 -->
+                  <div v-for="r in c.replies" :key="r.postCommentId" class="comment-row comment-reply">
+                    <img :src="r.avatar" class="comment-avatar" alt="avatar" />
+                    <div class="comment-bubble">
+                      <span class="comment-user">{{ r.user }}</span>
+                      <span>{{ r.commentText }}</span>
+                      <button class="btn-reply" @click="startReply(c)">回覆</button>
+                    </div>
                   </div>
                 </div>
+              </div>
+
+              <!-- 正在回覆某則留言時的提示：顯示「回覆 @xxx」，可以按 ✕ 取消、切回發新留言 -->
+              <div v-if="replyingTo" class="replying-to-row">
+                回覆 <strong>@{{ replyingTo.user }}</strong>
+                <button class="btn-cancel-reply" @click="cancelReply">✕</button>
               </div>
 
               <!-- 輸入留言 -->
@@ -301,7 +600,7 @@ const addComment = () => {
                   type="text"
                   v-model="newComment"
                   class="comment-input"
-                  placeholder="留下你的想法..."
+                  :placeholder="replyingTo ? `回覆 @${replyingTo.user}...` : '留下你的想法...'"
                   @keyup.enter="addComment"
                 />
                 <button class="btn-send" @click="addComment">送出</button>
@@ -314,20 +613,19 @@ const addComment = () => {
         <!-- 右側：這套穿搭的商品與推薦區 -->
         <div class="col-12 col-lg-4">
 
-          <!-- 穿搭商品清單 -->
-          <div class="side-card">
+          <!-- 穿搭商品清單：只顯示這篇貼文作者真的標記過的商品，沒有標記任何商品的貼文，這整張卡片不會出現 -->
+          <div class="side-card" v-if="post.taggedProducts.length">
             <div class="side-title"><span class="dot"></span>這套穿搭的商品</div>
 
             <div class="product-list">
-              <div v-for="item in products" :key="item.id" class="product-row">
+              <div v-for="item in post.taggedProducts" :key="item.postTaggedProductId" class="product-row">
                 <!--
-                  product-link：把圖片＋商品資訊包成一個區塊，之後接上真的
-                  商品頁時可以換回 <a :href="item.productRoute">，
-                  現在先用 <div> 不會跳轉，只是給老師看畫面用，
-                  跟旁邊「加入購物車」按鈕分開（按鈕還是純粹的按鈕）。
+                  product-link：之後 productRoute 是真的商品頁網址時，可以換回
+                  <a :href="item.productRoute">，現在先用 <div> 不會跳轉。
+                  目前 Product 表沒有圖片欄位（圖片是另一張 ProductImg 表，還沒接），
+                  所以先不顯示縮圖，只顯示名稱、價格。
                 -->
                 <div class="product-link">
-                  <img :src="item.image" class="product-thumb" alt="product" />
                   <div class="product-info">
                     <p class="product-name">{{ item.name }}</p>
                     <p class="product-price">NT$ {{ item.price }}</p>
@@ -338,17 +636,22 @@ const addComment = () => {
             </div>
 
             <button class="btn-buy-all">
-              一鍵購買全套穿搭 · NT$ 2,860
+              一鍵購買全套穿搭 · NT$ {{ totalTaggedPrice.toLocaleString() }}
             </button>
           </div>
 
-          <!-- 相似穿搭推薦 -->
+          <!-- 相似穿搭推薦：跟這篇貼文標記過同一個商品的其他貼文，點縮圖可以直接跳過去那篇貼文 -->
           <div class="side-card">
             <div class="side-title"><span class="dot"></span>相似穿搭推薦</div>
             <div class="similar-grid">
-              <div v-for="sim in similarPosts" :key="sim.id" class="similar-thumb">
-                <img :src="sim.image" alt="similar look" />
-              </div>
+              <router-link
+                v-for="sp in similarPosts"
+                :key="sp.communityPostId"
+                :to="`/community/post/${sp.communityPostId}`"
+                class="similar-thumb"
+              >
+                <img :src="sp.image" alt="similar look" />
+              </router-link>
             </div>
           </div>
 
@@ -387,6 +690,13 @@ const addComment = () => {
   transition:all .18s ease;
 }
 .back-pill:hover{ background:var(--ink); color:var(--cream); }
+
+/* ---------- 找不到貼文 ---------- */
+.not-found-state{
+  background:var(--paper); border:1px dashed var(--hairline); border-radius:16px;
+  padding:3rem 2rem; text-align:center; color:var(--ink-soft);
+}
+.not-found-state p{ margin-bottom:1rem; }
 
 /* ---------- 主卡片 ---------- */
 .post-main-card{
@@ -448,6 +758,40 @@ const addComment = () => {
   border-color:transparent var(--plum-deep) transparent transparent;
 }
 
+/* ---------- 主圖輪播：箭頭、圓點 ---------- */
+.media-arrow{
+  position:absolute; top:50%; transform:translateY(-50%); z-index:3;
+  width:36px; height:36px; border-radius:50%;
+  background:rgba(0,0,0,.45); color:#fff; border:none;
+  font-size:1.3rem; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .18s ease;
+}
+.media-arrow:hover{ background:rgba(0,0,0,.7); }
+.media-arrow-prev{ left:12px; }
+.media-arrow-next{ right:12px; }
+
+.media-dots{
+  position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:3;
+  display:flex; gap:.4rem;
+}
+.media-dot{
+  width:7px; height:7px; border-radius:50%;
+  background:rgba(255,255,255,.55); border:none; padding:0;
+  transition:background .18s ease, transform .18s ease;
+}
+.media-dot.active{ background:#fff; transform:scale(1.25); }
+
+/* ---------- 縮圖列 ---------- */
+.post-thumb-row{ display:flex; gap:.5rem; margin-bottom:1.1rem; }
+.post-thumb-item{
+  width:56px; height:56px; border-radius:6px; overflow:hidden; flex-shrink:0;
+  border:2px solid transparent; padding:0; background:none;
+  transition:border-color .18s ease;
+}
+.post-thumb-item.active{ border-color:var(--plum); }
+.post-thumb-item img{ width:100%; height:100%; object-fit:cover; display:block; }
+
 /* ---------- 互動列 ---------- */
 .action-bar{
   display:flex; align-items:center; justify-content:space-between;
@@ -505,8 +849,10 @@ const addComment = () => {
   width:6px; height:6px; border-radius:50%; background:var(--ochre);
 }
 
-.comments-list{ display:flex; flex-direction:column; gap:.7rem; margin-bottom:1.1rem; }
+.comments-list{ display:flex; flex-direction:column; gap:1rem; margin-bottom:1.1rem; }
+.comment-thread{ display:flex; flex-direction:column; gap:.5rem; }
 .comment-row{ display:flex; align-items:flex-start; gap:.6rem; }
+.comment-row.comment-reply{ margin-left:2.4rem; } /* 往內縮排，跟 IG 的回覆呈現方式一樣 */
 .comment-avatar{ width:28px; height:28px; border-radius:50%; object-fit:cover; flex-shrink:0; }
 .comment-bubble{
   background:var(--paper);
@@ -515,8 +861,30 @@ const addComment = () => {
   padding:.55rem .9rem;
   font-size:.85rem; color:var(--ink);
   width:100%;
+  display:flex; align-items:baseline; flex-wrap:wrap; gap:.4rem;
 }
-.comment-user{ font-weight:700; margin-right:.5rem; }
+.comment-user{ font-weight:700; margin-right:.1rem; }
+.btn-reply{
+  background:none; border:none; padding:0;
+  font-size:.78rem; color:var(--ink-soft); cursor:pointer;
+  margin-left:auto; flex-shrink:0;
+}
+.btn-reply:hover{ color:var(--plum); }
+.reply-count{ font-size:.76rem; color:var(--ochre); font-weight:600; width:100%; }
+
+.replying-to-row{
+  display:flex; align-items:center; gap:.5rem;
+  font-size:.8rem; color:var(--ink-soft);
+  margin-bottom:.5rem;
+}
+.btn-cancel-reply{
+  border:none; background:var(--hairline); color:var(--ink-soft);
+  width:18px; height:18px; border-radius:50%;
+  font-size:.68rem; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .18s ease,color .18s ease;
+}
+.btn-cancel-reply:hover{ background:var(--plum); color:#fff; }
 
 .comment-input-row{ display:flex; gap:.6rem; }
 .comment-input{
@@ -599,6 +967,7 @@ const addComment = () => {
 
 .similar-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:.6rem; }
 .similar-thumb{
+  display:block;
   aspect-ratio:3/4; border-radius:6px; overflow:hidden;
   background:var(--cream);
   cursor:pointer;
