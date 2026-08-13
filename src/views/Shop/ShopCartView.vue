@@ -2,10 +2,22 @@
 import { useCartStore } from '@/stores/ShopCart' // 引入購物車store
 import { useRouter } from 'vue-router'
 import { useFavoriteStore } from '@/stores/ShopFavorite'
+import { onMounted } from 'vue'
+
+const API_BASE = 'https://localhost:7255'
+function getImageUrl(fileName) {
+  if (!fileName) return 'https://placehold.co/80x80?text=No+Image'
+  return `${API_BASE}/images/product/${fileName}`
+}
 
 const cartStore = useCartStore() // 使用購物車store
 const router = useRouter()
 const favoriteStore = useFavoriteStore()
+
+onMounted(() => {
+  console.log('購物車頁載入了！') // 測試用
+  cartStore.loadCart() // 從後端拿購物車
+})
 
 function goShop() {
   router.push({ name: 'shop' })
@@ -61,13 +73,13 @@ function moveToFavorite(product) {
 <template>
   <h3 class="fw-bold mb-4">購物車</h3>
 
-  <!-- ⚠️ 測試用按鈕，測完要刪掉 -->
+  <!-- ⚠️⚠️⚠️⚠️⚠️⚠️⚠️ 測試用按鈕，測完要刪掉⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️ -->
   <!-- <div class="border p-3 mb-3" style="background: #fffbe6">
     <p class="mb-2 text-muted">🧪 測試區（完成後刪除）</p>
     <button class="btn btn-sm btn-outline-dark me-2" @click="addTestItem1">加入 白襯衫 白M</button>
     <button class="btn btn-sm btn-outline-dark me-2" @click="addTestItem2">加入 白襯衫 黑L</button>
     <button class="btn btn-sm btn-outline-dark" @click="addTestItem3">加入 牛仔褲</button>
-  </div> -->
+  </div>⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️ -->
 
   <!-- 購物車空狀態 -->
   <div v-if="cartStore.items.length == 0" class="text-center py-5 text-body-secondary">
@@ -103,15 +115,14 @@ function moveToFavorite(product) {
                     @change="cartStore.toggleSelect(product.productSpecificationId)"
                   />
                 </td>
+
                 <td>
                   <div class="d-flex align-items-center gap-3">
-                    <!-- 商品圖片 -->
                     <img
-                      :src="product.image"
+                      :src="getImageUrl(product.image)"
                       :alt="product.productName"
-                      style="width: 64px; height: 64px; object-fit: cover; border-radius: 6px"
+                      style="width: 56px; height: 56px; object-fit: cover; border-radius: 6px"
                     />
-                    <!-- 名稱 + 規格 -->
                     <div>
                       <div class="fw-semibold">{{ product.productName }}</div>
                       <div class="text-muted" style="font-size: 0.85rem">
@@ -120,6 +131,7 @@ function moveToFavorite(product) {
                     </div>
                   </div>
                 </td>
+
                 <td class="text-center">NT$ {{ product.price }}</td>
                 <td>
                   <div class="input-group input-group-sm">
