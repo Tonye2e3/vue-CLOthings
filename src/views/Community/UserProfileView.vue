@@ -465,14 +465,15 @@ const toggleFollow = async () => {
                   <div class="stat-num">{{ userProfile.postsCount }}</div>
                   <div class="stat-label">貼文</div>
                 </div>
-                <div class="stat-item">
+                <!-- router-link 換掉了原本的彈窗按鈕：長列表切到獨立頁面比彈窗好滑、好找 -->
+                <router-link :to="`/community/profile/${viewedUserId}/followers`" class="stat-item stat-item-clickable">
                   <div class="stat-num">{{ userProfile.followersCount }}</div>
                   <div class="stat-label">粉絲</div>
-                </div>
-                <div class="stat-item">
+                </router-link>
+                <router-link :to="`/community/profile/${viewedUserId}/following`" class="stat-item stat-item-clickable">
                   <div class="stat-num">{{ userProfile.followingCount }}</div>
                   <div class="stat-label">追蹤中</div>
-                </div>
+                </router-link>
               </div>
 
               <!-- 只有瀏覽「別人」的個人頁才顯示追蹤／訊息按鈕；瀏覽自己的頁面不會出現這排按鈕 -->
@@ -831,6 +832,12 @@ const toggleFollow = async () => {
 
 .stat-group{ display:flex; gap:2.2rem; }
 .stat-item{ text-align:center; }
+.stat-item-clickable{
+  background:none; border:none; padding:0; cursor:pointer;
+  text-decoration:none; display:block;
+  transition:opacity .18s ease;
+}
+.stat-item-clickable:hover{ opacity:.7; }
 .stat-num{
   font-family:'Noto Serif TC', serif;
   font-weight:900; font-size:1.25rem; color:var(--ink); line-height:1.1;
