@@ -1,5 +1,19 @@
 <template>
-  <h3 class="fw-bold mb-4">團購訂單管理</h3>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold mb-0">團購訂單管理</h3>
+    <RouterLink :to="{ name: 'GroupProducts' }" class="back-link">
+      ← 返回商品列表
+    </RouterLink>
+  </div>
+
+  <div class="mb-3 d-flex gap-2">
+    <button type="button" class="btn btn-outline-secondary" @click="openShipperManageModal">
+      物流商管理
+    </button>
+    <button type="button" class="btn btn-outline-secondary" @click="openServiceListModal">
+      客服紀錄查詢
+    </button>
+  </div>
 
   <div class="mb-3 d-flex align-items-center flex-wrap gap-2">
     <label class="form-label mb-0">篩選狀態：</label>
@@ -166,11 +180,138 @@
       </div>
     </div>
   </div>
+
+  <!-- ============ 物流商管理 Modal ============ -->
+  <div v-if="showShipperManageModal" class="modal-backdrop fade show"></div>
+  <div
+    v-if="showShipperManageModal"
+    class="modal fade show d-block"
+    tabindex="-1"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold mb-0">物流商管理</h5>
+          <button type="button" class="btn-close" aria-label="Close" @click="showShipperManageModal = false"></button>
+        </div>
+        <div class="modal-body">
+          <ul class="list-group mb-2">
+            <li
+              v-for="s in shippers"
+              :key="s.groupShipperId"
+              class="list-group-item d-flex justify-content-between align-items-center"
+            >
+              <template v-if="editingShipperId === s.groupShipperId">
+                <div class="flex-grow-1 me-2">
+                  <input type="text" class="form-control form-control-sm mb-1" placeholder="物流商名稱" v-model="shipperEditForm.shipperName" />
+                  <input type="text" class="form-control form-control-sm mb-1" placeholder="Email" v-model="shipperEditForm.email" />
+                  <input type="text" class="form-control form-control-sm" placeholder="地址" v-model="shipperEditForm.address" />
+                </div>
+                <div class="d-flex flex-column gap-1">
+                  <button type="button" class="btn btn-sm btn-primary" @click="saveShipperEdit(s)">存</button>
+                  <button type="button" class="btn btn-sm btn-secondary" @click="editingShipperId = null">取消</button>
+                </div>
+              </template>
+              <template v-else>
+                <div>
+                  <div class="fw-semibold">{{ s.shipperName }}</div>
+                  <div class="text-muted small">{{ s.email }}｜{{ s.address }}</div>
+                </div>
+                <div class="d-flex gap-1">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" @click="startEditShipper(s)">編輯</button>
+                  <button type="button" class="btn btn-sm btn-outline-danger" @click="handleDeleteShipper(s)">刪除</button>
+                </div>
+              </template>
+            </li>
+            <li v-if="shippers.length === 0" class="list-group-item text-muted text-center">
+              尚未建立任何物流商
+            </li>
+          </ul>
+
+          <hr />
+          <h6 class="fw-bold">新增物流商</h6>
+          <div class="row g-2">
+            <div class="col-md-4">
+              <input type="text" class="form-control form-control-sm" placeholder="物流商名稱" v-model="newShipperForm.shipperName" />
+            </div>
+            <div class="col-md-4">
+              <input type="text" class="form-control form-control-sm" placeholder="Email" v-model="newShipperForm.email" />
+            </div>
+            <div class="col-md-4">
+              <input type="text" class="form-control form-control-sm" placeholder="地址" v-model="newShipperForm.address" />
+            </div>
+          </div>
+          <button type="button" class="btn btn-outline-primary btn-sm mt-2" @click="handleCreateShipper">新增</button>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" @click="showShipperManageModal = false">關閉</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 客服紀錄查詢 Modal ============ -->
+  <div v-if="showServiceListModal" class="modal-backdrop fade show"></div>
+  <div
+    v-if="showServiceListModal"
+    class="modal fade show d-block"
+    tabindex="-1"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold mb-0">客服紀錄查詢</h5>
+          <button type="button" class="btn-close" aria-label="Close" @click="showServiceListModal = false"></button>
+        </div>
+        <div class="modal-body">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>訂單編號</th>
+                <th>姓名</th>
+                <th>聯絡方式</th>
+                <th>標題</th>
+                <th>內容</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in allServiceRecords" :key="r.groupCustomerServiceId">
+                <td>#{{ r.groupOrderId }}</td>
+                <td>{{ r.name }}</td>
+                <td>{{ r.email }}｜{{ r.phone }}</td>
+                <td>{{ r.title }}</td>
+                <td>{{ r.content }}</td>
+              </tr>
+              <tr v-if="allServiceRecords.length === 0">
+                <td colspan="5" class="text-center text-muted py-4">目前沒有任何客服紀錄</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" @click="showServiceListModal = false">關閉</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
-import { getAllOrders, updateOrderStatus, assignShipper, getShippers } from '@/api/groupShopAdmin'
+import {
+  getAllOrders,
+  updateOrderStatus,
+  assignShipper,
+  getShippers,
+  createShipper,
+  updateShipper,
+  deleteShipper,
+  getAllCustomerService
+} from '@/api/groupShopAdmin'
 
 const orders = ref([])
 const shippers = ref([])
@@ -184,6 +325,54 @@ onMounted(async () => {
   await loadOrders()
   shippers.value = await getShippers()
 })
+
+// ---- 物流商管理 Modal ----
+const showShipperManageModal = ref(false)
+const openShipperManageModal = () => {
+  showShipperManageModal.value = true
+}
+
+const newShipperForm = reactive({ shipperName: '', email: '', address: '' })
+const handleCreateShipper = async () => {
+  if (!newShipperForm.shipperName.trim()) return
+  await createShipper({ ...newShipperForm })
+  newShipperForm.shipperName = ''
+  newShipperForm.email = ''
+  newShipperForm.address = ''
+  shippers.value = await getShippers()
+}
+
+const editingShipperId = ref(null)
+const shipperEditForm = reactive({ shipperName: '', email: '', address: '' })
+const startEditShipper = (s) => {
+  editingShipperId.value = s.groupShipperId
+  shipperEditForm.shipperName = s.shipperName
+  shipperEditForm.email = s.email
+  shipperEditForm.address = s.address
+}
+const saveShipperEdit = async (s) => {
+  if (!shipperEditForm.shipperName.trim()) return
+  await updateShipper(s.groupShipperId, { ...shipperEditForm })
+  editingShipperId.value = null
+  shippers.value = await getShippers()
+}
+const handleDeleteShipper = async (s) => {
+  if (!confirm(`確定要刪除物流商「${s.shipperName}」嗎？`)) return
+  try {
+    await deleteShipper(s.groupShipperId)
+    shippers.value = await getShippers()
+  } catch (err) {
+    alert(err.response?.data || '這個物流商已經有訂單在使用，不能刪除')
+  }
+}
+
+// ---- 客服紀錄查詢 Modal ----
+const showServiceListModal = ref(false)
+const allServiceRecords = ref([])
+const openServiceListModal = async () => {
+  allServiceRecords.value = await getAllCustomerService()
+  showServiceListModal.value = true
+}
 
 // ---- 搜尋（商品名稱 或 訂單編號） ----
 const searchQuery = ref('')
@@ -304,3 +493,15 @@ const handleSaveShipper = async () => {
   showShipperModal.value = false
 }
 </script>
+<style scoped>
+.back-link {
+  display: inline-block;
+  font-size: 0.88rem;
+  color: #6c757d;
+  text-decoration: none;
+}
+.back-link:hover {
+  color: #212529;
+  text-decoration: underline;
+}
+</style>

@@ -36,13 +36,19 @@ api.interceptors.response.use(
     if (status === 401) {
       const authStore = useAuthStore()
 
+      // 先記住「呼叫這支 API 之前是不是已經登入」，清除登入資料之前判斷才準確
+      const wasLoggedIn = authStore.isLoggedIn
+
       // 清除 Pinia 裡的登入資料
       authStore.clearAuth()
 
-      alert('登入已過期，請重新登入')
-
-      // 回登入頁
-      window.location.href = '/login'
+      // 本來就沒登入（例如訪客瀏覽商品列表時背景呼叫購物車 API）不用跳「登入已過期」，
+      // 那句話是給「本來有登入、但 token 過期/失效」的人看的，兩種情況不一樣。
+      // 沒登入的情況交給呼叫端自己處理（例如各頁面的 try/catch，或按鈕點擊前的登入判斷）。
+      if (wasLoggedIn) {
+        alert('登入已過期，請重新登入')
+        window.location.href = '/login'
+      }
     } else if (status == 403) {
       alert('您沒有執行此操作的權限')
     } else if (status >= 500) {

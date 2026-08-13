@@ -3,28 +3,42 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGroupCartStore } from '@/stores/groupCart'
+import { useAuthStore } from '@/stores/auth'
 // 改成呼叫「建立付款」，不再直接呼叫 checkout（要先付款成功才會真的建立訂單）
 import { createPayment } from '@/api/groupShop'
 
 const route = useRoute()
 const router = useRouter()
 const cartStore = useGroupCartStore()
+const authStore = useAuthStore()
 
-const navItems = [
-  { label: '專案瀏覽', icon: 'user', to: '/GroupShop' },
-  { label: '團購紀錄', icon: 'history', to: '/GroupShop/orders' }
-]
+// 一般管理員（Admin）前台只能看不能操作，SuperAdmin 不受限
+const isReadOnly = computed(() => authStore.role === 'Admin')
+
+// 左側選單：一般會員只看得到「專案瀏覽」「團購紀錄」，
+// Admin / SuperAdmin 登入時，「團購紀錄」下面會多出後台管理的兩個項目
+const navItems = computed(() => {
+  const items = [
+    { label: '專案瀏覽', icon: 'user', to: '/GroupShop' },
+    { label: '團購紀錄', icon: 'history', to: '/GroupShop/orders' }
+  ]
+  if (authStore.isAdmin) {
+    items.push(
+      { label: '團購商品管理', icon: 'box', to: '/GroupShop/admin/products' },
+      { label: '團購訂單管理', icon: 'clipboard', to: '/GroupShop/admin/orders' }
+    )
+  }
+  return items
+})
 const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : route.path.startsWith(to))
 
-// 會員名稱：優先帶入登入後存下的會員資料，尚未登入則顯示預設值
-const memberName = ref(localStorage.getItem('memberName') || '會員')
+// 會員名稱：登入狀態統一用 useAuthStore()，尚未登入則顯示預設值
+const memberName = computed(() => authStore.name || '會員')
 
 onMounted(() => {
-  cartStore.fetchCart()
+  // 管理員（Admin）沒有購物車權限，fetchCart 會回 403，補上 catch 避免出現未處理的 Promise 錯誤
+  cartStore.fetchCart().catch(() => {})
 })
-
-// 目前登入會員的 userId（跟 groupCart.js 用同一套邏輯，之後接上真正登入流程後統一調整即可）
-const getUserId = () => Number(localStorage.getItem('userId')) || 1
 
 const cartItems = computed(() => cartStore.items)
 const cartCount = computed(() => cartItems.value.length)
@@ -73,8 +87,8 @@ const handleSubmit = async () => {
   }
 
   try {
+    // UserId 不用帶了，後端一律從 JWT 判斷是誰的訂單
     const result = await createPayment({
-      userId: getUserId(),
       shipName: orderInfo.shipName,
       shipPhone: orderInfo.shipPhone,
       shipAddress: orderInfo.shipAddress,
@@ -115,6 +129,17 @@ const handleSubmit = async () => {
                   <polyline points="1 4 1 10 7 10"></polyline>
                   <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
                 </svg>
+                <svg v-else-if="item.icon === 'box'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
+                  <polyline points="3.29 7 12 12 20.71 7"></polyline>
+                  <line x1="12" y1="22" x2="12" y2="12"></line>
+                </svg>
+                <svg v-else-if="item.icon === 'clipboard'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                  <line x1="9" y1="12" x2="15" y2="12"></line>
+                  <line x1="9" y1="16" x2="15" y2="16"></line>
+                </svg>
               </span>
               <span>{{ item.label }}</span>
             </router-link>
@@ -128,6 +153,17 @@ const handleSubmit = async () => {
                 <svg v-else-if="item.icon === 'history'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="1 4 1 10 7 10"></polyline>
                   <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                </svg>
+                <svg v-else-if="item.icon === 'box'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
+                  <polyline points="3.29 7 12 12 20.71 7"></polyline>
+                  <line x1="12" y1="22" x2="12" y2="12"></line>
+                </svg>
+                <svg v-else-if="item.icon === 'clipboard'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                  <line x1="9" y1="12" x2="15" y2="12"></line>
+                  <line x1="9" y1="16" x2="15" y2="16"></line>
                 </svg>
               </span>
               <span>{{ item.label }}</span>
@@ -221,10 +257,11 @@ const handleSubmit = async () => {
                   <span class="fw-bold fs-4 text-accent">${{ formatCurrency(grandTotal) }}</span>
                 </div>
 
-                <!-- 購物車是空的時候，按鈕會被禁用，避免送出空訂單 -->
+                <!-- 購物車是空的時候，或目前是唯讀身分（Admin），按鈕會被禁用 -->
                 <button
                   class="btn btn-main w-100"
-                  :disabled="cartItems.length === 0"
+                  :disabled="cartItems.length === 0 || isReadOnly"
+                  :title="isReadOnly ? '管理員帳號僅供瀏覽，無法送出訂單' : ''"
                   @click="handleSubmit"
                 >
                   確認送出訂單
