@@ -12,6 +12,7 @@ api.interceptors.request.use(
   (config) => {
     //這是之後登入取得token放的地方
     const token = useAuthStore().token
+    //如果token存在，則將token放入請求頭中
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -25,8 +26,22 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status
-    if (status == 401) {
+    const requestUrl = error.config?.url
+
+    // 登入 API 自己的 401，交給 LoginView 處理
+    if (status === 401 && requestUrl?.includes('/User/login')) {
+      return Promise.reject(error)
+    }
+
+    if (status === 401) {
+      const authStore = useAuthStore()
+
+      // 清除 Pinia 裡的登入資料
+      authStore.clearAuth()
+
       alert('登入已過期，請重新登入')
+
+      // 回登入頁
       window.location.href = '/login'
     } else if (status == 403) {
       alert('您沒有執行此操作的權限')

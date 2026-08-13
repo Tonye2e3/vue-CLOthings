@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -93,7 +94,7 @@ const router = createRouter({
     },
     {
       path: '/user',
-      meta: { requireMember: false },
+      meta: { requiresAuth: true },
       children: [
         {
           path: 'user',
@@ -103,6 +104,21 @@ const router = createRouter({
       ],
     },
   ],
+})
+
+// 路由守衛
+router.beforeEach((to) => {
+  const authStore = useAuthStore()
+
+  // 要進入的頁面需要登入，而且目前沒有登入
+  if (to.meta.requiresAuth && !authStore.isLoggedIn) {
+    return {
+      name: 'login',
+      query: {
+        redirect: to.fullPath,
+      },
+    }
+  }
 })
 
 export default router
