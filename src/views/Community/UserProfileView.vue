@@ -29,6 +29,17 @@ const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
 
 const route = useRoute()
 
+// onAvatarError：大頭貼圖片載入失敗時執行（例如資料庫存的路徑指到 wwwroot 裡
+// 實際上還沒有的檔案），失敗時把圖片來源換成 dicebear 產生的預設頭像，
+// 跟 CommunityView.vue 的 onAvatarError 是同一套邏輯。
+const onAvatarError = (event, name) => {
+  // 加個保護：如果換成 dicebear 網址後還是失敗（例如完全沒有網路），
+  // 就不要再觸發一次 @error，避免無限迴圈一直重新請求。
+  if (event.target.dataset.fallback) return
+  event.target.dataset.fallback = '1'
+  event.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+}
+
 // currentUserId：目前登入者真正的 userId，跟 CommunityView.vue 共用同一份（import 進來的）。
 // 這個是「我是誰」，跟下面的 viewedUserId（「我正在看誰的頁面」）是兩回事——
 // 只有兩者相等時，才代表「我正在看自己的頁面」，編輯／刪除貼文才該出現。
@@ -359,7 +370,16 @@ const fetchPublicProfile = async () => {
     const res = await api.get(`/PublicUserProfile/${viewedUserId.value}`)
     userProfile.value.name = res.data.username
     userProfile.value.handle = `@${res.data.account}`
-    userProfile.value.avatar = res.data.avatar || userProfile.value.avatar
+    // res.data.avatar 後端存的是相對路徑（例如 /avatars/user002.png），要接上 IMAGE_BASE
+    // 才是完整網址；沒設大頭貼的人（avatar 是 null）改成用 dicebear 產生跟這個人帳號綁定
+    // 的預設頭像——不能再像原本那樣「維持 userProfile.value.avatar 原本的值」，那個原本的值
+    // 是元件一開始寫死的預設圖（seed=Emily），不管換到哪個沒設大頭貼的人的頁面都會長一樣，
+    // 也會跟貼文卡片、留言那邊用 username 當 seed 產生出來的頭像對不起來（同一個人在不同頁面
+    // 卻顯示兩種不同的預設頭像）。這裡改成一樣用 res.data.username 當 seed，
+    // 這樣同一個帳號不管在貼文卡片、留言、還是自己的個人頁，沒設大頭貼時看到的預設圖都會是同一張。
+    userProfile.value.avatar = res.data.avatar
+      ? `${IMAGE_BASE}${res.data.avatar}`
+      : `https://api.dicebear.com/7.x/avataaars/svg?seed=${res.data.username}`
     userProfile.value.bioTag = res.data.styleTag || ''
     userProfile.value.bio = res.data.intro || ''
   } catch (err) {
@@ -454,7 +474,7 @@ const toggleFollow = async () => {
                 所以這裡的圖片網址會直接抓 userProfile 裡的 avatar 值。
                 （在 template 裡面直接寫 userProfile.avatar，不用加 .value）
               -->
-              <img :src="userProfile.avatar" class="avatar-img" alt="Avatar" />
+              <img :src="userProfile.avatar" class="avatar-img" alt="Avatar" @error="onAvatarError($event, userProfile.name)" />
             </div>
 
             <!-- 數據與動作 -->

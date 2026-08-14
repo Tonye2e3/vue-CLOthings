@@ -7,9 +7,24 @@ import api from '@/services/api'
 // 從 router-index.js 裡路由的 props 直接傳進來（不是網址參數，是路由設定裡寫死的）。
 const props = defineProps({ mode: String })
 
+// IMAGE_BASE：圖片是靜態檔案，走的不是 /api 這條路徑，不能直接用 api 服務的
+// baseURL（那個含 /api）。這裡把 VITE_API_URL 尾巴的 /api 拿掉，變成純網域。
+const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+
 const route = useRoute()
 const users = ref([])
 const loading = ref(true)
+
+// onAvatarError：大頭貼圖片載入失敗時執行（例如資料庫存的路徑指到 wwwroot 裡
+// 實際上還沒有的檔案），失敗時把圖片來源換成 dicebear 產生的預設頭像，
+// 跟 CommunityView.vue 的 onAvatarError 是同一套邏輯。
+const onAvatarError = (event, name) => {
+  // 加個保護：如果換成 dicebear 網址後還是失敗（例如完全沒有網路），
+  // 就不要再觸發一次 @error，避免無限迴圈一直重新請求。
+  if (event.target.dataset.fallback) return
+  event.target.dataset.fallback = '1'
+  event.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+}
 
 // pageTitle：頁面標題文字，依 mode 決定顯示「粉絲」還是「追蹤中」。
 const pageTitle = () => (props.mode === 'followers' ? '粉絲' : '追蹤中')
@@ -56,7 +71,12 @@ watch(() => route.params.userId, fetchList)
           :to="`/community/profile/${u.userId}`"
           class="follow-user-row"
         >
-          <img :src="u.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + u.username" class="follow-user-avatar" alt="avatar" />
+          <img
+            :src="u.avatar ? `${IMAGE_BASE}${u.avatar}` : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + u.username"
+            class="follow-user-avatar"
+            alt="avatar"
+            @error="onAvatarError($event, u.username)"
+          />
           <span class="follow-user-name">{{ u.username }}</span>
         </router-link>
       </div>

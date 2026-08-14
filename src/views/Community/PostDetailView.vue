@@ -34,6 +34,17 @@ const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
 // route：呼叫 useRoute() 拿到「目前網址」的資訊物件。
 const route = useRoute()
 
+// onAvatarError：大頭貼圖片載入失敗時執行（例如資料庫存的路徑指到 wwwroot 裡
+// 實際上還沒有的檔案），失敗時把圖片來源換成 dicebear 產生的預設頭像，
+// 跟 CommunityView.vue 的 onAvatarError 是同一套邏輯。
+const onAvatarError = (event, name) => {
+  // 加個保護：如果換成 dicebear 網址後還是失敗（例如完全沒有網路），
+  // 就不要再觸發一次 @error，避免無限迴圈一直重新請求。
+  if (event.target.dataset.fallback) return
+  event.target.dataset.fallback = '1'
+  event.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+}
+
 // 貼文詳細資料
 // 這是一個很大的物件，裡面用「巢狀」的方式（物件裡面還有物件、陣列）
 // 裝著這篇貼文需要的所有資訊。
@@ -96,7 +107,12 @@ const fetchPost = async () => {
     post.value = {
       communityPostId: p.communityPostId,
       userId: p.userId,
-      user: p.user || { name: '未知使用者', avatar: '', location: '' },
+      // p.user.avatar 後端存的是相對路徑（例如 /avatars/user002.png），要接上 IMAGE_BASE
+      // 才是瀏覽器看得懂的完整網址，跟貼文圖片、商品圖片是同一種處理方式。
+      // 沒有設大頭貼的人（avatar 是 null）就用預設的頭像頂著，不要顯示破圖。
+      user: p.user
+        ? { ...p.user, avatar: p.user.avatar ? `${IMAGE_BASE}${p.user.avatar}` : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + p.user.name }
+        : { name: '未知使用者', avatar: '', location: '' },
       isFollowing: false, // 先給預設值，實際有沒有追蹤過由下面 fetchFollowStatus() 另外去問後端才知道
       postDate: p.postDate,
       status: p.status,
@@ -312,7 +328,12 @@ const cancelReply = () => {
 const fetchComments = async () => {
   try {
     const res = await api.get(`/PostComment/post/${route.params.id}`)
-    comments.value = res.data
+    // c.avatar 後端存的是相對路徑（例如 /avatars/user002.png），要接上 IMAGE_BASE
+    // 才是完整網址；沒設大頭貼的人（avatar 是 null）用預設頭像頂著。
+    comments.value = res.data.map(c => ({
+      ...c,
+      avatar: c.avatar ? `${IMAGE_BASE}${c.avatar}` : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + c.user
+    }))
   } catch (err) {
     console.error('讀取留言失敗：', err)
   }
@@ -439,7 +460,7 @@ const addComment = async () => {
                 class="text-decoration-none"：Bootstrap 的工具 class，把 <a> 連結預設的底線拿掉。
               -->
               <router-link :to="`/community/profile/${post.userId}`" class="author-info text-decoration-none">
-                <img :src="post.user.avatar" class="author-avatar" alt="avatar" />
+                <img :src="post.user.avatar" class="author-avatar" alt="avatar" @error="onAvatarError($event, post.user.name)" />
                 <div>
                   <h6 class="author-name">{{ post.user.name }}</h6>
                   <!-- postTimeAgo：上面 script 用 postDate 算出來的「N 小時前」文字 -->
@@ -561,7 +582,7 @@ const addComment = async () => {
                 <!-- v-for="c in groupedComments"：只跑主留言，每則主留言底下再跑一次 c.replies 畫出它的回覆 -->
                 <div v-for="c in groupedComments" :key="c.postCommentId" class="comment-thread">
                   <div class="comment-row">
-                    <img :src="c.avatar" class="comment-avatar" alt="avatar" />
+                    <img :src="c.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, c.user)" />
                     <div class="comment-bubble">
                       <span class="comment-user">{{ c.user }}</span>
                       <span>{{ c.commentText }}</span>
@@ -573,7 +594,7 @@ const addComment = async () => {
 
                   <!-- 回覆列表：往內縮排（class="comment-reply"），跟 IG 留言底下的回覆呈現方式一樣 -->
                   <div v-for="r in c.replies" :key="r.postCommentId" class="comment-row comment-reply">
-                    <img :src="r.avatar" class="comment-avatar" alt="avatar" />
+                    <img :src="r.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, r.user)" />
                     <div class="comment-bubble">
                       <span class="comment-user">{{ r.user }}</span>
                       <span>{{ r.commentText }}</span>
