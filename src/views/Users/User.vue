@@ -9,6 +9,14 @@ import '@/assets/styles/user-common.css'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 
+import {
+  faUser,
+  faIdCard,
+  faHouse,
+  faLink,
+  faRightFromBracket,
+} from '@fortawesome/free-solid-svg-icons'
+
 const authStore = useAuthStore()
 const router = useRouter()
 
@@ -31,8 +39,11 @@ function logout() {
         </div>
 
         <nav class="sidebar-nav">
+          <!-- 帳戶資料 -->
           <a href="#account" class="nav-item">
-            <span class="nav-icon">👤</span>
+            <span class="nav-icon">
+              <font-awesome-icon :icon="faUser" />
+            </span>
 
             <div>
               <span class="nav-title">帳戶資料</span>
@@ -40,8 +51,11 @@ function logout() {
             </div>
           </a>
 
+          <!-- 個人資料 -->
           <a href="#profile" class="nav-item">
-            <span class="nav-icon">🪪</span>
+            <span class="nav-icon">
+              <font-awesome-icon :icon="faIdCard" />
+            </span>
 
             <div>
               <span class="nav-title">個人資料</span>
@@ -49,8 +63,11 @@ function logout() {
             </div>
           </a>
 
+          <!-- 收件資料 -->
           <a href="#address" class="nav-item">
-            <span class="nav-icon">📍</span>
+            <span class="nav-icon">
+              <font-awesome-icon :icon="faHouse" />
+            </span>
 
             <div>
               <span class="nav-title">收件資料</span>
@@ -58,8 +75,11 @@ function logout() {
             </div>
           </a>
 
+          <!-- 第三方登入 -->
           <a href="#oauth" class="nav-item">
-            <span class="nav-icon">🔗</span>
+            <span class="nav-icon">
+              <font-awesome-icon :icon="faLink" />
+            </span>
 
             <div>
               <span class="nav-title">第三方登入</span>
@@ -70,9 +90,17 @@ function logout() {
 
         <div class="sidebar-footer">
           <button type="button" class="logout-btn" @click="logout">
-            <span>↪</span>
+            <font-awesome-icon :icon="faRightFromBracket" />
             登出
           </button>
+        </div>
+        <div style="font-size: 30px">
+          <i class="fa-solid fa-user"></i>
+          <i class="fa-solid fa-house"></i>
+          <i class="fa-solid fa-heart"></i>
+          <i class="fa-solid fa-star"></i>
+          <i class="fa-solid fa-check"></i>
+          <i class="fa-solid fa-xmark"></i>
         </div>
       </aside>
 
@@ -384,13 +412,5 @@ function logout() {
   .page-header h1 {
     font-size: 26px;
   }
-}
-
-.user-page {
-  min-height: 100vh;
-  background: #f9f4f0;
-  padding: 48px 24px 80px;
-
-  scroll-behavior: smooth;
 }
 </style>
