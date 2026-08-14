@@ -34,6 +34,17 @@ const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
 // route：呼叫 useRoute() 拿到「目前網址」的資訊物件。
 const route = useRoute()
 
+// onAvatarError：大頭貼圖片載入失敗時執行（例如資料庫存的路徑指到 wwwroot 裡
+// 實際上還沒有的檔案），失敗時把圖片來源換成 dicebear 產生的預設頭像，
+// 跟 CommunityView.vue 的 onAvatarError 是同一套邏輯。
+const onAvatarError = (event, name) => {
+  // 加個保護：如果換成 dicebear 網址後還是失敗（例如完全沒有網路），
+  // 就不要再觸發一次 @error，避免無限迴圈一直重新請求。
+  if (event.target.dataset.fallback) return
+  event.target.dataset.fallback = '1'
+  event.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+}
+
 // 貼文詳細資料
 // 這是一個很大的物件，裡面用「巢狀」的方式（物件裡面還有物件、陣列）
 // 裝著這篇貼文需要的所有資訊。
@@ -96,7 +107,12 @@ const fetchPost = async () => {
     post.value = {
       communityPostId: p.communityPostId,
       userId: p.userId,
-      user: p.user || { name: '未知使用者', avatar: '', location: '' },
+      // p.user.avatar 後端存的是相對路徑（例如 /avatars/user002.png），要接上 IMAGE_BASE
+      // 才是瀏覽器看得懂的完整網址，跟貼文圖片、商品圖片是同一種處理方式。
+      // 沒有設大頭貼的人（avatar 是 null）就用預設的頭像頂著，不要顯示破圖。
+      user: p.user
+        ? { ...p.user, avatar: p.user.avatar ? `${IMAGE_BASE}${p.user.avatar}` : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + p.user.name }
+        : { name: '未知使用者', avatar: '', location: '' },
       isFollowing: false, // 先給預設值，實際有沒有追蹤過由下面 fetchFollowStatus() 另外去問後端才知道
       postDate: p.postDate,
       status: p.status,
@@ -180,15 +196,32 @@ watch(() => route.params.id, () => {
   fetchSimilarPosts()
 })
 
-// postTimeAgo：把 post.postDate 這個正式時間，轉換成「N 小時前」這種給人看的相對時間文字。
-// 之後接上真的 API，這個計算方式不用變，只是 postDate 會是後端真正回傳的發文時間。
-const postTimeAgo = computed(() => {
-  const diffMs = Date.now() - new Date(post.value.postDate).getTime()
+// formatTimeAgo：把一個 ISO 時間字串，轉換成「N 小時前」這種給人看的相對時間文字。
+// 抽成共用函式，這樣貼文本身的時間（postTimeAgo）跟留言、回覆的時間可以共用同一套邏輯。
+const formatTimeAgo = (dateStr) => {
+  const diffMs = Date.now() - new Date(dateStr).getTime()
   const diffHours = Math.round(diffMs / (60 * 60 * 1000))
   if (diffHours < 1) return '剛剛'
   if (diffHours < 24) return `${diffHours} 小時前`
   return `${Math.round(diffHours / 24)} 天前`
-})
+}
+
+// formatDateTime：把一個 ISO 時間字串，轉換成「2026-06-06 12:00」這種固定格式的日期時間文字。
+// 留言、回覆的時間改用這個（不用「N 天前」的相對時間），可以直接看出是哪一天留的言。
+// padStart(2, '0')：數字不足兩位時前面補 0，例如 6 月要顯示成 06。
+const formatDateTime = (dateStr) => {
+  const d = new Date(dateStr)
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}`
+}
+
+// postTimeDisplay：把 post.postDate 這個正式時間，轉換成「2026-06-06 12:00」這種固定格式的日期時間文字。
+// 原本這裡是用 formatTimeAgo 顯示「N 天前」，改成跟留言一樣用 formatDateTime，直接看得出是哪一天發的文。
+const postTimeDisplay = computed(() => formatDateTime(post.value.postDate))
 
 // 按讚數改用數字追蹤，方便按讚時 +1、取消時 -1；畫面顯示再轉成千分位字串
 // likesNumber：存「真正的數字」，方便計算加減。
@@ -252,6 +285,98 @@ const toggleSave = () => {
   })
 }
 
+// ============================================================
+// 分享功能
+// ============================================================
+
+// fullShareUrl：這篇貼文完整的路由網址，當作短網址「還沒拿到之前」的備援。
+const fullShareUrl = computed(() => `${window.location.origin}/community/post/${route.params.id}`)
+
+// shortUrl：跟後端要到的短碼組出來的完整短網址，null 代表還沒拿到（或這次沒拿到）。
+// shareUrl：真正拿去分享／複製的網址——拿到短網址就優先用短網址，
+// 還沒拿到、或後端這支 API 掛了，就先用 fullShareUrl 頂著，不會讓分享功能整個壞掉。
+const shortUrl = ref(null)
+const fetchingShortUrl = ref(false)
+const shareUrl = computed(() => shortUrl.value || fullShareUrl.value)
+
+// ensureShortUrl：跟後端要這篇貼文的短碼，打的是 ShortUrlController.cs 裡的
+// POST api/ShortUrl。後端邏輯是「這篇貼文已經產生過短碼就回傳原本那組，沒有才新產生」，
+// 所以這裡不用擔心重複呼叫會一直生出新的短碼；用 shortUrl.value 判斷「已經拿過了」，
+// 避免同一次瀏覽重複打好幾次 API。
+// 短網址走的是後端網域（IMAGE_BASE，跟圖片是同一個網域），不是前端 SPA 的網域，
+// 因為 /s/{code} 這個轉址路由是後端提供的，不是 Vue Router 的路由——
+// 使用者點下短網址時，是瀏覽器直接對後端發請求，後端才能在還沒載入前端 App 之前
+// 就先查資料庫、決定要導去哪一篇貼文。
+const ensureShortUrl = async () => {
+  if (shortUrl.value || fetchingShortUrl.value) return
+  fetchingShortUrl.value = true
+  try {
+    const res = await api.post('/ShortUrl', { communityPostId: Number(route.params.id) })
+    shortUrl.value = `${IMAGE_BASE}/s/${res.data.shortCode}`
+  } catch (err) {
+    console.error('取得短網址失敗，先用完整網址分享：', err)
+  } finally {
+    fetchingShortUrl.value = false
+  }
+}
+
+// showShareMenu：分享選單目前是不是打開的。打開的當下順便去要短網址，
+// 使用者點「複製連結」的時候通常已經拿到短碼了。
+const showShareMenu = ref(false)
+const toggleShareMenu = () => {
+  showShareMenu.value = !showShareMenu.value
+  if (showShareMenu.value) ensureShortUrl()
+}
+const closeShareMenu = () => {
+  showShareMenu.value = false
+}
+
+// linkCopied：複製連結成功後，短暫把按鈕文字換成「已複製！」給使用者一個回饋，
+// 用 setTimeout 在 1.5 秒後自動切回「複製連結」。
+const linkCopied = ref(false)
+const copyLink = async () => {
+  // await ensureShortUrl()：保險起見再等一次——萬一使用者點開選單後，
+  // 手比 API 回應還快就按了複製，這裡確保複製到的是短網址，而不是還沒拿到就先用備援網址。
+  await ensureShortUrl()
+  try {
+    await navigator.clipboard.writeText(shareUrl.value)
+    linkCopied.value = true
+    setTimeout(() => { linkCopied.value = false }, 1500)
+  } catch (err) {
+    console.error('複製連結失敗：', err)
+  }
+  // 複製連結不需要馬上關閉選單，讓使用者看得到「已複製！」的回饋文字再自己收起來，
+  // 或繼續點別的分享方式。
+}
+
+// shareToLine／shareToFacebook：開一個新分頁，帶上這篇貼文的網址，
+// 走各平台自己提供的「分享連結」網址格式（不需要串接對方的 API 金鑰）。
+const shareToLine = async () => {
+  await ensureShortUrl()
+  window.open(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(shareUrl.value)}`, '_blank')
+  closeShareMenu()
+}
+const shareToFacebook = async () => {
+  await ensureShortUrl()
+  window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl.value)}`, '_blank')
+  closeShareMenu()
+}
+
+// nativeShare：手機瀏覽器（或部分桌機瀏覽器）通常有內建的系統分享面板
+// （例如手機上會跳出「傳送給...」「Line」「Messages」這種系統選單），
+// navigator.share 就是呼叫那個系統面板；電腦版 Chrome/Firefox 大多不支援，
+// 所以只有支援的瀏覽器才會顯示這個選項（canNativeShare 判斷）。
+const canNativeShare = typeof navigator !== 'undefined' && !!navigator.share
+const nativeShare = async () => {
+  await ensureShortUrl()
+  try {
+    await navigator.share({ title: post.value.content, url: shareUrl.value })
+  } catch (err) {
+    // 使用者自己按取消系統分享面板也會跑到這裡，是正常操作，不用特別跳錯誤訊息。
+  }
+  closeShareMenu()
+}
+
 // 「這套穿搭的商品」右側清單：直接用 post.taggedProducts（貼文作者真的搜尋、勾選過的商品），
 // 不再是另一份跟這篇貼文毫不相干的假資料。這樣畫面上只會出現作者自己標記過的東西，
 // 不會出現「使用者身上每一件都被當成我們家商品在賣」這種狀況。
@@ -283,7 +408,10 @@ const comments = ref([])
 // parentCommentId 是 null（或沒有值）的是主留言，parentCommentId 指到誰，
 // 就代表這則是在回覆那一則留言。
 const groupedComments = computed(() => {
-  const topLevel = comments.value.filter(c => !c.parentCommentId)
+  const topLevel = comments.value
+    .filter(c => !c.parentCommentId)
+    // 主留言照留言時間「新到舊」排，最新留的言會排在最上面
+    .sort((a, b) => new Date(b.commentDate) - new Date(a.commentDate))
   return topLevel.map(c => ({
     ...c,
     replies: comments.value
@@ -312,7 +440,12 @@ const cancelReply = () => {
 const fetchComments = async () => {
   try {
     const res = await api.get(`/PostComment/post/${route.params.id}`)
-    comments.value = res.data
+    // c.avatar 後端存的是相對路徑（例如 /avatars/user002.png），要接上 IMAGE_BASE
+    // 才是完整網址；沒設大頭貼的人（avatar 是 null）用預設頭像頂著。
+    comments.value = res.data.map(c => ({
+      ...c,
+      avatar: c.avatar ? `${IMAGE_BASE}${c.avatar}` : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + c.user
+    }))
   } catch (err) {
     console.error('讀取留言失敗：', err)
   }
@@ -439,11 +572,11 @@ const addComment = async () => {
                 class="text-decoration-none"：Bootstrap 的工具 class，把 <a> 連結預設的底線拿掉。
               -->
               <router-link :to="`/community/profile/${post.userId}`" class="author-info text-decoration-none">
-                <img :src="post.user.avatar" class="author-avatar" alt="avatar" />
+                <img :src="post.user.avatar" class="author-avatar" alt="avatar" @error="onAvatarError($event, post.user.name)" />
                 <div>
                   <h6 class="author-name">{{ post.user.name }}</h6>
-                  <!-- postTimeAgo：上面 script 用 postDate 算出來的「N 小時前」文字 -->
-                  <small class="author-meta">{{ postTimeAgo }} · {{ post.user.location }}</small>
+                  <!-- postTimeDisplay：上面 script 用 postDate 算出來的「2026-06-06 12:00」固定日期時間文字 -->
+                  <small class="author-meta">{{ postTimeDisplay }} · {{ post.user.location }}</small>
                 </div>
               </router-link>
               <button
@@ -463,8 +596,23 @@ const addComment = async () => {
 
               <!-- 上一張／下一張箭頭：只有超過 1 張照片才顯示，不然單張照片也會出現沒意義的箭頭 -->
               <template v-if="post.images.length > 1">
-                <button class="media-arrow media-arrow-prev" @click="prevImage">‹</button>
-                <button class="media-arrow media-arrow-next" @click="nextImage">›</button>
+                <!--
+                  原本這裡是用文字符號 ‹ › 當箭頭，但文字字元在字型裡的「字符框」本身
+                  就不是正中央對齊的（不同字型、不同瀏覽器對不齊的程度還不一樣），
+                  就算外層按鈕用 flex 置中，符號看起來還是會偏一邊。
+                  換成尺寸固定的 SVG 圖示，用 stroke 畫出來的線條圖形，
+                  就能真正置中在灰色圓形按鈕正中間，不受字型影響。
+                -->
+                <button class="media-arrow media-arrow-prev" @click="prevImage" aria-label="上一張">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                  </svg>
+                </button>
+                <button class="media-arrow media-arrow-next" @click="nextImage" aria-label="下一張">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </button>
                 <!-- 圓點指示器：點某個點可以直接跳到那張照片，目前顯示的那個點會反白 -->
                 <div class="media-dots">
                   <button
@@ -505,9 +653,37 @@ const addComment = async () => {
                 <button class="action-btn">
                   💬 {{ post.commentsCount }}
                 </button>
-                <button class="action-btn">
-                  ↗ 分享
-                </button>
+                <!--
+                  share-wrapper：包住分享按鈕跟下拉選單的容器，加 position:relative，
+                  這樣選單（position:absolute）才會是「相對這個按鈕」定位，而不是整個頁面。
+                -->
+                <div class="share-wrapper">
+                  <button class="action-btn" @click="toggleShareMenu">
+                    ↗ 分享
+                  </button>
+
+                  <!--
+                    分享選單：showShareMenu 是 true 才顯示。
+                    外層再包一層 share-menu-backdrop，鋪滿整個畫面但完全透明，
+                    點選單以外的任何地方都算點到這層背景，直接關閉選單——
+                    這是不用額外寫「偵測點擊選單外面」邏輯的簡單做法。
+                  -->
+                  <div v-if="showShareMenu" class="share-menu-backdrop" @click="closeShareMenu"></div>
+                  <div v-if="showShareMenu" class="share-menu">
+                    <button v-if="canNativeShare" type="button" class="share-menu-item" @click="nativeShare">
+                      <i class="fa-solid fa-share-nodes"></i> 系統分享
+                    </button>
+                    <button type="button" class="share-menu-item" @click="copyLink">
+                      <i class="fa-solid fa-link"></i> {{ linkCopied ? '已複製！' : '複製連結' }}
+                    </button>
+                    <button type="button" class="share-menu-item" @click="shareToLine">
+                      <i class="fa-brands fa-line"></i> 分享到 LINE
+                    </button>
+                    <button type="button" class="share-menu-item" @click="shareToFacebook">
+                      <i class="fa-brands fa-facebook"></i> 分享到 Facebook
+                    </button>
+                  </div>
+                </div>
               </div>
               <!--
                 收藏按鈕：
@@ -557,39 +733,13 @@ const addComment = async () => {
                 <span class="dot"></span>留言
               </div>
 
-              <div class="comments-list">
-                <!-- v-for="c in groupedComments"：只跑主留言，每則主留言底下再跑一次 c.replies 畫出它的回覆 -->
-                <div v-for="c in groupedComments" :key="c.postCommentId" class="comment-thread">
-                  <div class="comment-row">
-                    <img :src="c.avatar" class="comment-avatar" alt="avatar" />
-                    <div class="comment-bubble">
-                      <span class="comment-user">{{ c.user }}</span>
-                      <span>{{ c.commentText }}</span>
-                      <button class="btn-reply" @click="startReply(c)">回覆</button>
-                      <!-- 有人回覆過這則留言時，顯示「已回覆 N 則」，跟 IG 一樣讓人知道底下有討論 -->
-                      <span v-if="c.replies.length" class="reply-count">已回覆 {{ c.replies.length }} 則</span>
-                    </div>
-                  </div>
-
-                  <!-- 回覆列表：往內縮排（class="comment-reply"），跟 IG 留言底下的回覆呈現方式一樣 -->
-                  <div v-for="r in c.replies" :key="r.postCommentId" class="comment-row comment-reply">
-                    <img :src="r.avatar" class="comment-avatar" alt="avatar" />
-                    <div class="comment-bubble">
-                      <span class="comment-user">{{ r.user }}</span>
-                      <span>{{ r.commentText }}</span>
-                      <button class="btn-reply" @click="startReply(c)">回覆</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               <!-- 正在回覆某則留言時的提示：顯示「回覆 @xxx」，可以按 ✕ 取消、切回發新留言 -->
               <div v-if="replyingTo" class="replying-to-row">
                 回覆 <strong>@{{ replyingTo.user }}</strong>
                 <button class="btn-cancel-reply" @click="cancelReply">✕</button>
               </div>
 
-              <!-- 輸入留言 -->
+              <!-- 輸入留言：移到留言列表最上面，一打開貼文就能馬上留言，不用先滑過所有留言才看得到輸入框 -->
               <div class="comment-input-row">
                 <!--
                   @keyup.enter="addComment"：
@@ -605,6 +755,39 @@ const addComment = async () => {
                   @keyup.enter="addComment"
                 />
                 <button class="btn-send" @click="addComment">送出</button>
+              </div>
+
+              <div class="comments-list">
+                <!-- v-for="c in groupedComments"：只跑主留言，每則主留言底下再跑一次 c.replies 畫出它的回覆 -->
+                <div v-for="c in groupedComments" :key="c.postCommentId" class="comment-thread">
+                  <div class="comment-row">
+                    <img :src="c.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, c.user)" />
+                    <div class="comment-bubble">
+                      <span class="comment-user">{{ c.user }}</span>
+                      <span>{{ c.commentText }}</span>
+                      <div class="comment-meta">
+                        <!-- formatDateTime：留言時間顯示成「2026-06-06 12:00」固定格式，不用「N 天前」的相對時間 -->
+                        <span class="comment-time">{{ formatDateTime(c.commentDate) }}</span>
+                        <button class="btn-reply" @click="startReply(c)">回覆</button>
+                      </div>
+                      <!-- 有人回覆過這則留言時，顯示「已回覆 N 則」，跟 IG 一樣讓人知道底下有討論 -->
+                      <span v-if="c.replies.length" class="reply-count">已回覆 {{ c.replies.length }} 則</span>
+                    </div>
+                  </div>
+
+                  <!-- 回覆列表：往內縮排（class="comment-reply"），跟 IG 留言底下的回覆呈現方式一樣 -->
+                  <div v-for="r in c.replies" :key="r.postCommentId" class="comment-row comment-reply">
+                    <img :src="r.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, r.user)" />
+                    <div class="comment-bubble">
+                      <span class="comment-user">{{ r.user }}</span>
+                      <span>{{ r.commentText }}</span>
+                      <div class="comment-meta">
+                        <span class="comment-time">{{ formatDateTime(r.commentDate) }}</span>
+                        <button class="btn-reply" @click="startReply(c)">回覆</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -765,8 +948,7 @@ const addComment = async () => {
 .media-arrow{
   position:absolute; top:50%; transform:translateY(-50%); z-index:3;
   width:36px; height:36px; border-radius:50%;
-  background:rgba(0,0,0,.45); color:#fff; border:none;
-  font-size:1.3rem; line-height:1;
+  background:rgba(0,0,0,.45); color:#fff; border:none; padding:0;
   display:flex; align-items:center; justify-content:center;
   transition:background .18s ease;
 }
@@ -813,6 +995,35 @@ const addComment = async () => {
 .action-btn:hover{ color:var(--ink); }
 .action-btn.liked{ color:#B4453A; font-weight:600; }
 .action-btn.saved{ color:var(--ochre); font-weight:600; }
+
+/*
+  分享選單：
+  .share-wrapper 是定位的參考點（position:relative），.share-menu 用 position:absolute
+  相對它往下展開，不用 Teleport 也不會被裁切（.action-bar 本身沒有 overflow:hidden）。
+  .share-menu-backdrop 鋪滿整個畫面但透明，點選單以外的地方都算點到它，直接關閉選單，
+  比自己寫「偵測點擊發生在選單外面」的邏輯簡單很多。
+*/
+.share-wrapper{ position:relative; }
+.share-menu-backdrop{ position:fixed; inset:0; z-index:9; }
+.share-menu{
+  position:absolute; top:calc(100% + 8px); left:0; z-index:10;
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  border-radius:8px;
+  box-shadow:0 10px 30px rgba(42,36,32,.18);
+  padding:.4rem;
+  min-width:180px;
+  display:flex; flex-direction:column; gap:.15rem;
+}
+.share-menu-item{
+  display:flex; align-items:center; gap:.6rem;
+  background:none; border:none; border-radius:5px;
+  padding:.55rem .7rem; font-size:.84rem; color:var(--ink);
+  text-align:left; cursor:pointer;
+  transition:background .15s ease;
+}
+.share-menu-item:hover{ background:var(--cream); }
+.share-menu-item i{ width:16px; text-align:center; color:var(--ink-soft); }
 
 /* ---------- 內文 ---------- */
 .post-content{
@@ -867,10 +1078,11 @@ const addComment = async () => {
   display:flex; align-items:baseline; flex-wrap:wrap; gap:.4rem;
 }
 .comment-user{ font-weight:700; margin-right:.1rem; }
+.comment-meta{ display:flex; align-items:center; gap:.6rem; margin-left:auto; flex-shrink:0; }
+.comment-time{ font-size:.72rem; color:var(--ink-soft); white-space:nowrap; }
 .btn-reply{
   background:none; border:none; padding:0;
   font-size:.78rem; color:var(--ink-soft); cursor:pointer;
-  margin-left:auto; flex-shrink:0;
 }
 .btn-reply:hover{ color:var(--plum); }
 .reply-count{ font-size:.76rem; color:var(--ochre); font-weight:600; width:100%; }
@@ -889,7 +1101,7 @@ const addComment = async () => {
 }
 .btn-cancel-reply:hover{ background:var(--plum); color:#fff; }
 
-.comment-input-row{ display:flex; gap:.6rem; }
+.comment-input-row{ display:flex; gap:.6rem; margin-bottom:1.3rem; }
 .comment-input{
   flex:1;
   border:1px solid var(--hairline);

@@ -195,7 +195,7 @@ const handleSubmit = async () => {
   addPost({
     communityPostId: Date.now(), // 這裡只是先讓畫面上有個暫時的唯一編號可以用，跟資料庫實際存的 id 無關
     userId: currentUserId.value,
-    user: { name: currentUser.name, avatar: currentUser.avatar }, // 發文者資訊，來自剛剛 import 的 currentUser
+    user: { name: currentUser.value.name, avatar: currentUser.value.avatar }, // 發文者資訊，來自剛剛 import 的 currentUser（現在是 ref，資料庫真實的暱稱／大頭貼）
     content: postForm.value.content,
     postDate: new Date().toISOString(),
     status: postForm.value.status,
