@@ -2,25 +2,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import api from '@/services/api'
 
-//取得頭像位置
 const apiBaseUrl = 'https://localhost:7255'
-function getAvatarUrl() {
-  if (!profileData.avatar) {
-    return ''
-  }
-
-  return `${apiBaseUrl}${profileData.avatar}`
-}
-
-function getEditingAvatarUrl() {
-  // 有選擇新頭像 → 顯示預覽
-  if (avatarPreviewUrl.value) {
-    return avatarPreviewUrl.value
-  }
-
-  // 沒有選新頭像 → 顯示原本頭像
-  return getAvatarUrl()
-}
 
 const profileData = reactive({
   firstName: '',
@@ -32,10 +14,31 @@ const profileData = reactive({
   intro: '',
 })
 
+const backupData = reactive({})
+const isEditing = ref(false)
+
+const selectedAvatarFile = ref(null)
+const avatarPreviewUrl = ref('')
+
+function getAvatarUrl() {
+  if (!profileData.avatar) {
+    return ''
+  }
+
+  return `${apiBaseUrl}${profileData.avatar}`
+}
+
+function getEditingAvatarUrl() {
+  if (avatarPreviewUrl.value) {
+    return avatarPreviewUrl.value
+  }
+
+  return getAvatarUrl()
+}
+
 async function getProfile() {
   try {
     const resp = await api.get('/UserProfile/me')
-
     Object.assign(profileData, resp.data)
   } catch (error) {
     console.error('取得個人資料失敗：', error)
@@ -46,54 +49,52 @@ onMounted(() => {
   getProfile()
 })
 
-const backupData = reactive({}) // 暫存備份
-const isEditing = ref(false)
-// 暫存使用者新選擇的頭像檔案
-const selectedAvatarFile = ref(null)
-
-// 新頭像的前端預覽網址
-const avatarPreviewUrl = ref('')
-
-// 進入編輯模式
 const toggleEdit = () => {
-  Object.assign(backupData, profileData) // 備份原始資料
+  Object.assign(backupData, profileData)
   isEditing.value = true
 }
 
-// 儲存
+const handleAvatarChange = (event) => {
+  const file = event.target.files[0]
+
+  if (!file) {
+    return
+  }
+
+  selectedAvatarFile.value = file
+
+  if (avatarPreviewUrl.value) {
+    URL.revokeObjectURL(avatarPreviewUrl.value)
+  }
+
+  avatarPreviewUrl.value = URL.createObjectURL(file)
+}
+
 const save = async () => {
   try {
-    // 1. 如果使用者有選擇新頭像
+    // 有選新頭像才上傳
     if (selectedAvatarFile.value) {
       const formData = new FormData()
 
       formData.append('file', selectedAvatarFile.value)
 
-      // 上傳頭像
-      const resp = await api.post(
-        '/UserProfile/me/avatar',
-        formData
-      )
+      const avatarResp = await api.post('/UserProfile/me/avatar', formData)
 
-      // 更新後端回傳的頭像路徑
-      profileData.avatar = resp.data.avatar
+      profileData.avatar = avatarResp.data.avatar
     }
 
-    // 2. 準備個人資料
+    // Profile API 不再負責修改 Avatar
     const data = {
       firstName: profileData.firstName,
       lastName: profileData.lastName,
-      avatar: profileData.avatar || null,
       gender: profileData.gender || null,
       birthday: profileData.birthday || null,
       styleTag: profileData.styleTag || null,
       intro: profileData.intro || null,
     }
 
-    // 3. 更新個人資料
     await api.put('/UserProfile/me', data)
 
-    // 4. 清除頭像暫存
     selectedAvatarFile.value = null
 
     if (avatarPreviewUrl.value) {
@@ -111,15 +112,12 @@ const save = async () => {
   }
 }
 
-// 取消 → 還原備份
 const cancel = () => {
   // 還原進入編輯前的資料
   Object.assign(profileData, backupData)
 
-  // 清除剛剛選擇但尚未上傳的圖片
   selectedAvatarFile.value = null
 
-  // 清除瀏覽器產生的預覽網址
   if (avatarPreviewUrl.value) {
     URL.revokeObjectURL(avatarPreviewUrl.value)
     avatarPreviewUrl.value = ''
@@ -127,81 +125,228 @@ const cancel = () => {
 
   isEditing.value = false
 }
-
-// 處理頭像上傳
-const handleAvatarChange = async (event) => {
-  const file = event.target.files[0]
-
-  if (!file) {
-    return
-  }
-
-  // 暫存使用者選擇的檔案
-  selectedAvatarFile.value = file
-
-  // 如果之前已經產生過預覽 URL，先釋放
-  if (avatarPreviewUrl.value) {
-    URL.revokeObjectURL(avatarPreviewUrl.value)
-  }
-
-  // 產生本機預覽網址
-  avatarPreviewUrl.value = URL.createObjectURL(file)
-
-}
 </script>
 
 <template>
-  <div class="card p-4 shadow mb-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <h3 class="fw-bold mb-0">個人資料</h3>
-      <button v-if="!isEditing" @click="toggleEdit" class="btn btn-outline-primary">編輯</button>
+  <div class="user-card">
+    <div class="user-card-header">
+      <div>
+        <p class="user-section-label">PROFILE</p>
+        <h2 class="user-card-title">個人資料</h2>
+        <p class="user-card-description">管理你的個人資訊、穿搭風格與會員頭像。</p>
+      </div>
+
+      <button v-if="!isEditing" type="button" class="user-btn user-btn-outline" @click="toggleEdit">
+        編輯資料
+      </button>
     </div>
 
     <!-- 顯示模式 -->
     <div v-if="!isEditing">
-      <p>
-        <strong>姓名：</strong>
-        {{ profileData.lastName }}{{ profileData.firstName }}
-      </p>
+      <div class="profile-summary">
+        <div class="avatar-wrapper">
+          <img v-if="profileData.avatar" :src="getAvatarUrl()" alt="會員頭像" class="avatar" />
 
-      <p><strong>性別：</strong>{{ profileData.gender }}</p>
+          <div v-else class="profile-avatar avatar-placeholder">
+            {{ profileData.lastName?.charAt(0) || 'U' }}
+          </div>
+        </div>
 
-      <p><strong>生日：</strong>{{ profileData.birthday }}</p>
+        <div class="profile-intro">
+          <h3>{{ profileData.lastName }}{{ profileData.firstName }}</h3>
 
-      <p><strong>穿搭標籤：</strong>{{ profileData.styleTag }}</p>
+          <span v-if="profileData.styleTag" class="user-badge user-badge-dark">
+            {{ profileData.styleTag }}
+          </span>
 
-      <p><strong>自我介紹：</strong>{{ profileData.intro }}</p>
-      <div v-if="profileData.avatar" class="text-center mt-3">
-        <img :src="getAvatarUrl()" alt="大頭貼" class="rounded-circle border" width="120" height="120" />
+          <p class="intro-text">
+            {{ profileData.intro || '尚未填寫自我介紹' }}
+          </p>
+        </div>
+      </div>
+
+      <div class="user-info-grid">
+        <div class="user-info-item">
+          <span class="user-info-label">姓名</span>
+          <strong class="user-info-value">
+            {{
+              profileData.lastName || profileData.firstName
+                ? `${profileData.lastName}${profileData.firstName}`
+                : '未設定'
+            }}
+          </strong>
+        </div>
+
+        <div class="user-info-item">
+          <span class="user-info-label">性別</span>
+          <strong class="user-info-value">
+            {{
+              profileData.gender === 'Male'
+                ? '男'
+                : profileData.gender === 'Female'
+                  ? '女'
+                  : '未設定'
+            }}
+          </strong>
+        </div>
+
+        <div class="user-info-item">
+          <span class="user-info-label">生日</span>
+          <strong class="user-info-value">
+            {{ profileData.birthday || '未設定' }}
+          </strong>
+        </div>
       </div>
     </div>
 
     <!-- 編輯模式 -->
     <div v-else>
-      <input v-model="profileData.lastName" class="form-control mb-2" placeholder="姓" />
+      <div class="avatar-edit-area">
+        <img v-if="profileData.avatar || avatarPreviewUrl" :src="getEditingAvatarUrl()" alt="會員頭像"
+          class="avatar avatar-large" />
 
-      <input v-model="profileData.firstName" class="form-control mb-2" placeholder="名" />
+        <div v-else class="avatar avatar-large avatar-placeholder">U</div>
 
-      <select v-model="profileData.gender" class="form-control mb-2">
-        <option value="">請選擇性別</option>
-        <option value="Male">男</option>
-        <option value="Female">女</option>
-      </select>
+        <div>
+          <label class="upload-btn">
+            更換頭像
 
-      <input v-model="profileData.birthday" type="date" class="form-control mb-2" />
+            <input type="file" accept=".jpg,.jpeg,.png,.webp" hidden @change="handleAvatarChange" />
+          </label>
 
-      <input v-model="profileData.styleTag" class="form-control mb-2" placeholder="穿搭標籤" />
-
-      <textarea v-model="profileData.intro" class="form-control mb-2" placeholder="自我介紹"></textarea>
-      <div class="text-center mt-3">
-        <img v-if="profileData.avatar || avatarPreviewUrl" :src="getEditingAvatarUrl()" alt="大頭貼"
-          class="rounded-circle border mb-2" width="120" height="120" />
-        <input type="file" class="form-control" @change="handleAvatarChange" />
+          <p class="upload-hint">JPG、PNG、WEBP，最大 5 MB</p>
+        </div>
       </div>
-      <div class="d-flex gap-2 mt-3">
-        <button @click="cancel" class="btn btn-secondary flex-grow-1">取消</button>
-        <button @click="save" class="btn btn-primary flex-grow-1">確定</button>
+
+      <div class="user-form-grid">
+        <div class="user-form-group">
+          <label>姓氏</label>
+          <input v-model="profileData.lastName" type="text" class="form-control" placeholder="請輸入姓氏" />
+        </div>
+
+        <div class="user-form-group">
+          <label>名字</label>
+          <input v-model="profileData.firstName" type="text" class="form-control" placeholder="請輸入名字" />
+        </div>
+
+        <div class="user-form-group">
+          <label>性別</label>
+          <select v-model="profileData.gender" class="form-select">
+            <option value="">請選擇性別</option>
+            <option value="Male">男</option>
+            <option value="Female">女</option>
+          </select>
+        </div>
+
+        <div class="user-form-group">
+          <label>生日</label>
+          <input v-model="profileData.birthday" type="date" class="form-control" />
+        </div>
+
+        <div class="user-form-group user-form-group-full">
+          <label>穿搭標籤</label>
+          <input v-model="profileData.styleTag" type="text" maxlength="100" class="form-control"
+            placeholder="例如：Cyberpunk、Streetwear" />
+        </div>
+
+        <div class="user-form-group user-form-group-full">
+          <label>自我介紹</label>
+          <textarea v-model="profileData.intro" rows="4" maxlength="500" class="form-control"
+            placeholder="介紹一下你的風格..."></textarea>
+
+          <small class="char-count"> {{ profileData.intro?.length || 0 }} / 500 </small>
+        </div>
+      </div>
+
+      <div class="user-actions">
+        <button type="button" class="user-btn user-btn-secondary" @click="cancel">取消</button>
+
+        <button type="button" class="user-btn user-btn-primary" @click="save">儲存變更</button>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.profile-summary {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding-bottom: 26px;
+  margin-bottom: 26px;
+  border-bottom: 1px solid #eeeeee;
+}
+
+.profile-avatar {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid #f3f3f3;
+}
+
+.avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eeeeee;
+  color: #888888;
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.profile-intro h3 {
+  margin-bottom: 8px;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.intro-text {
+  max-width: 520px;
+  margin: 12px 0 0;
+  color: #777777;
+  line-height: 1.7;
+}
+
+.avatar-edit-area {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px;
+  margin-bottom: 26px;
+  background: #f8f8f7;
+  border-radius: 12px;
+}
+
+.upload-btn {
+  display: inline-block;
+  padding: 9px 16px;
+  border: 1px solid #cccccc;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.upload-hint {
+  margin: 7px 0 0;
+  color: #999999;
+  font-size: 11px;
+}
+
+.char-count {
+  align-self: flex-end;
+  color: #aaaaaa;
+  font-size: 11px;
+}
+
+@media (max-width: 700px) {
+
+  .profile-summary,
+  .avatar-edit-area {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+</style>

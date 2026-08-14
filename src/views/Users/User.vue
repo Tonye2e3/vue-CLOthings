@@ -4,6 +4,8 @@ import AddressCard from './UserCard/AddressCard.vue'
 import ProfileCard from './UserCard/ProfileCard.vue'
 import oAuthCard from './UserCard/oAuthCard.vue'
 
+import '@/assets/styles/user-common.css'
+
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 
@@ -17,80 +19,378 @@ function logout() {
 </script>
 
 <template>
-  <div class="row">
-    <!-- 左側固定導覽列 -->
-    <nav class="col-12 col-md-3 sidebar list-group mb-3 mb-md-0">
-      <ul>
-        <li><a href="#account">帳戶資料</a></li>
-        <li><a href="#profile">個人資料</a></li>
-        <li><a href="#address">收件資料</a></li>
-        <li><a href="#oauth">第三方登入</a></li>
-        <li>
-          <button type="button" class="logout-btn" @click="logout">登出</button>
-        </li>
-      </ul>
-    </nav>
+  <div class="user-page">
+    <div class="user-container">
+      <!-- ============================= -->
+      <!-- 左側會員中心導覽 -->
+      <!-- ============================= -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <p class="sidebar-subtitle">MEMBER CENTER</p>
+          <h2 class="sidebar-title">會員中心</h2>
+        </div>
 
-    <!-- 右側主要內容 -->
-    <div class="col-12 col-md-9 content-area">
-      <AccountCard id="account" />
-      <ProfileCard id="profile" />
-      <AddressCard id="address" />
-      <oAuthCard id="oauth" />
+        <nav class="sidebar-nav">
+          <a href="#account" class="nav-item">
+            <span class="nav-icon">👤</span>
+
+            <div>
+              <span class="nav-title">帳戶資料</span>
+              <small>Account</small>
+            </div>
+          </a>
+
+          <a href="#profile" class="nav-item">
+            <span class="nav-icon">🪪</span>
+
+            <div>
+              <span class="nav-title">個人資料</span>
+              <small>Profile</small>
+            </div>
+          </a>
+
+          <a href="#address" class="nav-item">
+            <span class="nav-icon">📍</span>
+
+            <div>
+              <span class="nav-title">收件資料</span>
+              <small>Address</small>
+            </div>
+          </a>
+
+          <a href="#oauth" class="nav-item">
+            <span class="nav-icon">🔗</span>
+
+            <div>
+              <span class="nav-title">第三方登入</span>
+              <small>Connections</small>
+            </div>
+          </a>
+        </nav>
+
+        <div class="sidebar-footer">
+          <button type="button" class="logout-btn" @click="logout">
+            <span>↪</span>
+            登出
+          </button>
+        </div>
+      </aside>
+
+      <!-- ============================= -->
+      <!-- 右側會員內容 -->
+      <!-- ============================= -->
+      <main class="content-area">
+        <div class="page-header">
+          <p class="page-subtitle">MY ACCOUNT</p>
+
+          <h1>帳戶設定</h1>
+
+          <p class="page-description">管理你的會員資料、個人資訊與收件地址。</p>
+        </div>
+
+        <section id="account" class="content-section">
+          <AccountCard />
+        </section>
+
+        <section id="profile" class="content-section">
+          <ProfileCard />
+        </section>
+
+        <section id="address" class="content-section">
+          <AddressCard />
+        </section>
+
+        <section id="oauth" class="content-section">
+          <oAuthCard />
+        </section>
+      </main>
     </div>
   </div>
 </template>
 
 <style scoped>
-.content-area {
-  margin-left: 220px;
-  margin-top: 50px;
-  width: 800px;
+/* =========================
+   整個會員中心背景
+========================= */
+
+.user-page {
+  min-height: 100vh;
+  background: #f9f4f0;
+  padding: 48px 24px 80px;
 }
+
+/* =========================
+   主要 Layout
+========================= */
+
+.user-container {
+  width: 100%;
+  max-width: 1200px;
+
+  margin: 0 auto;
+
+  display: grid;
+
+  grid-template-columns: 240px minmax(0, 1fr);
+
+  gap: 40px;
+
+  align-items: start;
+}
+
+/* =========================
+   Sidebar
+========================= */
 
 .sidebar {
-  position: fixed;
+  position: sticky;
+
   top: 100px;
-  /* 可依實際 header 高度調整 */
-  left: 350px;
-  width: 160px;
-  height: 50%;
-  /* 設定高度為 100% 以填滿整個視窗高度 */
-  padding: 20px;
-  background-color: rgb(255, 255, 254);
-  border: 1px solid #ccc;
-  border-radius: 0.375rem;
+
+  background: #ffffff;
+
+  border: 1px solid #e6e6e6;
+
+  border-radius: 16px;
+
+  overflow: hidden;
+
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
 }
 
-.sidebar ul {
-  list-style: none;
-  padding: 0;
+.sidebar-header {
+  padding: 26px 24px 20px;
+
+  border-bottom: 1px solid #eeeeee;
 }
 
-.sidebar li {
-  margin-bottom: 15px;
+.sidebar-subtitle {
+  margin: 0 0 5px;
+
+  font-size: 11px;
+
+  font-weight: 700;
+
+  letter-spacing: 1.5px;
+
+  color: #999999;
 }
 
-.sidebar a {
+.sidebar-title {
+  margin: 0;
+
+  font-size: 22px;
+
+  font-weight: 700;
+
+  color: #181818;
+}
+
+/* =========================
+   Navigation
+========================= */
+
+.sidebar-nav {
+  padding: 12px;
+}
+
+.nav-item {
+  display: flex;
+
+  align-items: center;
+
+  gap: 13px;
+
+  padding: 13px 14px;
+
+  margin-bottom: 4px;
+
+  border-radius: 10px;
+
   text-decoration: none;
-  color: #333;
-  font-weight: 500;
+
+  color: #444444;
+
+  transition: all 0.2s ease;
 }
 
-.sidebar a:hover {
-  color: #007bff;
+.nav-item:hover {
+  background: #f3f3f3;
+
+  color: #111111;
+
+  transform: translateX(3px);
+}
+
+.nav-icon {
+  width: 30px;
+
+  font-size: 18px;
+
+  text-align: center;
+}
+
+.nav-item div {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 1px;
+}
+
+.nav-title {
+  font-size: 14px;
+
+  font-weight: 600;
+}
+
+.nav-item small {
+  font-size: 11px;
+
+  color: #aaaaaa;
+}
+
+/* =========================
+   登出
+========================= */
+
+.sidebar-footer {
+  padding: 14px 18px 18px;
+
+  border-top: 1px solid #eeeeee;
 }
 
 .logout-btn {
-  background: none;
+  width: 100%;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 8px;
+
+  padding: 10px;
+
   border: none;
-  padding: 0;
+
+  border-radius: 9px;
+
+  background: transparent;
+
   color: #dc3545;
-  font-weight: 500;
+
+  font-weight: 600;
+
   cursor: pointer;
+
+  transition: 0.2s;
 }
 
 .logout-btn:hover {
-  color: #b02a37;
+  background: #fff1f1;
+}
+
+/* =========================
+   右側內容
+========================= */
+
+.content-area {
+  min-width: 0;
+}
+
+.page-header {
+  margin-bottom: 30px;
+}
+
+.page-subtitle {
+  margin-bottom: 5px;
+
+  color: #999999;
+
+  font-size: 11px;
+
+  font-weight: 700;
+
+  letter-spacing: 1.8px;
+}
+
+.page-header h1 {
+  margin: 0 0 8px;
+
+  font-size: 32px;
+
+  font-weight: 700;
+
+  color: #181818;
+}
+
+.page-description {
+  margin: 0;
+
+  color: #777777;
+
+  font-size: 14px;
+}
+
+/* =========================
+   每個 Card 區塊
+========================= */
+
+.content-section {
+  scroll-margin-top: 110px;
+
+  margin-bottom: 28px;
+}
+
+/* =========================
+   平板 / 手機
+========================= */
+
+@media (max-width: 900px) {
+  .user-container {
+    grid-template-columns: 1fr;
+
+    gap: 25px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-nav {
+    display: grid;
+
+    grid-template-columns: repeat(2, 1fr);
+
+    gap: 5px;
+  }
+
+  .nav-item {
+    margin: 0;
+  }
+}
+
+@media (max-width: 576px) {
+  .user-page {
+    padding: 25px 14px 60px;
+  }
+
+  .sidebar-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .page-header h1 {
+    font-size: 26px;
+  }
+}
+
+.user-page {
+  min-height: 100vh;
+  background: #f9f4f0;
+  padding: 48px 24px 80px;
+
+  scroll-behavior: smooth;
 }
 </style>
