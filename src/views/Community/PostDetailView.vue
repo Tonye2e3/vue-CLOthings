@@ -196,15 +196,32 @@ watch(() => route.params.id, () => {
   fetchSimilarPosts()
 })
 
-// postTimeAgo：把 post.postDate 這個正式時間，轉換成「N 小時前」這種給人看的相對時間文字。
-// 之後接上真的 API，這個計算方式不用變，只是 postDate 會是後端真正回傳的發文時間。
-const postTimeAgo = computed(() => {
-  const diffMs = Date.now() - new Date(post.value.postDate).getTime()
+// formatTimeAgo：把一個 ISO 時間字串，轉換成「N 小時前」這種給人看的相對時間文字。
+// 抽成共用函式，這樣貼文本身的時間（postTimeAgo）跟留言、回覆的時間可以共用同一套邏輯。
+const formatTimeAgo = (dateStr) => {
+  const diffMs = Date.now() - new Date(dateStr).getTime()
   const diffHours = Math.round(diffMs / (60 * 60 * 1000))
   if (diffHours < 1) return '剛剛'
   if (diffHours < 24) return `${diffHours} 小時前`
   return `${Math.round(diffHours / 24)} 天前`
-})
+}
+
+// formatDateTime：把一個 ISO 時間字串，轉換成「2026-06-06 12:00」這種固定格式的日期時間文字。
+// 留言、回覆的時間改用這個（不用「N 天前」的相對時間），可以直接看出是哪一天留的言。
+// padStart(2, '0')：數字不足兩位時前面補 0，例如 6 月要顯示成 06。
+const formatDateTime = (dateStr) => {
+  const d = new Date(dateStr)
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}`
+}
+
+// postTimeDisplay：把 post.postDate 這個正式時間，轉換成「2026-06-06 12:00」這種固定格式的日期時間文字。
+// 原本這裡是用 formatTimeAgo 顯示「N 天前」，改成跟留言一樣用 formatDateTime，直接看得出是哪一天發的文。
+const postTimeDisplay = computed(() => formatDateTime(post.value.postDate))
 
 // 按讚數改用數字追蹤，方便按讚時 +1、取消時 -1；畫面顯示再轉成千分位字串
 // likesNumber：存「真正的數字」，方便計算加減。
@@ -299,7 +316,10 @@ const comments = ref([])
 // parentCommentId 是 null（或沒有值）的是主留言，parentCommentId 指到誰，
 // 就代表這則是在回覆那一則留言。
 const groupedComments = computed(() => {
-  const topLevel = comments.value.filter(c => !c.parentCommentId)
+  const topLevel = comments.value
+    .filter(c => !c.parentCommentId)
+    // 主留言照留言時間「新到舊」排，最新留的言會排在最上面
+    .sort((a, b) => new Date(b.commentDate) - new Date(a.commentDate))
   return topLevel.map(c => ({
     ...c,
     replies: comments.value
@@ -463,8 +483,8 @@ const addComment = async () => {
                 <img :src="post.user.avatar" class="author-avatar" alt="avatar" @error="onAvatarError($event, post.user.name)" />
                 <div>
                   <h6 class="author-name">{{ post.user.name }}</h6>
-                  <!-- postTimeAgo：上面 script 用 postDate 算出來的「N 小時前」文字 -->
-                  <small class="author-meta">{{ postTimeAgo }} · {{ post.user.location }}</small>
+                  <!-- postTimeDisplay：上面 script 用 postDate 算出來的「2026-06-06 12:00」固定日期時間文字 -->
+                  <small class="author-meta">{{ postTimeDisplay }} · {{ post.user.location }}</small>
                 </div>
               </router-link>
               <button
@@ -484,8 +504,23 @@ const addComment = async () => {
 
               <!-- 上一張／下一張箭頭：只有超過 1 張照片才顯示，不然單張照片也會出現沒意義的箭頭 -->
               <template v-if="post.images.length > 1">
-                <button class="media-arrow media-arrow-prev" @click="prevImage">‹</button>
-                <button class="media-arrow media-arrow-next" @click="nextImage">›</button>
+                <!--
+                  原本這裡是用文字符號 ‹ › 當箭頭，但文字字元在字型裡的「字符框」本身
+                  就不是正中央對齊的（不同字型、不同瀏覽器對不齊的程度還不一樣），
+                  就算外層按鈕用 flex 置中，符號看起來還是會偏一邊。
+                  換成尺寸固定的 SVG 圖示，用 stroke 畫出來的線條圖形，
+                  就能真正置中在灰色圓形按鈕正中間，不受字型影響。
+                -->
+                <button class="media-arrow media-arrow-prev" @click="prevImage" aria-label="上一張">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                  </svg>
+                </button>
+                <button class="media-arrow media-arrow-next" @click="nextImage" aria-label="下一張">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </button>
                 <!-- 圓點指示器：點某個點可以直接跳到那張照片，目前顯示的那個點會反白 -->
                 <div class="media-dots">
                   <button
@@ -578,39 +613,13 @@ const addComment = async () => {
                 <span class="dot"></span>留言
               </div>
 
-              <div class="comments-list">
-                <!-- v-for="c in groupedComments"：只跑主留言，每則主留言底下再跑一次 c.replies 畫出它的回覆 -->
-                <div v-for="c in groupedComments" :key="c.postCommentId" class="comment-thread">
-                  <div class="comment-row">
-                    <img :src="c.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, c.user)" />
-                    <div class="comment-bubble">
-                      <span class="comment-user">{{ c.user }}</span>
-                      <span>{{ c.commentText }}</span>
-                      <button class="btn-reply" @click="startReply(c)">回覆</button>
-                      <!-- 有人回覆過這則留言時，顯示「已回覆 N 則」，跟 IG 一樣讓人知道底下有討論 -->
-                      <span v-if="c.replies.length" class="reply-count">已回覆 {{ c.replies.length }} 則</span>
-                    </div>
-                  </div>
-
-                  <!-- 回覆列表：往內縮排（class="comment-reply"），跟 IG 留言底下的回覆呈現方式一樣 -->
-                  <div v-for="r in c.replies" :key="r.postCommentId" class="comment-row comment-reply">
-                    <img :src="r.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, r.user)" />
-                    <div class="comment-bubble">
-                      <span class="comment-user">{{ r.user }}</span>
-                      <span>{{ r.commentText }}</span>
-                      <button class="btn-reply" @click="startReply(c)">回覆</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               <!-- 正在回覆某則留言時的提示：顯示「回覆 @xxx」，可以按 ✕ 取消、切回發新留言 -->
               <div v-if="replyingTo" class="replying-to-row">
                 回覆 <strong>@{{ replyingTo.user }}</strong>
                 <button class="btn-cancel-reply" @click="cancelReply">✕</button>
               </div>
 
-              <!-- 輸入留言 -->
+              <!-- 輸入留言：移到留言列表最上面，一打開貼文就能馬上留言，不用先滑過所有留言才看得到輸入框 -->
               <div class="comment-input-row">
                 <!--
                   @keyup.enter="addComment"：
@@ -626,6 +635,39 @@ const addComment = async () => {
                   @keyup.enter="addComment"
                 />
                 <button class="btn-send" @click="addComment">送出</button>
+              </div>
+
+              <div class="comments-list">
+                <!-- v-for="c in groupedComments"：只跑主留言，每則主留言底下再跑一次 c.replies 畫出它的回覆 -->
+                <div v-for="c in groupedComments" :key="c.postCommentId" class="comment-thread">
+                  <div class="comment-row">
+                    <img :src="c.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, c.user)" />
+                    <div class="comment-bubble">
+                      <span class="comment-user">{{ c.user }}</span>
+                      <span>{{ c.commentText }}</span>
+                      <div class="comment-meta">
+                        <!-- formatDateTime：留言時間顯示成「2026-06-06 12:00」固定格式，不用「N 天前」的相對時間 -->
+                        <span class="comment-time">{{ formatDateTime(c.commentDate) }}</span>
+                        <button class="btn-reply" @click="startReply(c)">回覆</button>
+                      </div>
+                      <!-- 有人回覆過這則留言時，顯示「已回覆 N 則」，跟 IG 一樣讓人知道底下有討論 -->
+                      <span v-if="c.replies.length" class="reply-count">已回覆 {{ c.replies.length }} 則</span>
+                    </div>
+                  </div>
+
+                  <!-- 回覆列表：往內縮排（class="comment-reply"），跟 IG 留言底下的回覆呈現方式一樣 -->
+                  <div v-for="r in c.replies" :key="r.postCommentId" class="comment-row comment-reply">
+                    <img :src="r.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, r.user)" />
+                    <div class="comment-bubble">
+                      <span class="comment-user">{{ r.user }}</span>
+                      <span>{{ r.commentText }}</span>
+                      <div class="comment-meta">
+                        <span class="comment-time">{{ formatDateTime(r.commentDate) }}</span>
+                        <button class="btn-reply" @click="startReply(c)">回覆</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -786,8 +828,7 @@ const addComment = async () => {
 .media-arrow{
   position:absolute; top:50%; transform:translateY(-50%); z-index:3;
   width:36px; height:36px; border-radius:50%;
-  background:rgba(0,0,0,.45); color:#fff; border:none;
-  font-size:1.3rem; line-height:1;
+  background:rgba(0,0,0,.45); color:#fff; border:none; padding:0;
   display:flex; align-items:center; justify-content:center;
   transition:background .18s ease;
 }
@@ -888,10 +929,11 @@ const addComment = async () => {
   display:flex; align-items:baseline; flex-wrap:wrap; gap:.4rem;
 }
 .comment-user{ font-weight:700; margin-right:.1rem; }
+.comment-meta{ display:flex; align-items:center; gap:.6rem; margin-left:auto; flex-shrink:0; }
+.comment-time{ font-size:.72rem; color:var(--ink-soft); white-space:nowrap; }
 .btn-reply{
   background:none; border:none; padding:0;
   font-size:.78rem; color:var(--ink-soft); cursor:pointer;
-  margin-left:auto; flex-shrink:0;
 }
 .btn-reply:hover{ color:var(--plum); }
 .reply-count{ font-size:.76rem; color:var(--ochre); font-weight:600; width:100%; }
@@ -910,7 +952,7 @@ const addComment = async () => {
 }
 .btn-cancel-reply:hover{ background:var(--plum); color:#fff; }
 
-.comment-input-row{ display:flex; gap:.6rem; }
+.comment-input-row{ display:flex; gap:.6rem; margin-bottom:1.3rem; }
 .comment-input{
   flex:1;
   border:1px solid var(--hairline);
