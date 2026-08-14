@@ -32,7 +32,7 @@ const router = createRouter({
       component: () => import('../views/Shop/ShopFavoriteView.vue'),
     },
     {
-      path: '/shop/product/:id',
+      path: '/shop/product',
       name: 'product',
       component: () => import('../views/Shop/ProductView.vue'),
     },
@@ -123,6 +123,21 @@ const router = createRouter({
       path: '/community/profile/:userId',
       name: 'CommunityUserProfile',
       component: () => import('@/views/Community/UserProfileView.vue'),
+    },
+    // 粉絲／追蹤中名單：獨立頁面（跟 IG app 一樣是切到新畫面，不是彈出視窗），
+    // 兩條路由共用同一個元件 FollowListView.vue，用 props: { mode: '...' } 這種寫法
+    // 直接把 mode 這個字串當成 props 傳進元件，不是網址參數，元件裡用 defineProps 接。
+    {
+      path: '/community/profile/:userId/followers',
+      name: 'CommunityFollowers',
+      component: () => import('@/views/Community/FollowListView.vue'),
+      props: { mode: 'followers' },
+    },
+    {
+      path: '/community/profile/:userId/following',
+      name: 'CommunityFollowing',
+      component: () => import('@/views/Community/FollowListView.vue'),
+      props: { mode: 'following' },
     },
     {
       path: '/community/create',

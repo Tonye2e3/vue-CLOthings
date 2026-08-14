@@ -73,3 +73,8 @@ export const getPendingPayment = (paymentId) =>
 // 確認付款結果：success 為 true 才會真的建立訂單
 export const confirmPayment = (paymentId, success) =>
   http.post(`/GroupPayment/${paymentId}/confirm`, { success }).then(res => res.data)
+
+// ---- LINE Pay（真的接 Sandbox，不是模擬付款）----
+// 回傳 LINE Pay 的付款頁網址，前端拿到後要整頁導過去（window.location.href），不能用 AJAX 導頁
+export const requestLinePay = (payload) =>
+  http.post('/GroupPayment/linepay/request', payload).then(res => res.data)

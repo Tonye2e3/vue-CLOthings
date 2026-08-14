@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useGroupCartStore } from '@/stores/groupCart'
 import { useAuthStore } from '@/stores/auth'
 // 改成呼叫「建立付款」，不再直接呼叫 checkout（要先付款成功才會真的建立訂單）
-import { createPayment } from '@/api/groupShop'
+import { createPayment, requestLinePay } from '@/api/groupShop'
 
 const route = useRoute()
 const router = useRouter()
@@ -64,6 +64,43 @@ const orderInfo = reactive({
   paymentMethod: '信用卡付款'
 })
 
+// ---- 超商電子地圖（選門市） ----
+const cvsStore = reactive({
+  storeId: '',
+  storeName: '',
+  address: ''
+})
+
+// 按下「選擇門市」時：直接組電子地圖網址、整頁導過去（不能用 iframe，超商電子地圖不支援）
+// eshopid 是跟統一超商申請電子地圖服務拿到的開發者代號，先用公開範例值 870 頂著，
+// 申請到正式代號後，換掉這個值就好，不用改其他程式碼
+const CVS_MAP_ESHOP_ID = '870'
+// callback 網址要是超商系統真的打得到的後端網址，不能寫死 localhost，
+// 跟其他圖片網址一樣改成從 VITE_API_URL 組出來（VITE_API_URL 本身已經包含 /api）
+const CVS_MAP_CALLBACK_URL = `${import.meta.env.VITE_API_URL}/GroupLogistics/cvs-map/callback`
+
+const openCvsMap = () => {
+  const mapUrl = `https://emap.presco.com.tw/c2cemap.ashx?eshopid=${CVS_MAP_ESHOP_ID}&servicetype=1&url=${encodeURIComponent(CVS_MAP_CALLBACK_URL)}`
+  window.location.href = mapUrl
+}
+
+// 頁面一進來就檢查網址上有沒有帶超商回傳的門市資料（從電子地圖選完門市、後端轉回來的）
+if (route.query.cvsStoreId) {
+  cvsStore.storeId = route.query.cvsStoreId
+  cvsStore.storeName = route.query.cvsStoreName || ''
+  cvsStore.address = route.query.cvsAddress || ''
+  // 選完門市後，配送地址欄位直接帶入門市地址，方便使用者送出
+  orderInfo.pickupMethod = '超商取貨'
+  orderInfo.shipAddress = cvsStore.address
+}
+
+// 從 LINE Pay 取消或付款失敗導回來的話，網址上會帶 linepay=cancelled / fail，顯示一下提示
+if (route.query.linepay === 'cancelled') {
+  alert('已取消 LINE Pay 付款，購物車內容仍保留')
+} else if (route.query.linepay === 'fail') {
+  alert('LINE Pay 付款未完成，請重新嘗試')
+}
+
 // 把數字格式化成千分位顯示（例如 1234 -> 1,234）
 const formatCurrency = (val) => new Intl.NumberFormat('zh-TW').format(val)
 
@@ -80,21 +117,41 @@ const handleSubmit = async () => {
     alert('請完整填寫收件人姓名、電話與地址')
     return
   }
+  // 選了超商取貨，但還沒選門市，不能送出
+  if (orderInfo.pickupMethod === '超商取貨' && !cvsStore.storeId) {
+    alert('請先選擇取貨門市')
+    return
+  }
   // 購物車是空的也不能送出訂單
   if (cartItems.value.length === 0) {
     alert('購物車是空的，請先加入商品')
     return
   }
 
+  // 目前訂單資料表沒有獨立的門市欄位，選超商取貨時把門市代號/名稱一併記在配送地址裡，方便後台出貨對照
+  const finalAddress = orderInfo.pickupMethod === '超商取貨' && cvsStore.storeId
+    ? `${cvsStore.storeName}（門市代號：${cvsStore.storeId}）${orderInfo.shipAddress}`
+    : orderInfo.shipAddress
+
+  const payload = {
+    shipName: orderInfo.shipName,
+    shipPhone: orderInfo.shipPhone,
+    shipAddress: finalAddress,
+    pickupMethod: orderInfo.pickupMethod,
+    paymentMethod: orderInfo.paymentMethod
+  }
+
   try {
+    // 選 LINE Pay 才走真的串接的付款流程，其他付款方式維持原本的模擬付款
+    if (orderInfo.paymentMethod === 'LINE Pay') {
+      const { paymentUrl } = await requestLinePay(payload)
+      // 整頁導去 LINE Pay 的付款頁，付款完成後 LINE Pay 會直接把使用者導回我們的後端、再轉回這裡
+      window.location.href = paymentUrl
+      return
+    }
+
     // UserId 不用帶了，後端一律從 JWT 判斷是誰的訂單
-    const result = await createPayment({
-      shipName: orderInfo.shipName,
-      shipPhone: orderInfo.shipPhone,
-      shipAddress: orderInfo.shipAddress,
-      pickupMethod: orderInfo.pickupMethod,
-      paymentMethod: orderInfo.paymentMethod
-    })
+    const result = await createPayment(payload)
 
     // 導去模擬付款頁，付款結果確認後才會真的建立訂單
     router.push(`/GroupShop/pay/${result.paymentId}`)
@@ -219,8 +276,19 @@ const handleSubmit = async () => {
                     <option value="信用卡付款">信用卡付款</option>
                     <option value="線上支付">線上支付</option>
                     <option value="貨到付款">貨到付款</option>
+                    <option value="LINE Pay">LINE Pay</option>
                   </select>
                 </div>
+              </div>
+
+              <!-- 選了超商取貨才顯示：選門市按鈕 + 已選門市資訊 -->
+              <div v-if="orderInfo.pickupMethod === '超商取貨'" class="mb-3">
+                <button type="button" class="btn btn-outline-secondary btn-sm" @click="openCvsMap">
+                  {{ cvsStore.storeId ? '重新選擇門市' : '選擇門市' }}
+                </button>
+                <p v-if="cvsStore.storeId" class="small text-muted mt-2 mb-0">
+                  已選門市：{{ cvsStore.storeName }}（{{ cvsStore.storeId }}）{{ cvsStore.address }}
+                </p>
               </div>
             </form>
           </div>

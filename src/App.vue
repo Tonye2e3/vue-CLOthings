@@ -71,7 +71,12 @@ function logout() {
         >
           <IconUser />
         </RouterLink>
-        <RouterLink v-else :to="{ name: 'login' }" class="icon-btn" aria-label="帳號">
+        <RouterLink
+          v-else
+          :to="{ name: 'login' }"
+          class="icon-btn"
+          aria-label="帳號"
+        >
           <IconUser />
         </RouterLink>
         <RouterLink

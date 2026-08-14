@@ -30,6 +30,21 @@ import { useAuthStore } from '@/stores/auth'
 // 存進這個 ref，不去動共用的 authStore 或 LoginView.vue。
 // 沒登入的人，currentUserId 會維持 null——發文、留言、按讚這些動作原本就會被
 // 後端 [Authorize] 擋掉，所以 null 的情況下這些按鈕本來就打不通，是預期內的。
+// IMAGE_BASE：圖片是靜態檔案（wwwroot/images/posts/xxx.jpg），走的不是 /api 這條路徑，
+// 不能直接用 api 服務的 baseURL（那個是 https://localhost:7255/api，多了 /api）。
+// 這裡把 VITE_API_URL 尾巴的 /api 拿掉，變成純網域，圖片網址才會組對。
+const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+
+// export const：export 代表「把這個變數開放給其他檔案使用」，
+// 其他檔案只要寫 import { currentUser } from '這個檔案路徑'，就能拿到它。
+// 包成 ref() 是因為會在下面 loadCurrentUser() 裡被換成資料庫裡真正登入者的資料，
+// 換掉之後畫面上用到它的地方（例如 CreatePostView.vue 發文預覽）要能自動跟著更新。
+// 這裡先給一個預設值頂著，等 loadCurrentUser() 打完 API 才會換成真的。
+export const currentUser = ref({
+  name: '',
+  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=guest'
+})
+
 export const currentUserId = ref(null)
 export const loadCurrentUserId = async () => {
   const authStore = useAuthStore()
@@ -40,28 +55,36 @@ export const loadCurrentUserId = async () => {
   try {
     const res = await api.get('/User/me')
     currentUserId.value = res.data.userId
+    // 拿到真正的 userId 之後，順便把「我自己」的暱稱、大頭貼也從資料庫撈回來，
+    // 不再只是發文時用寫死的假資料頂著。這裡直接重用 PublicUserProfileController.cs
+    // 已經有的 GET api/PublicUserProfile/{userid}，不用另外多寫一支 API。
+    await loadCurrentUser()
   } catch (err) {
     console.error('讀取登入者 userId 失敗：', err)
   }
 }
 
-// IMAGE_BASE：圖片是靜態檔案（wwwroot/images/posts/xxx.jpg），走的不是 /api 這條路徑，
-// 不能直接用 api 服務的 baseURL（那個是 https://localhost:7255/api，多了 /api）。
-// 這裡把 VITE_API_URL 尾巴的 /api 拿掉，變成純網域，圖片網址才會組對。
-const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+// loadCurrentUser：跟後端要「我自己」的公開基本資料（暱稱、大頭貼），
+// 打的是 PublicUserProfileController.cs 裡的 GET api/PublicUserProfile/{userid}，
+// 跟 UserProfileView.vue 的 fetchPublicProfile 是同一支 API、同一套邏輯。
+const loadCurrentUser = async () => {
+  if (!currentUserId.value) return
+  try {
+    const res = await api.get(`/PublicUserProfile/${currentUserId.value}`)
+    currentUser.value = {
+      name: res.data.username,
+      // res.data.avatar 後端存的是相對路徑，要接上 IMAGE_BASE 才是完整網址；
+      // 沒設大頭貼的人（avatar 是 null）用預設頭像頂著，不要顯示破圖。
+      avatar: res.data.avatar ? `${IMAGE_BASE}${res.data.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${res.data.username}`
+    }
+  } catch (err) {
+    console.error('讀取自己的公開個人資料失敗：', err)
+  }
+}
 
 // reactive() 跟前面看到的 ref() 功能很像，也是讓 Vue 追蹤資料變化、
 // 資料一改畫面就自動更新。差別是 reactive() 通常用在「物件」或「陣列」上，
 // 而且在 <script> 裡面使用它包起來的資料時，不用加 .value（這點跟 ref 不一樣）。
-
-// export const：export 代表「把這個變數開放給其他檔案使用」，
-// 其他檔案只要寫 import { currentUser } from '這個檔案路徑'，就能拿到它。
-// 這裡先寫死一個「目前登入的使用者」資料，之後如果接上真正的登入系統，
-// 只要把這裡換成登入後拿到的真實使用者資料即可。
-export const currentUser = {
-  name: 'Emily 艾米莉',
-  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily'
-}
 
 // formatCount：把純數字（例如 1200）轉成「1.2k」這種縮寫格式，只給畫面顯示用。
 // 之後接上真的 API 時，後端 likesCount／commentsCount 會是用
@@ -182,6 +205,18 @@ import { ref, computed, onMounted, watch } from 'vue'
 // useAuthStore 已經在上面那個 <script>（非 setup）區塊 import 過了，這裡直接呼叫就好。
 const authStore = useAuthStore()
 
+// onAvatarError：大頭貼圖片載入失敗時執行（例如資料庫存的路徑指到 wwwroot 裡
+// 實際上還沒有的檔案 — 跟先前貼文圖片遇到的狀況一樣，測試帳號的大頭貼路徑目前
+// 有些是佔位用的、對應的檔案還沒真的放上去）。
+// 失敗時把圖片來源換成 dicebear 產生的預設頭像，畫面才不會出現「圖片壞掉」的圖示。
+const onAvatarError = (event, name) => {
+  // 加個保護：如果換成 dicebear 網址後還是失敗（例如完全沒有網路），
+  // 就不要再觸發一次 @error，避免無限迴圈一直重新請求。
+  if (event.target.dataset.fallback) return
+  event.target.dataset.fallback = '1'
+  event.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+}
+
 // posts 已經在上面的 <script> 區塊宣告並 export，這裡同一個檔案內可以直接使用，不用再 import
 // api、currentUserId、IMAGE_BASE 現在也移到上面那個 <script> 區塊宣告了（因為 loadSavedPosts 也需要用到），
 // 這裡同樣不用再重複 import／宣告一次。
@@ -193,6 +228,8 @@ const fetchPosts = async () => {
   try {
     // api.get(網址)：對這個網址發送 GET 請求。
     // await：先暫停在這一行，等 API 真的回應了，才把結果存進 res，再往下執行。
+    // GetCommunityPost 現在固定只回傳 status 是 public 的貼文（後端已經寫死篩選），
+    // 不用再自己帶查詢參數。
     const res = await api.get(`/CommunityPost`)
 
     // res.data：axios 已經把後端回傳的 JSON 自動轉換成 JavaScript 的陣列／物件了，
@@ -204,7 +241,11 @@ const fetchPosts = async () => {
     const apiPosts = res.data.map(p => ({
       communityPostId: p.communityPostId,
       userId: p.userId,
-      user: p.user || { name: '未知使用者', avatar: '' },
+      // p.user.avatar 後端存的是相對路徑（例如 /avatars/user002.png），要接上 IMAGE_BASE
+      // 才是完整網址，跟貼文圖片是同一種處理方式；沒設大頭貼的人用預設頭像頂著。
+      user: p.user
+        ? { ...p.user, avatar: p.user.avatar ? `${IMAGE_BASE}${p.user.avatar}` : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + p.user.name }
+        : { name: '未知使用者', avatar: '' },
       content: p.content,
       postDate: p.postDate,
       status: p.status,
@@ -288,7 +329,8 @@ const fetchCreators = async () => {
     creators.value = res.data.map(c => ({
       id: c.userId, // 這個 id 現在是真的 userId，不再是這份清單自己編的假號碼了
       name: c.name,
-      avatar: c.avatar,
+      // c.avatar 一樣是相對路徑，要接上 IMAGE_BASE；沒設大頭貼的人用預設頭像頂著。
+      avatar: c.avatar ? `${IMAGE_BASE}${c.avatar}` : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + c.name,
       meta: `${formatCount(c.followersCount)}追蹤`,
       isFollowing: c.isFollowing,
       userFollowId: c.userFollowId
@@ -480,7 +522,7 @@ const toggleFollow = async (creator) => {
           </div>
         </div>
 
-        <!-- 搜尋列：可搜尋穿搭標籤、標籤或用戶 -->
+        <!-- 搜尋列：可搜尋穿搭標籤、單品或用戶 -->
         <div class="search-bar">
           <svg class="search-icon" viewBox="0 0 24 24" fill="none">
             <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
@@ -496,7 +538,7 @@ const toggleFollow = async (creator) => {
             type="text"
             v-model="searchQuery"
             class="search-input"
-            placeholder="搜尋穿搭、標籤或用戶..."
+            placeholder="搜尋穿搭、單品或用戶..."
           />
           <!--
             v-if="searchQuery"：只有搜尋框裡有文字的時候，才顯示這個「清除」按鈕。
@@ -566,7 +608,7 @@ const toggleFollow = async (creator) => {
             </router-link>
             <div class="feature-body">
               <router-link :to="`/community/profile/${featurePost.userId}`" class="author-row text-decoration-none">
-                <img class="avatar" :src="featurePost.user.avatar" alt="avatar" />
+                <img class="avatar" :src="featurePost.user.avatar" alt="avatar" @error="onAvatarError($event, featurePost.user.name)" />
                 <div>
                   <div class="author-name">{{ featurePost.user.name }}</div>
                   <div class="author-role">{{ currentTabCopy.role }}</div>
@@ -582,6 +624,7 @@ const toggleFollow = async (creator) => {
               <div class="stat-row">
                 <span>♥ {{ formatCount(featurePost.likesCount) }}</span>
                 <span>💬 {{ formatCount(featurePost.commentsCount) }}</span>
+                <a href="#" class="link-out">查看單品 →</a>
               </div>
             </div>
           </div>
@@ -595,7 +638,7 @@ const toggleFollow = async (creator) => {
             就改顯示 currentTabCopy.empty 這個針對目前分頁寫好的提示文字。
           -->
           <div class="empty-state" v-if="filteredPosts.length === 0">
-            {{ isSearching ? `找不到符合「${searchQuery}」的穿搭、標籤或用戶，換個關鍵字試試。` : currentTabCopy.empty }}
+            {{ isSearching ? `找不到符合「${searchQuery}」的穿搭、單品或用戶，換個關鍵字試試。` : currentTabCopy.empty }}
           </div>
 
           <!--
@@ -622,7 +665,7 @@ const toggleFollow = async (creator) => {
 
               <div class="post-body">
                 <router-link :to="`/community/profile/${post.userId}`" class="post-author text-decoration-none">
-                  <img :src="post.user.avatar" alt="avatar" />
+                  <img :src="post.user.avatar" alt="avatar" @error="onAvatarError($event, post.user.name)" />
                   <span>{{ post.user.name }}</span>
                 </router-link>
 
@@ -660,7 +703,7 @@ const toggleFollow = async (creator) => {
                  可以放心接 router-link 了，不會再連到不相干的使用者。 -->
             <div v-for="creator in filteredCreators" :key="creator.id" class="stylist-row">
               <router-link :to="`/community/profile/${creator.id}`" class="d-flex align-items-center text-decoration-none flex-grow-1 min-w-0">
-                <img class="stylist-avatar" :src="creator.avatar" alt="avatar" />
+                <img class="stylist-avatar" :src="creator.avatar" alt="avatar" @error="onAvatarError($event, creator.name)" />
                 <div class="min-w-0">
                   <div class="stylist-name text-truncate">{{ creator.name }}</div>
                   <div class="stylist-meta">{{ creator.meta }}</div>
