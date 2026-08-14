@@ -48,6 +48,8 @@ export const deleteShipper = (id) => http.delete(`/GroupShipper/${id}`)
 
 // ---- 客服紀錄（管理端）----
 export const getAllCustomerService = () => http.get('/GroupCustomerService/admin/all').then(res => res.data)
+export const replyCustomerService = (id, replyContent) =>
+  http.put(`/GroupCustomerService/${id}/reply`, { replyContent }).then(res => res.data)
 
 // ---- 訂單管理 ----
 // status 選填：帶了就只回傳該狀態的訂單
