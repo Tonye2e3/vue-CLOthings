@@ -1,10 +1,14 @@
 import axios from 'axios'
-import { useAuthStore } from '@/stores/auth'
+import {
+  useAuthStore
+} from '@/stores/auth'
 
 // axios.create() 創建一個新的axios實例
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL, //環境變數
   timeout: 30000, //連線逾時
+
+  withCredentials: true
 })
 
 //請求攔截器

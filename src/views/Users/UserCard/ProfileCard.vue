@@ -105,6 +105,7 @@ const save = async () => {
     alert('個人資料修改成功')
 
     isEditing.value = false
+
   } catch (error) {
     console.error('修改個人資料失敗：', error)
     alert('個人資料修改失敗')
@@ -112,6 +113,7 @@ const save = async () => {
 }
 
 const cancel = () => {
+  // 還原進入編輯前的資料
   Object.assign(profileData, backupData)
 
   selectedAvatarFile.value = null
@@ -200,12 +202,8 @@ const cancel = () => {
     <!-- 編輯模式 -->
     <div v-else>
       <div class="avatar-edit-area">
-        <img
-          v-if="profileData.avatar || avatarPreviewUrl"
-          :src="getEditingAvatarUrl()"
-          alt="會員頭像"
-          class="avatar avatar-large"
-        />
+        <img v-if="profileData.avatar || avatarPreviewUrl" :src="getEditingAvatarUrl()" alt="會員頭像"
+          class="avatar avatar-large" />
 
         <div v-else class="avatar avatar-large avatar-placeholder">U</div>
 
@@ -223,22 +221,12 @@ const cancel = () => {
       <div class="user-form-grid">
         <div class="user-form-group">
           <label>姓氏</label>
-          <input
-            v-model="profileData.lastName"
-            type="text"
-            class="form-control"
-            placeholder="請輸入姓氏"
-          />
+          <input v-model="profileData.lastName" type="text" class="form-control" placeholder="請輸入姓氏" />
         </div>
 
         <div class="user-form-group">
           <label>名字</label>
-          <input
-            v-model="profileData.firstName"
-            type="text"
-            class="form-control"
-            placeholder="請輸入名字"
-          />
+          <input v-model="profileData.firstName" type="text" class="form-control" placeholder="請輸入名字" />
         </div>
 
         <div class="user-form-group">
@@ -257,24 +245,14 @@ const cancel = () => {
 
         <div class="user-form-group user-form-group-full">
           <label>穿搭標籤</label>
-          <input
-            v-model="profileData.styleTag"
-            type="text"
-            maxlength="100"
-            class="form-control"
-            placeholder="例如：Cyberpunk、Streetwear"
-          />
+          <input v-model="profileData.styleTag" type="text" maxlength="100" class="form-control"
+            placeholder="例如：Cyberpunk、Streetwear" />
         </div>
 
         <div class="user-form-group user-form-group-full">
           <label>自我介紹</label>
-          <textarea
-            v-model="profileData.intro"
-            rows="4"
-            maxlength="500"
-            class="form-control"
-            placeholder="介紹一下你的風格..."
-          ></textarea>
+          <textarea v-model="profileData.intro" rows="4" maxlength="500" class="form-control"
+            placeholder="介紹一下你的風格..."></textarea>
 
           <small class="char-count"> {{ profileData.intro?.length || 0 }} / 500 </small>
         </div>
@@ -364,6 +342,7 @@ const cancel = () => {
 }
 
 @media (max-width: 700px) {
+
   .profile-summary,
   .avatar-edit-area {
     flex-direction: column;
