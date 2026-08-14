@@ -11,17 +11,19 @@ export const useCartStore = defineStore(
     const items = ref([]) // ref() 建立一個物件，並且可以監聽變化
 
     // 增加商品的方法，將商品加入購物車
-    function addItem(product) {
-      const existItem = items.value.find(
-        (p) => p.productSpecificationId === product.productSpecificationId,
-      ) // 這個id是否跟我已存在的陣列中有相同的規格id，如果找不到就會是null
-
-      if (existItem) {
-        // 商品已存在item之中，如果有找到相同的id，就會執行這段
-        existItem.quantity += product.quantity // 將該商品的數量加1
-      } else {
-        // 商品不存在item之中，如果沒有找到相同的id，就會執行這段
-        items.value.push(product) // // 陣列塞一個物件，將商品加入購物車
+    // 加入購物車（打後端 API）
+    async function addItem(product) {
+      try {
+        // 打 POST /api/cart，送規格 id + 數量
+        await api.post('/cart', {
+          productSpecificationId: product.productSpecificationId,
+          quantity: product.quantity,
+        })
+        // 加入成功後，重新從後端載入購物車（拿到含 cartId 的最新資料）
+        await loadCart()
+      } catch (error) {
+        console.error('加入購物車失敗：', error)
+        alert('加入購物車失敗，請稍後再試')
       }
     }
 
@@ -142,6 +144,4 @@ export const useCartStore = defineStore(
       loadCart,
     } // 回傳模組內的變數、方法、計算屬性
   },
-  { persist: true },
-  // 加上persist:true，代表這個狀態模組要持久化儲存，當頁面刷新時，資料不會消失
 )

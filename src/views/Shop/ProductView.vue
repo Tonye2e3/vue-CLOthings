@@ -47,8 +47,6 @@ onMounted(async () => {
     if (product.value.images && product.value.images.length > 0) {
       currentImage.value = getImageUrl(product.value.images[0])
     }
-
-    console.log('拿到的商品：', response.data) // 暫時看，測完刪
   } catch (error) {
     console.error('載入商品失敗：', error)
   }
@@ -72,25 +70,16 @@ function toggleFavorite() {
 }
 
 // 加入購物車
-function addToCart() {
-  //確認是否選規格
+async function addToCart() {
   if (!selectedColor.value || !selectedSize.value) {
     alert('請選擇顏色和尺寸')
     return
   }
-  // 用反查到的 selectedSpec，組合成購物車商品
-  cartStore.addItem({
-    productSpecificationId: selectedSpec.value.productSpecificationId, // ★ 關鍵：帶正確的規格 id
-    productId: product.value.productId,
-    productName: product.value.productName,
-    price: product.value.price,
-    color: selectedSpec.value.color,
-    size: selectedSpec.value.size,
-    image: currentImage.value,
+  // 只需要送規格 id 和數量
+  await cartStore.addItem({
+    productSpecificationId: selectedSpec.value.productSpecificationId,
     quantity: 1,
-    selected: true,
   })
-
   alert('已加入購物車！')
 }
 
@@ -100,12 +89,6 @@ function buyNow() {
     alert('請選擇顏色和尺寸')
     return
   }
-  //測試用
-  console.log('立即購買', {
-    name: product.value.name,
-    color: selectedColor.value,
-    size: selectedSize.value,
-  })
 }
 
 // 從規格組合中，取出所有「不重複的顏色」
