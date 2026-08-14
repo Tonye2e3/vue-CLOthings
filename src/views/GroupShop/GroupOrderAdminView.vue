@@ -276,6 +276,8 @@
                 <th>聯絡方式</th>
                 <th>標題</th>
                 <th>內容</th>
+                <th>回覆</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -285,15 +287,57 @@
                 <td>{{ r.email }}｜{{ r.phone }}</td>
                 <td>{{ r.title }}</td>
                 <td>{{ r.content }}</td>
+                <td>
+                  <span v-if="r.replyContent" class="text-success small">
+                    {{ r.replyContent }}
+                    <div class="text-muted">({{ r.repliedAt }})</div>
+                  </span>
+                  <span v-else class="text-muted small">尚未回覆</span>
+                </td>
+                <td>
+                  <button type="button" class="btn btn-sm btn-outline-primary" @click="openReplyModal(r)">
+                    {{ r.replyContent ? '編輯回覆' : '回覆' }}
+                  </button>
+                </td>
               </tr>
               <tr v-if="allServiceRecords.length === 0">
-                <td colspan="5" class="text-center text-muted py-4">目前沒有任何客服紀錄</td>
+                <td colspan="7" class="text-center text-muted py-4">目前沒有任何客服紀錄</td>
               </tr>
             </tbody>
           </table>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" @click="showServiceListModal = false">關閉</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 回覆客服 Modal ============ -->
+  <div v-if="showReplyModal" class="modal-backdrop fade show"></div>
+  <div
+    v-if="showReplyModal"
+    class="modal fade show d-block"
+    tabindex="-1"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold mb-0">回覆客服：{{ replyTarget?.title }}</h5>
+          <button type="button" class="btn-close" aria-label="Close" @click="showReplyModal = false"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small mb-2">買家提問：{{ replyTarget?.content }}</p>
+          <div class="mb-3">
+            <label class="form-label">回覆內容</label>
+            <textarea class="form-control" rows="4" v-model="replyContent"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" @click="showReplyModal = false">取消</button>
+          <button type="button" class="btn btn-primary" @click="handleSendReply">送出回覆</button>
         </div>
       </div>
     </div>
@@ -310,7 +354,8 @@ import {
   createShipper,
   updateShipper,
   deleteShipper,
-  getAllCustomerService
+  getAllCustomerService,
+  replyCustomerService
 } from '@/api/groupShopAdmin'
 
 const orders = ref([])
@@ -372,6 +417,30 @@ const allServiceRecords = ref([])
 const openServiceListModal = async () => {
   allServiceRecords.value = await getAllCustomerService()
   showServiceListModal.value = true
+}
+
+// ---- 回覆客服 Modal ----
+const showReplyModal = ref(false)
+const replyTarget = ref(null)
+const replyContent = ref('')
+
+const openReplyModal = (record) => {
+  replyTarget.value = record
+  replyContent.value = record.replyContent || ''
+  showReplyModal.value = true
+}
+
+const handleSendReply = async () => {
+  if (!replyContent.value.trim()) {
+    alert('請填寫回覆內容')
+    return
+  }
+  const updated = await replyCustomerService(replyTarget.value.groupCustomerServiceId, replyContent.value)
+  const idx = allServiceRecords.value.findIndex(r => r.groupCustomerServiceId === updated.groupCustomerServiceId)
+  if (idx !== -1) {
+    allServiceRecords.value[idx] = updated
+  }
+  showReplyModal.value = false
 }
 
 // ---- 搜尋（商品名稱 或 訂單編號） ----

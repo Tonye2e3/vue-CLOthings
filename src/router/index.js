@@ -32,7 +32,7 @@ const router = createRouter({
       component: () => import('../views/Shop/ShopFavoriteView.vue'),
     },
     {
-      path: '/shop/product/:id',
+      path: '/shop/product',
       name: 'product',
       component: () => import('../views/Shop/ProductView.vue'),
     },
