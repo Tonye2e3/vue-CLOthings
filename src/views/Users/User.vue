@@ -60,7 +60,7 @@ async function testRefresh() {
           <!-- 帳戶資料 -->
           <a href="#account" class="nav-item">
             <span class="nav-icon">
-              <font-awesome-icon :icon="faUser" />
+              <FontAwesomeIcon :icon="faUser" />
             </span>
 
             <div>
@@ -72,7 +72,7 @@ async function testRefresh() {
           <!-- 個人資料 -->
           <a href="#profile" class="nav-item">
             <span class="nav-icon">
-              <font-awesome-icon :icon="faIdCard" />
+              <FontAwesomeIcon :icon="faIdCard" />
             </span>
 
             <div>
@@ -84,7 +84,7 @@ async function testRefresh() {
           <!-- 收件資料 -->
           <a href="#address" class="nav-item">
             <span class="nav-icon">
-              <font-awesome-icon :icon="faHouse" />
+              <FontAwesomeIcon :icon="faHouse" />
             </span>
 
             <div>
@@ -96,7 +96,7 @@ async function testRefresh() {
           <!-- 第三方登入 -->
           <a href="#oauth" class="nav-item">
             <span class="nav-icon">
-              <font-awesome-icon :icon="faLink" />
+              <FontAwesomeIcon :icon="faLink" />
             </span>
 
             <div>
@@ -108,7 +108,7 @@ async function testRefresh() {
 
         <div class="sidebar-footer">
           <button type="button" class="logout-btn" @click="logout">
-            <font-awesome-icon :icon="faRightFromBracket" />
+            <FontAwesomeIcon :icon="faRightFromBracket" />
             登出
           </button>
         </div>
