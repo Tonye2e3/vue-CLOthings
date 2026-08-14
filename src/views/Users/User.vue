@@ -9,6 +9,8 @@ import '@/assets/styles/user-common.css'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 
+import api from '@/services/api'
+
 import {
   faUser,
   faIdCard,
@@ -24,9 +26,25 @@ function logout() {
   authStore.clearAuth()
   router.push({ name: 'login' })
 }
+
+async function testRefresh() {
+  try {
+    const resp = await api.post('/User/refresh')
+
+    console.log('Refresh 成功')
+    console.log('新的 Access Token：', resp.data.token)
+  } catch (error) {
+    console.error('Refresh 失敗：', error)
+    console.log('Status：', error.response?.status)
+    console.log('Response：', error.response?.data)
+  }
+}
 </script>
 
 <template>
+  <button class="btn btn-danger" @click="testRefresh">
+    測試 Refresh Token
+  </button>
   <div class="user-page">
     <div class="user-container">
       <!-- ============================= -->
