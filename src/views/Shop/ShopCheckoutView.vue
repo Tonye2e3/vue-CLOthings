@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/ShopCart'
+import api from '@/services/api'
 const cartStore = useCartStore()
 const router = useRouter()
 
@@ -29,38 +30,34 @@ function validateForm() {
   return true // 全部填了 → 回傳 true，可以送出
 }
 // 送出訂單
-function submitOrder() {
-  // ① 先驗證表單，沒填完整就停在這裡
+async function submitOrder() {
+  // ① 先驗證表單
   if (!validateForm()) {
-    return // 驗證沒過，直接結束，不往下送
+    return
   }
 
-  // ② 把所有資料組合成一張訂單
-  const order = {
-    // 收件資訊（來自表單）
-    recipient: form.value.name,
-    phone: form.value.phone,
-    address: form.value.address,
-    payment: form.value.payment,
-    // 訂購商品（勾選的那些）
-    items: cartStore.selectedItems,
-    // 金額
-    subtotal: cartStore.total,
-    shippingFee: cartStore.shippingFee,
-    total: cartStore.finalTotal,
+  // ② 組合「後端需要的」資料格式
+  const orderData = {
+    shipName: form.value.name,
+    shipAddress: form.value.address,
+    shipPhone: form.value.phone,
+    // 把購物車勾選的商品，轉成後端要的格式（只要規格 id + 數量）
+    items: cartStore.selectedItems.map((item) => ({
+      productSpecificationId: item.productSpecificationId,
+      quantity: item.quantity,
+    })),
   }
 
-  console.log('準備送出的訂單：', order) // 暫時印出來看，之後刪
-
-  // ③ 送到後端建立訂單（之後串 API）
-  // 【之後要做】POST /api/orders，把 order 送給後端
-  // await axios.post('/api/orders', order)
-
-  // ④ 送出成功後的善後（目前先做前端部分）
-  alert('訂單已送出！（測試階段，尚未真正存入後端）')
-  // 之後串好 API，這裡會：清空購物車 + 跳轉到訂單頁
-  // cartStore.clearCart()
-  // router.push({ name: 'orders' })
+  // ③ 打 API 建立訂單
+  try {
+    const response = await api.post('/order', orderData)
+    alert('訂單建立成功！訂單編號：' + response.data.orderId)
+    // ④ 成功後：跳到訂單頁（或首頁）
+    router.push({ name: 'orders' })
+  } catch (error) {
+    console.error('建立訂單失敗：', error)
+    alert('建立訂單失敗，請稍後再試')
+  }
 }
 // ═══════════════════════════════════════════════
 // 結帳頁 Checkout
@@ -140,10 +137,6 @@ function submitOrder() {
           <option>信用卡</option>
           <option>ATM 轉帳</option>
         </select>
-      </div>
-      <!-- ⚠️ 測試用，看 v-model 有沒有生效，測完刪 -->
-      <div class="border p-2 mb-3 text-muted" style="font-size: 0.8rem">
-        🧪 目前表單資料：{{ form }}
       </div>
     </section>
 
