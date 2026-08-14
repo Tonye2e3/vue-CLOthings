@@ -17,7 +17,11 @@ const loading = ref(true)
 const fetchPosts = async () => {
   loading.value = true
   try {
-    const res = await api.get(`/CommunityPost`)
+    // 打 AdminCommunityPostController（獨立的後台專用 Controller），不是一般的 CommunityPostController——
+    // 那支現在固定只回傳 public 狀態的貼文，後台要看到全部狀態（含隱藏、審核中的）才能管理。
+    // 這支整個 Controller 都加了 [Authorize(Roles = "Admin,SuperAdmin")]，配合這個檔案自己
+    // onMounted 裡的 authStore.isAdmin 檢查，前後端都有擋。
+    const res = await api.get(`/AdminCommunityPost`)
     posts.value = res.data
   } catch (err) {
     console.error('讀取貼文列表失敗：', err)
