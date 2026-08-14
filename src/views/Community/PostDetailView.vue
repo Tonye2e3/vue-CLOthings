@@ -285,6 +285,98 @@ const toggleSave = () => {
   })
 }
 
+// ============================================================
+// 分享功能
+// ============================================================
+
+// fullShareUrl：這篇貼文完整的路由網址，當作短網址「還沒拿到之前」的備援。
+const fullShareUrl = computed(() => `${window.location.origin}/community/post/${route.params.id}`)
+
+// shortUrl：跟後端要到的短碼組出來的完整短網址，null 代表還沒拿到（或這次沒拿到）。
+// shareUrl：真正拿去分享／複製的網址——拿到短網址就優先用短網址，
+// 還沒拿到、或後端這支 API 掛了，就先用 fullShareUrl 頂著，不會讓分享功能整個壞掉。
+const shortUrl = ref(null)
+const fetchingShortUrl = ref(false)
+const shareUrl = computed(() => shortUrl.value || fullShareUrl.value)
+
+// ensureShortUrl：跟後端要這篇貼文的短碼，打的是 ShortUrlController.cs 裡的
+// POST api/ShortUrl。後端邏輯是「這篇貼文已經產生過短碼就回傳原本那組，沒有才新產生」，
+// 所以這裡不用擔心重複呼叫會一直生出新的短碼；用 shortUrl.value 判斷「已經拿過了」，
+// 避免同一次瀏覽重複打好幾次 API。
+// 短網址走的是後端網域（IMAGE_BASE，跟圖片是同一個網域），不是前端 SPA 的網域，
+// 因為 /s/{code} 這個轉址路由是後端提供的，不是 Vue Router 的路由——
+// 使用者點下短網址時，是瀏覽器直接對後端發請求，後端才能在還沒載入前端 App 之前
+// 就先查資料庫、決定要導去哪一篇貼文。
+const ensureShortUrl = async () => {
+  if (shortUrl.value || fetchingShortUrl.value) return
+  fetchingShortUrl.value = true
+  try {
+    const res = await api.post('/ShortUrl', { communityPostId: Number(route.params.id) })
+    shortUrl.value = `${IMAGE_BASE}/s/${res.data.shortCode}`
+  } catch (err) {
+    console.error('取得短網址失敗，先用完整網址分享：', err)
+  } finally {
+    fetchingShortUrl.value = false
+  }
+}
+
+// showShareMenu：分享選單目前是不是打開的。打開的當下順便去要短網址，
+// 使用者點「複製連結」的時候通常已經拿到短碼了。
+const showShareMenu = ref(false)
+const toggleShareMenu = () => {
+  showShareMenu.value = !showShareMenu.value
+  if (showShareMenu.value) ensureShortUrl()
+}
+const closeShareMenu = () => {
+  showShareMenu.value = false
+}
+
+// linkCopied：複製連結成功後，短暫把按鈕文字換成「已複製！」給使用者一個回饋，
+// 用 setTimeout 在 1.5 秒後自動切回「複製連結」。
+const linkCopied = ref(false)
+const copyLink = async () => {
+  // await ensureShortUrl()：保險起見再等一次——萬一使用者點開選單後，
+  // 手比 API 回應還快就按了複製，這裡確保複製到的是短網址，而不是還沒拿到就先用備援網址。
+  await ensureShortUrl()
+  try {
+    await navigator.clipboard.writeText(shareUrl.value)
+    linkCopied.value = true
+    setTimeout(() => { linkCopied.value = false }, 1500)
+  } catch (err) {
+    console.error('複製連結失敗：', err)
+  }
+  // 複製連結不需要馬上關閉選單，讓使用者看得到「已複製！」的回饋文字再自己收起來，
+  // 或繼續點別的分享方式。
+}
+
+// shareToLine／shareToFacebook：開一個新分頁，帶上這篇貼文的網址，
+// 走各平台自己提供的「分享連結」網址格式（不需要串接對方的 API 金鑰）。
+const shareToLine = async () => {
+  await ensureShortUrl()
+  window.open(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(shareUrl.value)}`, '_blank')
+  closeShareMenu()
+}
+const shareToFacebook = async () => {
+  await ensureShortUrl()
+  window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl.value)}`, '_blank')
+  closeShareMenu()
+}
+
+// nativeShare：手機瀏覽器（或部分桌機瀏覽器）通常有內建的系統分享面板
+// （例如手機上會跳出「傳送給...」「Line」「Messages」這種系統選單），
+// navigator.share 就是呼叫那個系統面板；電腦版 Chrome/Firefox 大多不支援，
+// 所以只有支援的瀏覽器才會顯示這個選項（canNativeShare 判斷）。
+const canNativeShare = typeof navigator !== 'undefined' && !!navigator.share
+const nativeShare = async () => {
+  await ensureShortUrl()
+  try {
+    await navigator.share({ title: post.value.content, url: shareUrl.value })
+  } catch (err) {
+    // 使用者自己按取消系統分享面板也會跑到這裡，是正常操作，不用特別跳錯誤訊息。
+  }
+  closeShareMenu()
+}
+
 // 「這套穿搭的商品」右側清單：直接用 post.taggedProducts（貼文作者真的搜尋、勾選過的商品），
 // 不再是另一份跟這篇貼文毫不相干的假資料。這樣畫面上只會出現作者自己標記過的東西，
 // 不會出現「使用者身上每一件都被當成我們家商品在賣」這種狀況。
@@ -561,9 +653,37 @@ const addComment = async () => {
                 <button class="action-btn">
                   💬 {{ post.commentsCount }}
                 </button>
-                <button class="action-btn">
-                  ↗ 分享
-                </button>
+                <!--
+                  share-wrapper：包住分享按鈕跟下拉選單的容器，加 position:relative，
+                  這樣選單（position:absolute）才會是「相對這個按鈕」定位，而不是整個頁面。
+                -->
+                <div class="share-wrapper">
+                  <button class="action-btn" @click="toggleShareMenu">
+                    ↗ 分享
+                  </button>
+
+                  <!--
+                    分享選單：showShareMenu 是 true 才顯示。
+                    外層再包一層 share-menu-backdrop，鋪滿整個畫面但完全透明，
+                    點選單以外的任何地方都算點到這層背景，直接關閉選單——
+                    這是不用額外寫「偵測點擊選單外面」邏輯的簡單做法。
+                  -->
+                  <div v-if="showShareMenu" class="share-menu-backdrop" @click="closeShareMenu"></div>
+                  <div v-if="showShareMenu" class="share-menu">
+                    <button v-if="canNativeShare" type="button" class="share-menu-item" @click="nativeShare">
+                      <i class="fa-solid fa-share-nodes"></i> 系統分享
+                    </button>
+                    <button type="button" class="share-menu-item" @click="copyLink">
+                      <i class="fa-solid fa-link"></i> {{ linkCopied ? '已複製！' : '複製連結' }}
+                    </button>
+                    <button type="button" class="share-menu-item" @click="shareToLine">
+                      <i class="fa-brands fa-line"></i> 分享到 LINE
+                    </button>
+                    <button type="button" class="share-menu-item" @click="shareToFacebook">
+                      <i class="fa-brands fa-facebook"></i> 分享到 Facebook
+                    </button>
+                  </div>
+                </div>
               </div>
               <!--
                 收藏按鈕：
@@ -875,6 +995,35 @@ const addComment = async () => {
 .action-btn:hover{ color:var(--ink); }
 .action-btn.liked{ color:#B4453A; font-weight:600; }
 .action-btn.saved{ color:var(--ochre); font-weight:600; }
+
+/*
+  分享選單：
+  .share-wrapper 是定位的參考點（position:relative），.share-menu 用 position:absolute
+  相對它往下展開，不用 Teleport 也不會被裁切（.action-bar 本身沒有 overflow:hidden）。
+  .share-menu-backdrop 鋪滿整個畫面但透明，點選單以外的地方都算點到它，直接關閉選單，
+  比自己寫「偵測點擊發生在選單外面」的邏輯簡單很多。
+*/
+.share-wrapper{ position:relative; }
+.share-menu-backdrop{ position:fixed; inset:0; z-index:9; }
+.share-menu{
+  position:absolute; top:calc(100% + 8px); left:0; z-index:10;
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  border-radius:8px;
+  box-shadow:0 10px 30px rgba(42,36,32,.18);
+  padding:.4rem;
+  min-width:180px;
+  display:flex; flex-direction:column; gap:.15rem;
+}
+.share-menu-item{
+  display:flex; align-items:center; gap:.6rem;
+  background:none; border:none; border-radius:5px;
+  padding:.55rem .7rem; font-size:.84rem; color:var(--ink);
+  text-align:left; cursor:pointer;
+  transition:background .15s ease;
+}
+.share-menu-item:hover{ background:var(--cream); }
+.share-menu-item i{ width:16px; text-align:center; color:var(--ink-soft); }
 
 /* ---------- 內文 ---------- */
 .post-content{
