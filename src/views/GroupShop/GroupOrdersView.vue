@@ -60,6 +60,11 @@ onMounted(() => {
   // 管理員（Admin）沒有購物車權限，fetchCart 會回 403，補上 catch 避免出現未處理的 Promise 錯誤
   cartStore.fetchCart().catch(() => {})
   loadOrders()
+
+  // 從 LINE Pay 付款完成導回來的話，網址上會帶 linepay=success，顯示一下提示
+  if (route.query.linepay === 'success') {
+    alert('LINE Pay 付款成功，訂單已建立！')
+  }
 })
 
 // 依訂單狀態文字，回傳對應的徽章（badge）顏色 class，方便在畫面上用不同顏色標示不同狀態
@@ -416,7 +421,11 @@ const submitService = async () => {
             <p v-if="serviceRecords.length === 0" class="small text-muted">目前沒有客服紀錄</p>
             <div v-for="r in serviceRecords" :key="r.groupCustomerServiceId" class="service-record-row">
               <p class="small fw-bold mb-1">{{ r.title }}</p>
-              <p class="small text-muted mb-0">{{ r.content }}</p>
+              <p class="small text-muted mb-1">{{ r.content }}</p>
+              <p v-if="r.replyContent" class="small text-success mb-0">
+                客服回覆：{{ r.replyContent }}（{{ r.repliedAt }}）
+              </p>
+              <p v-else class="small text-muted mb-0">尚未回覆</p>
             </div>
           </div>
           <div class="modal-footer">
