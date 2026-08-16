@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import api from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
@@ -41,19 +41,43 @@ onMounted(() => {
   fetchPosts()
 })
 
+// searchQuery：搜尋框打的文字，同時比對「貼文內容」「發布者ID」「發布者帳號」，
+// 符合任一個就留在篩選結果裡。
+// p.user?.name：後端 AdminCommunityPostController 其實有把使用者帳號（例如 mei_chen88）
+// 一起包在 User.Name 裡回傳，只是列表表格目前沒有把這欄顯示出來（只顯示 userId 數字）——
+// 一開始漏掉這個欄位沒加進搜尋比對範圍，導致打帳號名稱搜尋不到東西，這裡補上。
+const searchQuery = ref('')
+const filteredPosts = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return posts.value
+  return posts.value.filter(p =>
+    p.content?.toLowerCase().includes(q) ||
+    String(p.userId).includes(q) ||
+    p.user?.name?.toLowerCase().includes(q)
+  )
+})
+
 // 分頁：跟 CommunityView.vue 的「載入更多」不同，這裡是傳統的頁碼分頁，
 // 跟你原本 MVC 後台的呈現方式一樣。
 const PAGE_SIZE = 5
 const currentPage = ref(1)
-const totalPages = computed(() => Math.max(1, Math.ceil(posts.value.length / PAGE_SIZE)))
+// totalPages、pagedPosts 現在都改看 filteredPosts（篩選後的結果），
+// 沒有搜尋文字時 filteredPosts 就等於 posts，行為跟原本一樣。
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredPosts.value.length / PAGE_SIZE)))
 const pagedPosts = computed(() => {
   const start = (currentPage.value - 1) * PAGE_SIZE
-  return posts.value.slice(start, start + PAGE_SIZE)
+  return filteredPosts.value.slice(start, start + PAGE_SIZE)
 })
 const goToPage = (page) => {
   if (page < 1 || page > totalPages.value) return
   currentPage.value = page
 }
+
+// 搜尋文字改變時，把頁碼重設回第 1 頁——不然搜尋結果變少了，
+// 但頁碼還停在原本比較後面，可能會出現「這一頁是空的」的狀況。
+watch(searchQuery, () => {
+  currentPage.value = 1
+})
 
 // statusLabel／statusClass：把資料庫存的英文狀態值，轉成中文文字跟對應的顏色 class。
 const statusLabel = (status) => {
@@ -90,10 +114,35 @@ const deletePost = async (post) => {
   <div class="admin-page">
     <div class="admin-container">
 
-      <div class="admin-breadcrumb">Admin / 社群貼文管理</div>
-      <h1 class="admin-title">社群貼文管理</h1>
+      <!--
+        admin-header-row：標題跟搜尋框排在同一排，靠 justify-content:space-between
+        一個貼左邊、一個貼右邊，對應畫面上紅框那個位置。
+      -->
+      <div class="admin-header-row">
+        <div>
+          <div class="admin-breadcrumb">Admin / 社群貼文管理</div>
+          <h1 class="admin-title">社群貼文管理</h1>
+        </div>
+        <div class="admin-search-bar">
+          <svg class="admin-search-icon" viewBox="0 0 24 24" fill="none">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+            <path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <input
+            type="text"
+            v-model="searchQuery"
+            class="admin-search-input"
+            placeholder="搜尋貼文內容、發布者ID或帳號"
+          />
+          <button v-if="searchQuery" type="button" class="admin-search-clear" @click="searchQuery = ''">✕</button>
+        </div>
+      </div>
 
       <div v-if="loading" class="admin-loading">載入中...</div>
+
+      <div v-else-if="filteredPosts.length === 0 && searchQuery.trim()" class="admin-loading">
+        找不到符合「{{ searchQuery }}」的貼文
+      </div>
 
       <div v-else class="admin-card">
         <table class="admin-table">
@@ -180,8 +229,42 @@ const deletePost = async (post) => {
 }
 .admin-container{ max-width:1200px; margin:0 auto; padding:0 1.5rem; }
 .admin-breadcrumb{ font-size:.8rem; color:var(--ink-soft); margin-bottom:.3rem; }
-.admin-title{ font-family:'Noto Serif TC', serif; font-weight:900; font-size:1.6rem; margin-bottom:1.4rem; color:var(--ink); }
+.admin-title{ font-family:'Noto Serif TC', serif; font-weight:900; font-size:1.6rem; margin:0; color:var(--ink); }
 .admin-loading{ padding:2rem; text-align:center; color:var(--ink-soft); }
+
+.admin-header-row{
+  display:flex; align-items:flex-end; justify-content:space-between;
+  gap:1rem; flex-wrap:wrap;
+  margin-bottom:1.4rem;
+}
+.admin-search-bar{
+  position:relative;
+  display:flex; align-items:center;
+  width:100%; max-width:320px;
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  border-radius:999px;
+  padding:.55rem 1rem;
+  transition:border-color .18s ease, box-shadow .18s ease;
+}
+.admin-search-bar:focus-within{
+  border-color:var(--plum);
+  box-shadow:0 0 0 3px rgba(122,75,84,.12);
+}
+.admin-search-icon{ width:16px; height:16px; color:var(--ink-soft); flex-shrink:0; }
+.admin-search-input{
+  border:none; outline:none; background:transparent;
+  flex:1; margin-left:.6rem; font-family:'Noto Sans TC', sans-serif;
+  font-size:.86rem; color:var(--ink);
+}
+.admin-search-input::placeholder{ color:var(--ink-soft); }
+.admin-search-clear{
+  border:none; background:var(--hairline); color:var(--ink-soft);
+  width:18px; height:18px; border-radius:50%; font-size:.65rem;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  cursor:pointer; margin-left:.4rem;
+}
+.admin-search-clear:hover{ background:var(--plum); color:#fff; }
 
 .admin-card{
   background:var(--paper); border:1px solid var(--hairline); border-radius:16px;
