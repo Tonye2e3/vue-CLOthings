@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import axios from 'axios'
+import api from '@/services/api'
 import Review from '@/components/Shop/ProductReview.vue'
 import Post from '@/components/Shop/ProductPost.vue'
 import { useCartStore } from '@/stores/ShopCart'
@@ -41,7 +41,7 @@ const isCurrentFavorite = computed(() => {
 onMounted(async () => {
   try {
     const id = route.params.id // 從網址拿 id（例如 /shop/product/5 → "5"）
-    const response = await axios.get(`${API_BASE}/api/product/${id}`)
+    const response = await api.get(`${API_BASE}/api/product/${id}`)
     product.value = response.data
     // 資料來了之後，才設定主圖（用 images 的第一張）
     if (product.value.images && product.value.images.length > 0) {
