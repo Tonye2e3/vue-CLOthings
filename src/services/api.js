@@ -1,12 +1,14 @@
 import axios from 'axios'
-import { useAuthStore } from '@/stores/auth'
+import {
+  useAuthStore
+} from '@/stores/auth'
 
 // ======================================================
 // Axios 實例
 // ======================================================
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
-  timeout: 30000,
+  timeout: 10000,
 
   // 讓瀏覽器可以攜帶 HttpOnly Cookie
   // Refresh Token 就是存在 Cookie 裡
@@ -46,9 +48,11 @@ api.interceptors.response.use(
 
   // API 發生錯誤
   async (error) => {
+    // 取得錯誤的狀態碼
     const status = error.response?.status
-    // 取得原本發生 401 的 request
+    // 取得原本發生錯誤的 request config
     const originalRequest = error.config
+    // 取得原本發生錯誤的 request URL
     const requestUrl = originalRequest?.url
 
     // ==================================================
@@ -133,6 +137,7 @@ api.interceptors.response.use(
         // ==============================================
 
         return api(originalRequest)
+
       } catch (refreshError) {
         authStore.clearAuth()
 
