@@ -62,7 +62,9 @@ export const offReceiveMessage = (callback) => {
 
 // sendChatMessage：呼叫後端 ChatHub.cs 的 SendMessage 方法，把訊息送出去。
 // invoke 的第一個參數 "SendMessage" 要跟後端 Hub 裡的方法名稱一致（大小寫也要一致）。
-export const sendChatMessage = async (receiverId, content) => {
+// imagePaths 是選填的陣列——如果這則訊息有附圖片（可以不只一張），是前端先呼叫 REST API
+// （POST api/Chat/upload-image）把檔案存到伺服器、拿到路徑清單之後，才傳進來這裡。
+export const sendChatMessage = async (receiverId, content, imagePaths = []) => {
   if (!connection) return
-  await connection.invoke('SendMessage', { receiverId, content })
+  await connection.invoke('SendMessage', { receiverId, content, imagePaths })
 }

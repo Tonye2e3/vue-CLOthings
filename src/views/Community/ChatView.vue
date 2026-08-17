@@ -27,6 +27,12 @@ const loadingMessages = ref(false)
 const newMessage = ref('')
 const messagesEl = ref(null)
 
+// pendingImages：使用者選好、還沒送出的圖片，可以一次選很多張。每一項 file 是原始檔案物件
+// （要上傳用），previewUrl 是本地暫時網址（選好馬上看到縮圖，不用等上傳完成）。
+// uploading：正在上傳中，避免使用者連點好幾次送出，重複送出同一批圖。
+const pendingImages = ref([])
+const uploading = ref(false)
+
 // avatarUrl／onAvatarError：跟 CommunityView.vue、PostDetailView.vue 是同一套邏輯——
 // 資料庫有存大頭貼路徑就接 IMAGE_BASE，沒有（或載入失敗）就用 dicebear 依帳號名稱產生預設圖，
 // 同一個帳號不管在哪個頁面看到的預設頭像都會是同一張。
@@ -145,14 +151,61 @@ const handleReceiveMessage = (dto) => {
   fetchConversations()
 }
 
+// handlePickImage：使用者從檔案選擇視窗選好圖片之後執行（可以一次選很多張，也可以分次
+//加選）——這裡只做「本地預覽」，還沒真的上傳到伺服器，上傳的動作留到按下「送出」的那一刻
+// 才做（handleSend 裡）。這樣如果選好圖片後反悔按了「移除」，就不會浪費一次上傳。
+const handlePickImage = (event) => {
+  const files = Array.from(event.target.files || [])
+  files.forEach(file => {
+    pendingImages.value.push({
+      file,
+      // URL.createObjectURL(file)：瀏覽器內建功能，幫本地檔案產生一個暫時網址，
+      // 讓 <img> 可以直接預覽，重新整理頁面就會失效（跟 CreatePostView.vue 選圖片預覽同一招）。
+      previewUrl: URL.createObjectURL(file)
+    })
+  })
+  event.target.value = '' // 清空，這樣選同一張圖也能再次觸發 change
+}
+const removePendingImage = (index) => {
+  pendingImages.value.splice(index, 1)
+}
+
 const handleSend = async () => {
   const content = newMessage.value.trim()
-  if (!content || !activeOtherUserId.value) return
-  newMessage.value = ''
+  // 文字、圖片至少要有一個才能送出——都是空的話不用送。
+  if ((!content && pendingImages.value.length === 0) || !activeOtherUserId.value) return
+
+  let imagePaths = []
+  if (pendingImages.value.length > 0) {
+    uploading.value = true
+    try {
+      const formData = new FormData()
+      // 'files'（跟 CommunityPostController.cs 的 UploadImages(List<IFormFile> files) 一樣）：
+      // append 同一個欄位名稱多次，後端就會收到一個「檔案清單」，一次上傳全部選好的圖片。
+      pendingImages.value.forEach(img => formData.append('files', img.file))
+      const res = await api.post('/Chat/upload-image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      imagePaths = res.data
+    } catch (err) {
+      console.error('圖片上傳失敗：', err)
+      alert('圖片上傳失敗，請稍後再試一次！')
+      uploading.value = false
+      return
+    }
+    uploading.value = false
+  }
+
+  // 先呼叫 sendChatMessage，確定後端真的收下了才清空輸入框跟圖片預覽——
+  // 不然像之前那樣「先清空、再送出」，一旦後端這步失敗，畫面上什麼提示都沒有，
+  // 打好的字、選好的圖也跟著憑空消失，使用者只會覺得「送出去了但沒反應」。
   try {
-    await sendChatMessage(activeOtherUserId.value, content)
+    await sendChatMessage(activeOtherUserId.value, content, imagePaths)
+    newMessage.value = ''
+    pendingImages.value = []
   } catch (err) {
     console.error('送出訊息失敗：', err)
+    alert('訊息送出失敗，請稍後再試一次！')
   }
 }
 
@@ -179,7 +232,14 @@ watch(() => route.params.userId, (newVal) => {
 
 <template>
   <div class="chat-page">
-    <div class="chat-container">
+    <div class="chat-page-container">
+      <!-- 返回上一頁：跟 UserProfileView.vue、FollowListView.vue 是同一顆 back-pill 按鈕、
+           同一套樣式。用 $router.back() 而不是寫死 to="/community"，是因為使用者可能是從
+           不同地方點「訊息」進來的（例如某個人的個人頁），返回應該回到「剛剛那一頁」，
+           不是每次都固定跳去社群首頁。 -->
+      <button type="button" class="back-pill" @click="$router.back()">← 返回</button>
+
+      <div class="chat-container">
 
       <!-- 左側：對話清單 -->
       <aside class="chat-sidebar">
@@ -255,15 +315,53 @@ watch(() => route.params.userId, (newVal) => {
                   alt="avatar"
                   @error="onAvatarError($event, activeOtherUsername)"
                 />
-                <div class="chat-bubble">
-                  <p>{{ m.content }}</p>
+                <div class="chat-bubble" :class="{ 'image-only': m.imagePaths?.length > 0 && !m.content }">
+                  <!--
+                    多張圖片排成小格狀（跟貼文卡片縮圖列是同樣的排版邏輯），只有 1 張時自然
+                    就是單張大圖。點圖片開新分頁看原始大小的圖，跟其他頁面的燈箱比起來陽春
+                    一點，但聊天室的圖片通常是隨手拍的截圖，用新分頁看原圖已經夠用。
+                  -->
+                  <div v-if="m.imagePaths?.length > 0" class="chat-bubble-image-grid" :class="`count-${Math.min(m.imagePaths.length, 4)}`">
+                    <a
+                      v-for="(img, idx) in m.imagePaths"
+                      :key="idx"
+                      :href="`${IMAGE_BASE}${img}`"
+                      target="_blank"
+                      rel="noopener"
+                    >
+                      <img :src="`${IMAGE_BASE}${img}`" class="chat-bubble-image" alt="聊天圖片" />
+                    </a>
+                  </div>
+                  <p v-if="m.content">{{ m.content }}</p>
                   <span class="chat-bubble-time">{{ formatChatTime(m.sentAt) }}</span>
                 </div>
               </div>
             </template>
           </div>
 
+          <!-- 選好但還沒送出的圖片預覽（可以一次選好幾張）：送出前可以先看一眼、
+               或個別按 ✕ 移除某一張、換一張／取消 -->
+          <div v-if="pendingImages.length > 0" class="chat-pending-row">
+            <div v-for="(img, idx) in pendingImages" :key="idx" class="chat-pending-image">
+              <img :src="img.previewUrl" alt="預覽圖片" />
+              <button type="button" class="chat-pending-remove" @click="removePendingImage(idx)">✕</button>
+            </div>
+          </div>
+
           <div class="chat-input-row">
+            <!-- 圖片按鈕本身是一個包住隱藏 file input 的 label，點按鈕視覺上是點圖示，
+                 實際觸發的是底下那個看不見的 <input type="file">，開出系統的檔案選擇視窗。
+                 multiple：可以一次選很多張圖片，也可以分好幾次加選。 -->
+            <label class="chat-image-btn" title="傳送圖片">
+              📷
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                class="file-input-hidden"
+                @change="handlePickImage"
+              />
+            </label>
             <input
               type="text"
               v-model="newMessage"
@@ -271,8 +369,13 @@ watch(() => route.params.userId, (newVal) => {
               placeholder="輸入訊息..."
               @keyup.enter="handleSend"
             />
-            <button type="button" class="btn-send-chat" :disabled="!newMessage.trim()" @click="handleSend">
-              送出
+            <button
+              type="button"
+              class="btn-send-chat"
+              :disabled="(!newMessage.trim() && pendingImages.length === 0) || uploading"
+              @click="handleSend"
+            >
+              {{ uploading ? '上傳中...' : '送出' }}
             </button>
           </div>
         </template>
@@ -282,6 +385,7 @@ watch(() => route.params.userId, (newVal) => {
         </div>
       </section>
 
+      </div>
     </div>
   </div>
 </template>
@@ -295,14 +399,22 @@ watch(() => route.params.userId, (newVal) => {
   color:var(--ink);
   padding:1.5rem 0;
 }
+.chat-page-container{ max-width:1100px; margin:0 auto; padding:0 1.5rem; }
+.back-pill{
+  display:inline-flex; align-items:center; gap:.3rem;
+  border:1px solid var(--ink); border-radius:999px;
+  padding:.35rem 1rem; font-size:.82rem; color:var(--ink);
+  background:none; margin-bottom:1.2rem; cursor:pointer;
+  transition:all .18s ease;
+}
+.back-pill:hover{ background:var(--ink); color:var(--cream); }
 .chat-container{
-  max-width:1100px; margin:0 auto; padding:0 1.5rem;
   display:grid; grid-template-columns:300px 1fr;
   background:var(--paper);
   border:1px solid var(--hairline);
   border-radius:16px;
   overflow:hidden;
-  height:calc(100vh - 3rem);
+  height:calc(100vh - 8rem);
 }
 
 /* ---------- 左側對話清單 ---------- */
@@ -345,7 +457,7 @@ watch(() => route.params.userId, (newVal) => {
 }
 
 /* ---------- 右側訊息串 ---------- */
-.chat-main{ display:flex; flex-direction:column; min-width:0; }
+.chat-main{ display:flex; flex-direction:column; min-width:0; min-height:0; }
 .chat-placeholder{
   flex:1; display:flex; align-items:center; justify-content:center;
   color:var(--ink-soft); font-size:.9rem;
@@ -357,8 +469,17 @@ watch(() => route.params.userId, (newVal) => {
 .chat-main-name{ font-weight:700; color:var(--ink); text-decoration:none; }
 .chat-main-name:hover{ color:var(--plum); }
 
+/*
+  min-height:0：flex 子元素預設的 min-height 是 auto，不是 0，意思是「flex:1 最多只會
+  縮到剛好裝得下裡面所有內容為止」，不會真的縮小到比內容還小——這樣一來，訊息一多，
+  .chat-messages 就會直接把自己撐高去塞下所有訊息，而不是維持固定高度、內部出現捲軸。
+  整個 .chat-main 也跟著被撐高，把下面的輸入框推到看不見的地方（就是這次回報的問題：
+  訊息一多，輸入框「消失」了，其實不是不見，是被推到很下面，要一直往下捲頁面才找得到）。
+  加上 min-height:0，才會照 flex:1 原本該有的行為：固定在容器剩下的空間裡，
+  超出的內容用內部捲軸（overflow-y:auto）處理，輸入框永遠固定在底部。
+*/
 .chat-messages{
-  flex:1; overflow-y:auto; padding:1.2rem 1.4rem;
+  flex:1; min-height:0; overflow-y:auto; padding:1.2rem 1.4rem;
   display:flex; flex-direction:column; gap:.7rem;
 }
 .chat-bubble-row{ display:flex; align-items:flex-end; gap:.5rem; max-width:70%; }
@@ -373,10 +494,89 @@ watch(() => route.params.userId, (newVal) => {
 .chat-bubble-time{
   display:block; font-size:.64rem; margin-top:.25rem; opacity:.65;
 }
+/* 圖片訊息：圖片本身要有自己的圓角、限制最大寬度，避免一張超大照片把整個聊天室撐爆版 */
+.chat-bubble-image{
+  display:block; width:100%; height:100%;
+  border-radius:10px; object-fit:cover; cursor:zoom-in;
+}
+/*
+  chat-bubble-image-grid：一則訊息可能附好幾張圖片，用 CSS Grid 排成小格狀，
+  跟 CreatePostView.vue 選圖片的縮圖列是同樣的排版邏輯——只有 1 張時 grid 只有一格，
+  視覺上就等於單張大圖，不用另外寫一套「只有 1 張時特別處理」的邏輯。
+  count-2／count-3／count-4：依照這則訊息實際附了幾張圖片，切換 grid 的欄數，
+  2 張並排比較好看，3 張以上排成 2 欄多列的九宮格感覺（IG、Messenger 常見的排法）。
+*/
+.chat-bubble-image-grid{
+  display:grid; gap:3px; border-radius:10px; overflow:hidden;
+}
+/* 只有 1 張圖片時，維持原始比例（不強制裁成正方形），跟原本單張大圖的呈現方式一樣，
+   只限制最大寬高，避免超大照片把整個聊天室撐爆版 */
+.chat-bubble-image-grid.count-1{ max-width:220px; max-height:220px; }
+.chat-bubble-image-grid.count-1 .chat-bubble-image{ width:auto; height:auto; max-width:220px; max-height:220px; }
+/* 2 張以上：排成正方形小格的網格，才能對齊整齊（IG、Messenger 常見的多圖排法） */
+.chat-bubble-image-grid.count-2{ grid-template-columns:1fr 1fr; width:220px; }
+.chat-bubble-image-grid.count-2 .chat-bubble-image{ aspect-ratio:1; }
+.chat-bubble-image-grid.count-3{ grid-template-columns:1fr 1fr; width:220px; }
+.chat-bubble-image-grid.count-3 a:first-child{ grid-column:span 2; }
+.chat-bubble-image-grid.count-3 .chat-bubble-image{ aspect-ratio:1; }
+.chat-bubble-image-grid.count-4{ grid-template-columns:1fr 1fr; width:220px; }
+.chat-bubble-image-grid.count-4 .chat-bubble-image{ aspect-ratio:1; }
+/* image-only：這則訊息只有圖片、沒有文字時，氣泡本身不要留白底色跟內距，
+   讓圖片本身的圓角直接就是氣泡的邊界，貼合一般聊天軟體「純圖片訊息」的呈現方式 */
+.chat-bubble.image-only{ background:none; padding:0; }
+/*
+  這裡要多寫一條 .chat-bubble-row.mine .chat-bubble.image-only，是因為
+  .chat-bubble-row.mine .chat-bubble{ background:var(--plum); } 那條規則選擇器
+  疊了 3 層 class（chat-bubble-row + mine + chat-bubble），比上面 .chat-bubble.image-only
+  （只疊 2 層）更「精確」，CSS 選中規則是「越精確的規則優先」，不是「寫在後面的優先」，
+  所以自己傳的純圖片訊息，底色沒有真的被蓋掉、還是看得到梅紫色的方框——這裡把兩個 class
+  疊在同一條規則上（4 層），確保精確度贏過那條，背景才真的會被拿掉。
+*/
+.chat-bubble-row.mine .chat-bubble.image-only{ background:none; }
+.chat-bubble.image-only .chat-bubble-time{
+  margin-top:.3rem; padding:0 .2rem; color:var(--ink-soft); opacity:1;
+}
+.chat-bubble-row.mine .chat-bubble.image-only .chat-bubble-time{ text-align:right; }
+
+/* 選好但還沒送出的圖片預覽（可以一次選好幾張，橫向排一排） */
+.chat-pending-row{
+  display:flex; gap:.5rem; flex-wrap:wrap;
+  padding:.8rem 1.4rem 0;
+}
+.chat-pending-image{
+  position:relative; width:64px; height:64px;
+  border-radius:8px; overflow:hidden;
+  border:1px solid var(--hairline); flex-shrink:0;
+}
+.chat-pending-image img{ width:100%; height:100%; object-fit:cover; display:block; }
+.chat-pending-remove{
+  position:absolute; top:2px; right:2px;
+  width:18px; height:18px; border-radius:50%;
+  background:rgba(42,36,32,.75); color:#fff; border:none;
+  font-size:.62rem; line-height:1; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .18s ease;
+}
+.chat-pending-remove:hover{ background:var(--plum); }
 
 .chat-input-row{
-  display:flex; gap:.6rem;
+  display:flex; align-items:center; gap:.6rem;
   padding:1rem 1.4rem; border-top:1px solid var(--hairline); flex-shrink:0;
+}
+/* 圖片按鈕：一個包住隱藏 file input 的圓形按鈕，跟 UserProfileView.vue 編輯表單的
+   縮圖上傳是同一套「label 包住看不見的 input[type=file]」寫法 */
+.chat-image-btn{
+  position:relative;
+  width:38px; height:38px; border-radius:50%;
+  background:var(--cream); flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.1rem; cursor:pointer;
+  transition:background .18s ease;
+}
+.chat-image-btn:hover{ background:var(--hairline); }
+.file-input-hidden{
+  position:absolute; opacity:0; width:100%; height:100%;
+  top:0; left:0; cursor:pointer;
 }
 .chat-input{
   flex:1; border:1px solid var(--hairline); border-radius:999px;
