@@ -28,14 +28,10 @@ const selectedColor = ref(null) //預設沒選顏色
 const selectedSize = ref(null) //預設沒選尺寸
 
 //==== 按鈕區，收藏、加入購物車、立即結帳====
-// 當前選的規格，有沒有在收藏裡？（去問收藏 store）
+// 這個「商品」有沒有在收藏裡？（用 productId 判斷）
 const isCurrentFavorite = computed(() => {
-  // 還沒選規格，就當作沒收藏
-  if (!selectedSpec.value) {
-    return false
-  }
-  // 問收藏 store：這個 productSpecificationId 在收藏清單裡嗎？
-  return favoriteStore.isFavorite(selectedSpec.value.productSpecificationId)
+  if (!product.value) return false
+  return favoriteStore.isFavorite(product.value.productId)
 })
 
 onMounted(async () => {
@@ -50,23 +46,23 @@ onMounted(async () => {
   } catch (error) {
     console.error('載入商品失敗：', error)
   }
+  await favoriteStore.loadFavorites()
 })
 
 //切換收藏狀態
-function toggleFavorite() {
-  if (!selectedColor.value || !selectedSize.value) {
-    alert('請先選擇顏色和尺寸')
-    return
+async function toggleFavorite() {
+  const productId = product.value.productId
+
+  if (favoriteStore.isFavorite(productId)) {
+    // 已收藏 → 找出 customerFavoriteId 來移除
+    const fav = favoriteStore.favorites.find((f) => f.productId === productId)
+    if (fav) {
+      await favoriteStore.removeFavorite(fav.customerFavoriteId)
+    }
+  } else {
+    // 沒收藏 → 加入
+    await favoriteStore.addFavorite(productId)
   }
-  favoriteStore.toggleFavorite({
-    productSpecificationId: selectedSpec.value.productSpecificationId,
-    productId: product.value.productId,
-    productName: product.value.productName,
-    price: product.value.price,
-    color: selectedSpec.value.color,
-    size: selectedSpec.value.size,
-    image: currentImage.value,
-  })
 }
 
 // 加入購物車

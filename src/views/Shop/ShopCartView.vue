@@ -22,9 +22,9 @@ function goShop() {
   router.push({ name: 'shop' })
 }
 
-function moveToFavorite(product) {
-  favoriteStore.addFavorite(product) //加入收藏
-  cartStore.removeItem(product.productSpecificationId) // 從購物車移除
+async function moveToFavorite(item) {
+  await favoriteStore.addFavorite(item.productId)   // 傳 productId（不是整個 item）
+  await cartStore.removeItem(item.productSpecificationId)   // 從購物車移除（用規格 id）
 }
 
 
@@ -50,6 +50,7 @@ function moveToFavorite(product) {
           <table class="table mb-0 align-middle">
             <thead class="table-light">
               <tr>
+                <th></th>
                 <th>商品</th>
                 <th class="text-center">單價</th>
                 <th class="text-center" style="width: 140px">數量</th>
