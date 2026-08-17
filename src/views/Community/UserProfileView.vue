@@ -323,6 +323,7 @@ const saveEdit = async (post) => {
     return { name, productId: matched ? matched.productId : null, productRoute: null }
   })
   editingPostId.value = null
+  alert('儲存成功！')
 }
 
 // onMounted：這個元件的畫面第一次被畫出來之後，自動執行裡面的程式碼一次。

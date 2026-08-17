@@ -353,7 +353,7 @@ watch(() => route.params.userId, (newVal) => {
                  實際觸發的是底下那個看不見的 <input type="file">，開出系統的檔案選擇視窗。
                  multiple：可以一次選很多張圖片，也可以分好幾次加選。 -->
             <label class="chat-image-btn" title="傳送圖片">
-              📷
+              <i class="fa-solid fa-image" style="color: rgb(122, 75, 84);"></i>
               <input
                 type="file"
                 accept="image/*"
