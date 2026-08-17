@@ -140,7 +140,7 @@ const statusLabel = (status) => {
 
         <!-- 原始貼文資訊（唯讀） -->
         <div class="admin-card">
-          <div class="section-head">📌 貼文主體內容</div>
+          <div class="section-head">貼文主體內容</div>
           <div class="meta-row">
             <div>
               <span class="meta-label">發布使用者</span>
@@ -167,7 +167,7 @@ const statusLabel = (status) => {
 
         <!-- 標記商品 -->
         <div class="admin-card" v-if="post.taggedProducts.length">
-          <div class="section-head section-head-cyan">🏷 標記商品</div>
+          <div class="section-head section-head-cyan">標記商品</div>
           <div>
             <span v-for="t in post.taggedProducts" :key="t.postTaggedProductId" class="tag-chip-big">{{ t.name }}</span>
           </div>
@@ -175,7 +175,7 @@ const statusLabel = (status) => {
 
         <!-- 管理者處置設定 -->
         <div class="admin-card">
-          <div class="section-head section-head-blue">🛠 管理者處置設定</div>
+          <div class="section-head section-head-blue">管理者處置設定</div>
           <label class="field-label">文章顯示狀態 (Status)</label>
           <select v-model="selectedStatus" class="status-select">
             <option value="public">public（公開顯示）</option>
@@ -186,8 +186,8 @@ const statusLabel = (status) => {
             說明：public 為前台正常公開；若有爭議需釐清請設為 check（審核中）；若確認違規請設為 hide（強制下架）。
           </p>
           <div class="admin-actions">
-            <button class="btn-save" @click="saveStatus">💾 儲存變更</button>
-            <button class="btn-delete-big" @click="deletePost">🗑 刪除貼文</button>
+            <button class="btn-save" @click="saveStatus">儲存變更</button>
+            <button class="btn-delete-big" @click="deletePost">刪除貼文</button>
             <router-link to="/admin/community/posts" class="btn-back">返回列表</router-link>
           </div>
         </div>

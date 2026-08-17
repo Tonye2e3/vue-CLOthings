@@ -92,25 +92,6 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.promo {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 64px 24px;
-}
-
-.section-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-bottom: 32px;
-  color: var(--home-text);
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
-}
-
 .card {
   border: 1px solid var(--home-border);
   transition:
@@ -127,16 +108,9 @@ onMounted(async () => {
 
 .card-image {
   position: relative;
+  width: 100%;
   aspect-ratio: 3 / 4;
-  background: linear-gradient(135deg, #f2f2f2, #e5e5e5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.placeholder-label {
-  color: #999;
-  font-size: 0.85rem;
+  overflow: hidden;
 }
 
 .card-tag {
@@ -173,12 +147,6 @@ onMounted(async () => {
   color: var(--home-text);
 }
 
-.product-img {
-  width: 258.4px;
-  height: 344.3px;
-  object-fit: cover; /* 圖片填滿、裁切多餘部分，不變形 */
-}
-
 .category-filter {
   display: flex;
   flex-wrap: wrap;
@@ -201,12 +169,42 @@ onMounted(async () => {
   border-color: var(--home-text);
 }
 
+.product-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.placeholder-label {
+  color: #999;
+  font-size: 0.85rem;
+}
+
+.promo {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 64px 24px;
+}
+
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 32px;
+  color: var(--home-text);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
 @media (max-width: 1024px) {
   .grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   .grid {
     grid-template-columns: 1fr;
   }

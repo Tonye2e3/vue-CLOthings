@@ -30,6 +30,21 @@ import { useAuthStore } from '@/stores/auth'
 // 存進這個 ref，不去動共用的 authStore 或 LoginView.vue。
 // 沒登入的人，currentUserId 會維持 null——發文、留言、按讚這些動作原本就會被
 // 後端 [Authorize] 擋掉，所以 null 的情況下這些按鈕本來就打不通，是預期內的。
+// IMAGE_BASE：圖片是靜態檔案（wwwroot/images/posts/xxx.jpg），走的不是 /api 這條路徑，
+// 不能直接用 api 服務的 baseURL（那個是 https://localhost:7255/api，多了 /api）。
+// 這裡把 VITE_API_URL 尾巴的 /api 拿掉，變成純網域，圖片網址才會組對。
+const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+
+// export const：export 代表「把這個變數開放給其他檔案使用」，
+// 其他檔案只要寫 import { currentUser } from '這個檔案路徑'，就能拿到它。
+// 包成 ref() 是因為會在下面 loadCurrentUser() 裡被換成資料庫裡真正登入者的資料，
+// 換掉之後畫面上用到它的地方（例如 CreatePostView.vue 發文預覽）要能自動跟著更新。
+// 這裡先給一個預設值頂著，等 loadCurrentUser() 打完 API 才會換成真的。
+export const currentUser = ref({
+  name: '',
+  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=guest'
+})
+
 export const currentUserId = ref(null)
 export const loadCurrentUserId = async () => {
   const authStore = useAuthStore()
@@ -40,41 +55,36 @@ export const loadCurrentUserId = async () => {
   try {
     const res = await api.get('/User/me')
     currentUserId.value = res.data.userId
+    // 拿到真正的 userId 之後，順便把「我自己」的暱稱、大頭貼也從資料庫撈回來，
+    // 不再只是發文時用寫死的假資料頂著。這裡直接重用 PublicUserProfileController.cs
+    // 已經有的 GET api/PublicUserProfile/{userid}，不用另外多寫一支 API。
+    await loadCurrentUser()
   } catch (err) {
     console.error('讀取登入者 userId 失敗：', err)
   }
 }
 
-// IMAGE_BASE：圖片是靜態檔案（wwwroot/images/posts/xxx.jpg），走的不是 /api 這條路徑，
-// 不能直接用 api 服務的 baseURL（那個是 https://localhost:7255/api，多了 /api）。
-// 這裡把 VITE_API_URL 尾巴的 /api 拿掉，變成純網域，圖片網址才會組對。
-const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+// loadCurrentUser：跟後端要「我自己」的公開基本資料（暱稱、大頭貼），
+// 打的是 PublicUserProfileController.cs 裡的 GET api/PublicUserProfile/{userid}，
+// 跟 UserProfileView.vue 的 fetchPublicProfile 是同一支 API、同一套邏輯。
+const loadCurrentUser = async () => {
+  if (!currentUserId.value) return
+  try {
+    const res = await api.get(`/PublicUserProfile/${currentUserId.value}`)
+    currentUser.value = {
+      name: res.data.username,
+      // res.data.avatar 後端存的是相對路徑，要接上 IMAGE_BASE 才是完整網址；
+      // 沒設大頭貼的人（avatar 是 null）用預設頭像頂著，不要顯示破圖。
+      avatar: res.data.avatar ? `${IMAGE_BASE}${res.data.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${res.data.username}`
+    }
+  } catch (err) {
+    console.error('讀取自己的公開個人資料失敗：', err)
+  }
+}
 
 // reactive() 跟前面看到的 ref() 功能很像，也是讓 Vue 追蹤資料變化、
 // 資料一改畫面就自動更新。差別是 reactive() 通常用在「物件」或「陣列」上，
 // 而且在 <script> 裡面使用它包起來的資料時，不用加 .value（這點跟 ref 不一樣）。
-
-// export const：export 代表「把這個變數開放給其他檔案使用」，
-// 其他檔案只要寫 import { currentUser } from '這個檔案路徑'，就能拿到它。
-// 這裡先寫死一個「目前登入的使用者」資料，之後如果接上真正的登入系統，
-// 只要把這裡換成登入後拿到的真實使用者資料即可。
-export const currentUser = {
-  name: 'Emily 艾米莉',
-  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily'
-}
-
-// 假資料的發布時間改成「相對現在往前推 N 天」，而不是寫死未來日期。
-// 這樣不管使用者電腦當下實際日期是哪一天，假資料永遠會比「剛剛發布」的新貼文舊，
-// 「最新」分頁排序時，新發的貼文才會保證排在最上面。
-//
-// 這一行是「箭頭函式」的寫法：(n) => { ... } 的意思是
-// 「定義一個函式，它需要一個叫做 n 的輸入值，然後回傳後面算出來的結果」。
-// Date.now()：拿到「現在」的時間（用電腦看得懂的數字格式）。
-// n * 24 * 60 * 60 * 1000：把「n 天」換算成「n 天總共有幾毫秒」
-// （1 天 = 24 小時 = 24*60 分鐘 = 24*60*60 秒 = 24*60*60*1000 毫秒）。
-// 用「現在的時間」減掉「n 天份的毫秒數」，就會得到「n 天前的時間」。
-// .toISOString()：把時間轉換成一種國際通用的文字格式，方便存起來、之後比較大小。
-const daysAgo = (n) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString()
 
 // formatCount：把純數字（例如 1200）轉成「1.2k」這種縮寫格式，只給畫面顯示用。
 // 之後接上真的 API 時，後端 likesCount／commentsCount 會是用
@@ -92,89 +102,19 @@ export const formatCount = (n) => {
 
 // posts：全站所有貼文的清單，這是一個陣列，每個元素都是一篇貼文的資料物件。
 // 一樣用 export 開放給 CreatePostView.vue 使用。
+// 先給空陣列，等 fetchPosts() 打完 API 才會有真正資料庫裡的貼文——
+// 如果 API 打不通，畫面就是空清單，不會混進假資料。
 //
 // 欄位對照資料庫（Community_Post + Post_Images + Post_Tagged_Products）：
 // communityPostId      對應 post_id
 // userId      對應 user_id（真正串 API 後，user 顯示資訊會是後端 join Users 表回傳的）
 // content     對應 content（資料庫只有一個欄位，所以原本拆開的 title/desc 合併成一個）
 // postDate    對應 post_date
-// status      對應 status（貼文狀態，例如 'published' 已發布）
+// status      對應 status（貼文狀態，例如 'public' 公開、'hide' 隱藏）
 // images      對應 Post_Images 這張表（一篇貼文可以有多張圖，依 sortOrder 排序）
-// likesCount / commentsCount   之後會是後端算好的 COUNT(*) 數字，這裡先存純數字
-// taggedProducts   對應 Post_Tagged_Products（productId、productRoute 是資料庫真的欄位；
-//                   name 是「假設」後端會順便 join 商品名稱回傳，方便畫面直接顯示）
-export const posts = reactive([
-  {
-    communityPostId: 1,
-    userId: 1,
-    user: { name: 'Amy_穿搭日記', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Amy' },
-    content: '秋季奶茶色系穿搭，寬褲+針織的溫柔搭配。用奶茶色打底，寬褲修飾比例，針織外套增加層次，走在街上也很有電影感。',
-    postDate: daysAgo(2), // 呼叫剛剛定義的函式，代表「2 天前發布的」
-    status: 'published',
-    images: [
-      { postImageId: 101, imageFileName: 'outfit-cream-knit.jpg', sortOrder: 1, url: 'https://picsum.photos/seed/outfit-cream-knit/900/720' }
-    ],
-    likesCount: 1200,
-    commentsCount: 89,
-    taggedProducts: [{ postTaggedProductId: 1, productId: 3, productRoute: '/shop/product/3', name: '羊毛混紡針織外套' }]
-  },
-  {
-    communityPostId: 2,
-    userId: 2,
-    user: { name: 'Kevin.style', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Kevin' },
-    content: '極簡工裝風｜大地色機能外套通勤也好看。極簡工裝風，大地色機能外套通勤也好看，口袋設計實用又有型。',
-    postDate: daysAgo(4),
-    status: 'published',
-    images: [
-      { postImageId: 102, imageFileName: 'outfit-utility-jacket.jpg', sortOrder: 1, url: 'https://picsum.photos/seed/outfit-utility-jacket/700/560' }
-    ],
-    likesCount: 856,
-    commentsCount: 42,
-    taggedProducts: [{ postTaggedProductId: 2, productId: 1, productRoute: '/shop/product/1', name: '經典圓領短T' }]
-  },
-  {
-    communityPostId: 3,
-    userId: 3,
-    user: { name: '小雨 rainy', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Rainy' },
-    content: '約會小心機｜法式碎花洋裝配藤編包 🌸。約會小心機，法式碎花洋裝配藤編包，甜而不膩剛剛好。',
-    postDate: daysAgo(1),
-    status: 'published',
-    images: [
-      { postImageId: 103, imageFileName: 'outfit-floral-dress.jpg', sortOrder: 1, url: 'https://picsum.photos/seed/outfit-floral-dress/700/560' }
-    ],
-    likesCount: 2400,
-    commentsCount: 158,
-    taggedProducts: [{ postTaggedProductId: 3, productId: 2, productRoute: '/shop/product/2', name: '法式碎花洋裝' }]
-  },
-  {
-    communityPostId: 4,
-    userId: 4,
-    user: { name: 'Leo_urban', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Leo' },
-    content: '街頭機能風｜背心＋工裝褲率性感。機能背心＋工裝褲，街頭感十足，鞋款選厚底增加率性。',
-    postDate: daysAgo(5),
-    status: 'published',
-    images: [
-      { postImageId: 104, imageFileName: 'outfit-street-utility.jpg', sortOrder: 1, url: 'https://picsum.photos/seed/outfit-street-utility/700/560' }
-    ],
-    likesCount: 631,
-    commentsCount: 27,
-    taggedProducts: [{ postTaggedProductId: 4, productId: 4, productRoute: '/shop/product/4', name: '修身牛仔褲' }]
-  },
-  {
-    communityPostId: 5,
-    userId: 5,
-    user: { name: 'Mia.wardrobe', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mia' },
-    content: '極簡膠囊衣櫥｜五件單品排列組合穿一週。挑五件百搭基本款互相搭配，減法生活從衣櫃開始，出門前不再猶豫要穿什麼。',
-    postDate: daysAgo(3),
-    status: 'published',
-    images: [
-      { postImageId: 105, imageFileName: 'outfit-capsule-wardrobe.jpg', sortOrder: 1, url: 'https://picsum.photos/seed/outfit-capsule-wardrobe/700/560' }
-    ],
-    likesCount: 1100,
-    commentsCount: 54,
-    taggedProducts: [{ postTaggedProductId: 5, productId: 5, productRoute: '/shop/product/5', name: '百褶及膝裙' }]
-  }
-])
+// likesCount / commentsCount   後端算好的 COUNT(*) 數字，這裡存純數字
+// taggedProducts   對應 Post_Tagged_Products
+export const posts = reactive([])
 
 // addPost：一個函式，作用是「把一篇新貼文加到 posts 清單的最前面」。
 // CreatePostView.vue 裡使用者按「確認發布」的時候，就會呼叫這個函式。
@@ -265,6 +205,18 @@ import { ref, computed, onMounted, watch } from 'vue'
 // useAuthStore 已經在上面那個 <script>（非 setup）區塊 import 過了，這裡直接呼叫就好。
 const authStore = useAuthStore()
 
+// onAvatarError：大頭貼圖片載入失敗時執行（例如資料庫存的路徑指到 wwwroot 裡
+// 實際上還沒有的檔案 — 跟先前貼文圖片遇到的狀況一樣，測試帳號的大頭貼路徑目前
+// 有些是佔位用的、對應的檔案還沒真的放上去）。
+// 失敗時把圖片來源換成 dicebear 產生的預設頭像，畫面才不會出現「圖片壞掉」的圖示。
+const onAvatarError = (event, name) => {
+  // 加個保護：如果換成 dicebear 網址後還是失敗（例如完全沒有網路），
+  // 就不要再觸發一次 @error，避免無限迴圈一直重新請求。
+  if (event.target.dataset.fallback) return
+  event.target.dataset.fallback = '1'
+  event.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+}
+
 // posts 已經在上面的 <script> 區塊宣告並 export，這裡同一個檔案內可以直接使用，不用再 import
 // api、currentUserId、IMAGE_BASE 現在也移到上面那個 <script> 區塊宣告了（因為 loadSavedPosts 也需要用到），
 // 這裡同樣不用再重複 import／宣告一次。
@@ -276,6 +228,8 @@ const fetchPosts = async () => {
   try {
     // api.get(網址)：對這個網址發送 GET 請求。
     // await：先暫停在這一行，等 API 真的回應了，才把結果存進 res，再往下執行。
+    // GetCommunityPost 現在固定只回傳 status 是 public 的貼文（後端已經寫死篩選），
+    // 不用再自己帶查詢參數。
     const res = await api.get(`/CommunityPost`)
 
     // res.data：axios 已經把後端回傳的 JSON 自動轉換成 JavaScript 的陣列／物件了，
@@ -287,7 +241,11 @@ const fetchPosts = async () => {
     const apiPosts = res.data.map(p => ({
       communityPostId: p.communityPostId,
       userId: p.userId,
-      user: p.user || { name: '未知使用者', avatar: '' },
+      // p.user.avatar 後端存的是相對路徑（例如 /avatars/user002.png），要接上 IMAGE_BASE
+      // 才是完整網址，跟貼文圖片是同一種處理方式；沒設大頭貼的人用預設頭像頂著。
+      user: p.user
+        ? { ...p.user, avatar: p.user.avatar ? `${IMAGE_BASE}${p.user.avatar}` : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + p.user.name }
+        : { name: '未知使用者', avatar: '' },
       content: p.content,
       postDate: p.postDate,
       status: p.status,
@@ -313,7 +271,8 @@ const fetchPosts = async () => {
     posts.splice(0, posts.length, ...apiPosts)
   } catch (err) {
     // 如果打 API 失敗（後端沒開、網址打錯、CORS 設定問題...），
-    // 先在瀏覽器主控台印出錯誤內容方便除錯，畫面就繼續顯示原本的假資料，不會整頁空白。
+    // 先在瀏覽器主控台印出錯誤內容方便除錯。posts 維持空陣列，畫面會顯示空清單，
+    // 不會混進假資料——這是刻意的決定，寧可看到空白也不要顯示不是真的資料。
     console.error('讀取貼文列表失敗：', err)
   }
 }
@@ -370,7 +329,8 @@ const fetchCreators = async () => {
     creators.value = res.data.map(c => ({
       id: c.userId, // 這個 id 現在是真的 userId，不再是這份清單自己編的假號碼了
       name: c.name,
-      avatar: c.avatar,
+      // c.avatar 一樣是相對路徑，要接上 IMAGE_BASE；沒設大頭貼的人用預設頭像頂著。
+      avatar: c.avatar ? `${IMAGE_BASE}${c.avatar}` : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + c.name,
       meta: `${formatCount(c.followersCount)}追蹤`,
       isFollowing: c.isFollowing,
       userFollowId: c.userFollowId
@@ -648,7 +608,7 @@ const toggleFollow = async (creator) => {
             </router-link>
             <div class="feature-body">
               <router-link :to="`/community/profile/${featurePost.userId}`" class="author-row text-decoration-none">
-                <img class="avatar" :src="featurePost.user.avatar" alt="avatar" />
+                <img class="avatar" :src="featurePost.user.avatar" alt="avatar" @error="onAvatarError($event, featurePost.user.name)" />
                 <div>
                   <div class="author-name">{{ featurePost.user.name }}</div>
                   <div class="author-role">{{ currentTabCopy.role }}</div>
@@ -705,7 +665,7 @@ const toggleFollow = async (creator) => {
 
               <div class="post-body">
                 <router-link :to="`/community/profile/${post.userId}`" class="post-author text-decoration-none">
-                  <img :src="post.user.avatar" alt="avatar" />
+                  <img :src="post.user.avatar" alt="avatar" @error="onAvatarError($event, post.user.name)" />
                   <span>{{ post.user.name }}</span>
                 </router-link>
 
@@ -743,7 +703,7 @@ const toggleFollow = async (creator) => {
                  可以放心接 router-link 了，不會再連到不相干的使用者。 -->
             <div v-for="creator in filteredCreators" :key="creator.id" class="stylist-row">
               <router-link :to="`/community/profile/${creator.id}`" class="d-flex align-items-center text-decoration-none flex-grow-1 min-w-0">
-                <img class="stylist-avatar" :src="creator.avatar" alt="avatar" />
+                <img class="stylist-avatar" :src="creator.avatar" alt="avatar" @error="onAvatarError($event, creator.name)" />
                 <div class="min-w-0">
                   <div class="stylist-name text-truncate">{{ creator.name }}</div>
                   <div class="stylist-meta">{{ creator.meta }}</div>

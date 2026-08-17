@@ -29,6 +29,17 @@ const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
 
 const route = useRoute()
 
+// onAvatarError：大頭貼圖片載入失敗時執行（例如資料庫存的路徑指到 wwwroot 裡
+// 實際上還沒有的檔案），失敗時把圖片來源換成 dicebear 產生的預設頭像，
+// 跟 CommunityView.vue 的 onAvatarError 是同一套邏輯。
+const onAvatarError = (event, name) => {
+  // 加個保護：如果換成 dicebear 網址後還是失敗（例如完全沒有網路），
+  // 就不要再觸發一次 @error，避免無限迴圈一直重新請求。
+  if (event.target.dataset.fallback) return
+  event.target.dataset.fallback = '1'
+  event.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+}
+
 // currentUserId：目前登入者真正的 userId，跟 CommunityView.vue 共用同一份（import 進來的）。
 // 這個是「我是誰」，跟下面的 viewedUserId（「我正在看誰的頁面」）是兩回事——
 // 只有兩者相等時，才代表「我正在看自己的頁面」，編輯／刪除貼文才該出現。
@@ -97,7 +108,10 @@ const fetchUserPosts = async () => {
       images: post.images || [],
       likesCount: post.likesCount,
       commentsCount: post.commentsCount,
-      tags: post.taggedProducts.map(t => `#${t.name}`)
+      tags: post.taggedProducts.map(t => `#${t.name}`),
+      // taggedProducts：保留完整的原始標記商品清單（不是只有格式化過的 #名稱 字串），
+      // 編輯貼文改標記商品時要用到，卡片本身顯示還是繼續用上面那個 tags 就好。
+      taggedProducts: post.taggedProducts || []
     }))
     // 貼文數：直接用剛剛抓回來的貼文數量就好，不用另外多打一支 API 算，
     // 跟 CommunityPostController.cs 裡 LikesCount／CommentsCount 用 .Count() 算的道理一樣，
@@ -132,18 +146,63 @@ const deletePost = async (communityPostId) => {
 // 這樣才知道要在「哪一張」卡片底下顯示編輯表單。
 const editingPostId = ref(null)
 
+// availableProducts：可標記的商品清單，跟 CreatePostView.vue 是同一套邏輯，
+// 先給空陣列，等 fetchProducts() 打完 API 才會有真正資料庫裡的商品。
+const availableProducts = ref([])
+const fetchProducts = async () => {
+  try {
+    const res = await api.get('/Product')
+    availableProducts.value = res.data.map(p => ({
+      productId: p.productId,
+      name: p.productName
+    }))
+  } catch (err) {
+    console.error('讀取商品清單失敗：', err)
+  }
+}
+
+// productSearch：編輯表單裡「標記標籤商品」搜尋框打的文字。
+// 因為同一時間只會有一張卡片在編輯模式，全頁共用一份搜尋狀態就夠了。
+const productSearch = ref('')
+const filteredProducts = computed(() => {
+  const q = productSearch.value.trim().toLowerCase()
+  if (!q) {
+    // 沒有搜尋文字時，只列出前 5 個當作「熱門標籤」頂著，不要把商品全部攤開，
+    // 不然商品一多，標籤區塊、進而整張卡片就會被拉得越來越長（開會時提到的問題）。
+    // 這裡先用 availableProducts 原本的順序（後端 /Product 回來的順序）取前 5 個；
+    // 之後如果後端有「熱門商品」（例如依標記次數排序）的 API，把這裡換成打那支 API 就好，
+    // 前端邏輯不用變。
+    return availableProducts.value.slice(0, 5)
+  }
+  return availableProducts.value.filter(p => p.name.toLowerCase().includes(q))
+})
+
+// toggleEditProduct：點某個商品標籤時執行，已選就取消、未選就加入，跟
+// CreatePostView.vue 的 toggleProduct 是同一套邏輯，只是改在編輯表單上操作。
+const toggleEditProduct = (name) => {
+  const list = editForm.value.taggedProducts
+  const idx = list.indexOf(name)
+  if (idx === -1) {
+    list.push(name)
+  } else {
+    list.splice(idx, 1)
+  }
+}
+
 // editForm：編輯表單目前打的內容，對應 CommunityPostController.cs 的
-// PutCommunityPost 能改的欄位：content、status、images。
+// PutCommunityPost 能改的欄位：content、status、images、taggedProducts。
 // images 陣列裡每一筆是 { imageFileName, sortOrder, url, isNew }：
 // isNew 是 false 代表這張是「本來就有」的舊照片（imageFileName 是資料庫裡真的路徑）；
 // isNew 是 true 代表這張是「這次新選的」照片（imageFileName 先用檔案原始名稱佔位，
 // 等圖片上傳功能做好再換成真正存到伺服器後的路徑，跟 CreatePostView.vue 現在的做法一樣）。
-const editForm = ref({ content: '', status: 'public', images: [] })
+// taggedProducts 是商品名稱的字串陣列（跟 CreatePostView.vue 的 selectedProducts 同一種格式）。
+const editForm = ref({ content: '', status: 'public', images: [], taggedProducts: [] })
 
 // startEdit：按下「編輯貼文」時執行，把表單內容預先填成這篇貼文現在的資料，
 // 並把 editingPostId 設成這篇貼文的 id，畫面上就會展開編輯表單。
 const startEdit = (post) => {
   editingPostId.value = post.communityPostId
+  productSearch.value = '' // 每次打開編輯表單，搜尋框重設乾淨
   editForm.value = {
     content: post.content,
     status: post.status || 'public',
@@ -152,13 +211,24 @@ const startEdit = (post) => {
       sortOrder: img.sortOrder,
       url: `${IMAGE_BASE}${img.imageFileName}`,
       isNew: false
-    }))
+    })),
+    taggedProducts: (post.taggedProducts || []).map(t => t.name)
   }
 }
 
 // cancelEdit：取消編輯，收起表單，不送出任何變更。
 const cancelEdit = () => {
   editingPostId.value = null
+}
+
+// lightboxImage：目前燈箱裡放大顯示的圖片網址，null 代表燈箱沒有打開。
+// openLightbox／closeLightbox：點編輯表單裡的縮圖放大看原圖、點背景或 ✕ 關閉。
+const lightboxImage = ref(null)
+const openLightbox = (url) => {
+  lightboxImage.value = url
+}
+const closeLightbox = () => {
+  lightboxImage.value = null
 }
 
 // handleEditFileChange：編輯表單裡選新照片時執行，邏輯跟 CreatePostView.vue 的
@@ -215,13 +285,25 @@ const saveEdit = async (post) => {
     sortOrder: idx + 1
   }))
 
+  // 把選中的商品名稱陣列，轉換成對應 Post_Tagged_Product 格式的物件陣列，
+  // 用 availableProducts.find(...) 找回這個名字對應的 productId，
+  // 跟 CreatePostView.vue 組 taggedProducts 的方式完全一樣。
+  const taggedProducts = editForm.value.taggedProducts.map(name => {
+    const matched = availableProducts.value.find(p => p.name === name)
+    return {
+      productId: matched ? matched.productId : null,
+      productRoute: null
+    }
+  })
+
   try {
     await api.put(`/CommunityPost/${post.communityPostId}`, {
       communityPostId: post.communityPostId,
       userId: post.userId,
       content: editForm.value.content,
       status: editForm.value.status,
-      images
+      images,
+      taggedProducts
     })
   } catch (err) {
     console.error('編輯貼文失敗：', err)
@@ -234,6 +316,13 @@ const saveEdit = async (post) => {
   post.status = editForm.value.status
   post.images = images
   post.image = images.length > 0 ? `${IMAGE_BASE}${images[0].imageFileName}` : ''
+  // 標記商品也要跟著更新畫面：tags（給卡片顯示用的 #名稱 字串）跟
+  // taggedProducts（保留原始格式，下次再編輯時要用）都要同步。
+  post.tags = editForm.value.taggedProducts.map(name => `#${name}`)
+  post.taggedProducts = editForm.value.taggedProducts.map(name => {
+    const matched = availableProducts.value.find(p => p.name === name)
+    return { name, productId: matched ? matched.productId : null, productRoute: null }
+  })
   editingPostId.value = null
 }
 
@@ -246,6 +335,7 @@ onMounted(async () => {
   loadSavedPosts()
   fetchFollowCounts()
   fetchPublicProfile()
+  fetchProducts() // 編輯貼文表單要用到，只有看自己的頁面才用得上，但先載入沒關係
   // await loadCurrentUserId()：這頁可能是使用者直接連進來的（沒先經過 CommunityView.vue），
   // currentUserId 這時候還是 null，要先確定拿到真正的 userId，下面比對
   // 「瀏覽的是不是自己」才會準——不然沒登入或還沒查完時，currentUserId.value 是 null，
@@ -297,7 +387,16 @@ const fetchPublicProfile = async () => {
     const res = await api.get(`/PublicUserProfile/${viewedUserId.value}`)
     userProfile.value.name = res.data.username
     userProfile.value.handle = `@${res.data.account}`
-    userProfile.value.avatar = res.data.avatar || userProfile.value.avatar
+    // res.data.avatar 後端存的是相對路徑（例如 /avatars/user002.png），要接上 IMAGE_BASE
+    // 才是完整網址；沒設大頭貼的人（avatar 是 null）改成用 dicebear 產生跟這個人帳號綁定
+    // 的預設頭像——不能再像原本那樣「維持 userProfile.value.avatar 原本的值」，那個原本的值
+    // 是元件一開始寫死的預設圖（seed=Emily），不管換到哪個沒設大頭貼的人的頁面都會長一樣，
+    // 也會跟貼文卡片、留言那邊用 username 當 seed 產生出來的頭像對不起來（同一個人在不同頁面
+    // 卻顯示兩種不同的預設頭像）。這裡改成一樣用 res.data.username 當 seed，
+    // 這樣同一個帳號不管在貼文卡片、留言、還是自己的個人頁，沒設大頭貼時看到的預設圖都會是同一張。
+    userProfile.value.avatar = res.data.avatar
+      ? `${IMAGE_BASE}${res.data.avatar}`
+      : `https://api.dicebear.com/7.x/avataaars/svg?seed=${res.data.username}`
     userProfile.value.bioTag = res.data.styleTag || ''
     userProfile.value.bio = res.data.intro || ''
   } catch (err) {
@@ -392,7 +491,7 @@ const toggleFollow = async () => {
                 所以這裡的圖片網址會直接抓 userProfile 裡的 avatar 值。
                 （在 template 裡面直接寫 userProfile.avatar，不用加 .value）
               -->
-              <img :src="userProfile.avatar" class="avatar-img" alt="Avatar" />
+              <img :src="userProfile.avatar" class="avatar-img" alt="Avatar" @error="onAvatarError($event, userProfile.name)" />
             </div>
 
             <!-- 數據與動作 -->
@@ -403,14 +502,15 @@ const toggleFollow = async () => {
                   <div class="stat-num">{{ userProfile.postsCount }}</div>
                   <div class="stat-label">貼文</div>
                 </div>
-                <div class="stat-item">
+                <!-- router-link 換掉了原本的彈窗按鈕：長列表切到獨立頁面比彈窗好滑、好找 -->
+                <router-link :to="`/community/profile/${viewedUserId}/followers`" class="stat-item stat-item-clickable">
                   <div class="stat-num">{{ userProfile.followersCount }}</div>
                   <div class="stat-label">粉絲</div>
-                </div>
-                <div class="stat-item">
+                </router-link>
+                <router-link :to="`/community/profile/${viewedUserId}/following`" class="stat-item stat-item-clickable">
                   <div class="stat-num">{{ userProfile.followingCount }}</div>
                   <div class="stat-label">追蹤中</div>
-                </div>
+                </router-link>
               </div>
 
               <!-- 只有瀏覽「別人」的個人頁才顯示追蹤／訊息按鈕；瀏覽自己的頁面不會出現這排按鈕 -->
@@ -515,6 +615,16 @@ const toggleFollow = async () => {
               這裡顯示的時候想拿掉 #。
             -->
             <span class="tag-label" v-if="post.tags[0]">{{ post.tags[0].replace('#', '') }}</span>
+            <!--
+              狀態徽章：只有在「看自己的頁面」才顯示——因為別人看不到你 hide/check 狀態的貼文
+              （後端已經擋掉了，別人的 userPosts 裡本來就不會有這些），所以這個徽章對別人來說
+              永遠不會出現，只有本人才看得到自己貼文目前是公開／隱藏／審核中。
+            -->
+            <span
+              v-if="viewedUserId === currentUserId && post.status !== 'public'"
+              class="post-status-badge"
+              :class="post.status === 'hide' ? 'badge-hide' : 'badge-check'"
+            >{{ post.status === 'hide' ? '隱藏' : '審核中' }}</span>
             <img :src="post.image" :alt="post.content" />
           </router-link>
 
@@ -541,42 +651,106 @@ const toggleFollow = async () => {
               瀏覽別人的個人頁時，這整塊（包含編輯表單本身）完全不會出現。
             -->
             <template v-if="viewedUserId === currentUserId">
-              <div v-if="editingPostId === post.communityPostId" class="edit-form">
-                <textarea v-model="editForm.content" class="edit-textarea" rows="3"></textarea>
+              <!--
+                Teleport to="body"：把編輯表單「傳送」到 <body> 底下渲染，脫離原本這張
+                貼文卡片狹窄的欄寬限制，這樣才能做成置中的彈出視窗，而不是被卡片撐得
+                又窄又長。同一時間只會有一篇貼文在編輯（editingPostId 是單一值），
+                所以就算表單搬到 <body> 下面，也不會跟其他卡片衝突。
+              -->
+              <Teleport to="body" v-if="editingPostId === post.communityPostId">
+                <div class="edit-modal-overlay" @click.self="cancelEdit">
+                  <div class="edit-modal">
+                    <!-- 新增一個標題列：跟原本純表單比起來更有「這是一個彈出視窗」的感覺，右上角 ✕ 也能關閉 -->
+                    <div class="edit-modal-header">
+                      <h3 class="edit-modal-title">編輯貼文</h3>
+                      <button type="button" class="edit-modal-close" @click="cancelEdit">✕</button>
+                    </div>
 
-                <!-- 照片編輯：跟 CreatePostView.vue 的縮圖列是同一套邏輯，只是排版比較精簡 -->
-                <div class="edit-thumb-row">
-                  <div class="edit-thumb-item" v-for="(img, idx) in editForm.images" :key="idx">
-                    <img :src="img.url" alt="縮圖" />
-                    <button type="button" class="edit-thumb-remove" @click="removeEditImage(idx)">✕</button>
+                    <div class="edit-form">
+                      <textarea v-model="editForm.content" class="edit-textarea" rows="3"></textarea>
+
+                      <!-- 照片編輯：跟 CreatePostView.vue 的縮圖列是同一套邏輯，只是排版比較精簡 -->
+                      <div class="edit-thumb-row">
+                        <div class="edit-thumb-item" v-for="(img, idx) in editForm.images" :key="idx">
+                          <!-- @click="openLightbox(img.url)"：點縮圖本身放大看原圖，跟點右上角 ✕ 移除圖片是分開的兩個按鈕，不會互相誤觸 -->
+                          <img :src="img.url" alt="縮圖" @click="openLightbox(img.url)" />
+                          <button type="button" class="edit-thumb-remove" @click="removeEditImage(idx)">✕</button>
+                        </div>
+                        <!-- 這個「＋」縮圖也是一個隱藏的檔案上傳框，讓使用者可以再加選照片 -->
+                        <label class="edit-thumb-add">
+                          <input
+                            type="file"
+                            class="file-input-hidden"
+                            accept="image/*"
+                            multiple
+                            @change="handleEditFileChange"
+                          />
+                          ＋
+                        </label>
+                      </div>
+                      <p class="edit-photo-hint">
+                        第一張會作為封面，點縮圖可以放大看原圖
+                      </p>
+
+                      <!-- 標記標籤商品：跟 CreatePostView.vue 是同一套搜尋/選取邏輯，只是改在編輯表單上操作 -->
+                      <label class="edit-field-label">標記標籤商品</label>
+                      <div class="edit-search-bar">
+                        <input
+                          type="text"
+                          v-model="productSearch"
+                          class="edit-search-input"
+                          placeholder="輸入商品名稱搜尋，例如：牛仔褲"
+                        />
+                        <button
+                          v-if="productSearch"
+                          type="button"
+                          class="edit-search-clear"
+                          @click="productSearch = ''"
+                        >✕</button>
+                      </div>
+                      <!--
+                        沒有打字搜尋的時候，只列出「熱門」的前 5 個標籤，
+                        而不是把資料庫裡所有商品全部攤開——不然商品一多，
+                        這個標籤區塊、進而整張卡片就會被拉得越來越長。
+                        想標記其他商品的話，直接在上面搜尋框打名字就找得到。
+                      -->
+                      <p class="edit-field-hint" v-if="!productSearch.trim()">熱門標籤，想找其他商品請直接搜尋</p>
+                      <div class="tag-cloud">
+                        <button
+                          v-for="product in filteredProducts"
+                          :key="product.productId"
+                          type="button"
+                          class="tag-chip selectable"
+                          :class="{ active: editForm.taggedProducts.includes(product.name) }"
+                          @click="toggleEditProduct(product.name)"
+                        >#{{ product.name }}</button>
+                        <span v-if="filteredProducts.length === 0" class="tag-empty">
+                          找不到符合「{{ productSearch }}」的商品
+                        </span>
+                      </div>
+                      <div class="tag-preview" v-if="editForm.taggedProducts.length">
+                        <span v-for="name in editForm.taggedProducts" :key="name" class="tag-chip selected-chip">
+                          #{{ name }}
+                          <button type="button" class="chip-remove" @click="toggleEditProduct(name)">✕</button>
+                        </span>
+                      </div>
+
+                      <div class="edit-visibility">
+                        <label><input type="radio" v-model="editForm.status" value="public" /> 公開</label>
+                        <label><input type="radio" v-model="editForm.status" value="hide" /> 隱藏</label>
+                      </div>
+                    </div>
+
+                    <!-- 底部按鈕獨立在 .edit-form 外面，不會跟著上面內容一起捲動，滑到多長都找得到 -->
+                    <div class="edit-modal-footer">
+                      <button class="btn-cancel-edit" @click="cancelEdit">取消</button>
+                      <button class="btn-save-edit" @click="saveEdit(post)">儲存</button>
+                    </div>
                   </div>
-                  <!-- 這個「＋」縮圖也是一個隱藏的檔案上傳框，讓使用者可以再加選照片 -->
-                  <label class="edit-thumb-add">
-                    <input
-                      type="file"
-                      class="file-input-hidden"
-                      accept="image/*"
-                      multiple
-                      @change="handleEditFileChange"
-                    />
-                    ＋
-                  </label>
                 </div>
-                <p class="edit-photo-hint">
-                  第一張會作為封面
-                </p>
+              </Teleport>
 
-                <div class="edit-visibility">
-                  <label><input type="radio" v-model="editForm.status" value="public" /> 公開</label>
-                  <label><input type="radio" v-model="editForm.status" value="hide" /> 隱藏</label>
-                </div>
-                <div class="edit-actions">
-                  <button class="btn-cancel-edit" @click="cancelEdit">取消</button>
-                  <button class="btn-save-edit" @click="saveEdit(post)">儲存</button>
-                </div>
-              </div>
-
-              <div v-else class="post-manage-actions">
+              <div v-if="editingPostId !== post.communityPostId" class="post-manage-actions">
                 <button class="btn-edit-post" @click="startEdit(post)">編輯貼文</button>
                 <button class="btn-delete-post" @click="deletePost(post.communityPostId)">刪除貼文</button>
               </div>
@@ -629,6 +803,19 @@ const toggleFollow = async () => {
       </div>
 
     </div>
+
+    <!--
+      圖片放大燈箱：跟編輯視窗一樣 Teleport 到 <body>，蓋在最上面。
+      放在整個頁面最外層（不是放在某張貼文卡片裡面），這樣不管是哪張卡片、
+      哪張縮圖被點開，都共用同一個燈箱，不用每張卡片各自複製一份。
+      lightboxImage 有值才顯示；點背景（不是點到圖片本身）就關閉。
+    -->
+    <Teleport to="body" v-if="lightboxImage">
+      <div class="lightbox-overlay" @click.self="closeLightbox">
+        <button type="button" class="lightbox-close" @click="closeLightbox">✕</button>
+        <img :src="lightboxImage" class="lightbox-image" alt="放大圖片" />
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -723,6 +910,12 @@ const toggleFollow = async () => {
 
 .stat-group{ display:flex; gap:2.2rem; }
 .stat-item{ text-align:center; }
+.stat-item-clickable{
+  background:none; border:none; padding:0; cursor:pointer;
+  text-decoration:none; display:block;
+  transition:opacity .18s ease;
+}
+.stat-item-clickable:hover{ opacity:.7; }
 .stat-num{
   font-family:'Noto Serif TC', serif;
   font-weight:900; font-size:1.25rem; color:var(--ink); line-height:1.1;
@@ -822,6 +1015,15 @@ const toggleFollow = async () => {
   border-color:transparent var(--plum-deep) transparent transparent;
 }
 
+.post-status-badge{
+  position:absolute; top:12px; right:12px; z-index:2;
+  color:#fff; font-size:.68rem; font-weight:700;
+  padding:.26rem .7rem; border-radius:999px;
+  box-shadow:0 2px 6px rgba(0,0,0,.2);
+}
+.post-status-badge.badge-hide{ background:var(--ink-soft); }
+.post-status-badge.badge-check{ background:var(--ochre); }
+
 .post-body{ padding:.95rem 1rem 1.1rem; }
 .post-title{
   font-family:'Noto Serif TC', serif;
@@ -861,7 +1063,65 @@ const toggleFollow = async () => {
 }
 .btn-delete-post:hover{ background:#B4453A; color:#fff; }
 
-.edit-form{ margin-top:.8rem; display:flex; flex-direction:column; gap:.6rem; }
+/*
+  edit-modal-overlay：鋪滿整個畫面的半透明黑底，蓋在其他內容上面（position:fixed + inset:0），
+  用 flex 置中把 .edit-modal 放在正中間。z-index 開高一點，確保蓋在導覽列之類的元素之上。
+  @click.self="cancelEdit"（寫在 template 裡）：點背景（不是點到裡面的表單）就等於取消編輯。
+
+  這裡重新宣告一次跟 .community-page 一樣的顏色變數（--ink、--plum...），是因為 Teleport
+  會把這個彈出視窗「搬到」<body> 底下渲染，脫離了原本 .community-page 這個父層元素——
+  CSS 變數是跟著 DOM 樹「父傳子」繼承下去的，搬出去之後就不再是 .community-page 的子元素，
+  裡面所有用 var(--plum) 之類寫法的樣式全部會抓不到值（之前選好的標籤商品變成一片空白，
+  就是因為 var(--plum) 抓不到值，背景跟文字都變不出顏色）。在這裡重新宣告一次，
+  底下所有 var(--xxx) 才能正常運作。
+*/
+.edit-modal-overlay{
+  --cream:#F9F4F0;
+  --paper:#FFFDFB;
+  --ink:#2A2420;
+  --ink-soft:#7A6E63;
+  --plum:#7A4B54;
+  --plum-deep:#5E3941;
+  --ochre:#B8862E;
+  --hairline:#E4D8CC;
+  position:fixed; inset:0;
+  background:rgba(42,36,32,.55);
+  display:flex; align-items:center; justify-content:center;
+  z-index:1000;
+  padding:1.5rem;
+}
+.edit-modal{
+  background:var(--paper);
+  border-radius:14px;
+  width:100%;
+  max-width:640px;
+  max-height:88vh;
+  box-shadow:0 20px 60px rgba(42,36,32,.35);
+  display:flex; flex-direction:column;
+  overflow:hidden; /* 讓內層 .edit-form 自己捲動，標題列跟底部按鈕才能固定不跟著捲走 */
+}
+.edit-modal-header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:1.2rem 1.6rem;
+  border-bottom:1px solid var(--hairline);
+  flex-shrink:0;
+}
+.edit-modal-title{
+  font-family:'Noto Serif TC', serif; font-weight:700; font-size:1.1rem;
+  color:var(--ink); margin:0;
+}
+.edit-modal-close{
+  width:28px; height:28px; border-radius:50%;
+  border:none; background:var(--hairline); color:var(--ink-soft);
+  font-size:.8rem; line-height:1; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  transition:background .18s ease, color .18s ease;
+}
+.edit-modal-close:hover{ background:var(--plum); color:#fff; }
+.edit-field-hint{ font-size:.72rem; color:var(--ink-soft); margin:-.3rem 0 0; }
+
+.edit-form{ display:flex; flex-direction:column; gap:.6rem; padding:1.4rem 1.6rem; overflow-y:auto; }
+
 .edit-textarea{
   width:100%;
   border:1px solid var(--hairline); border-radius:4px;
@@ -872,7 +1132,14 @@ const toggleFollow = async () => {
 .edit-textarea:focus{ border-color:var(--plum); }
 .edit-visibility{ display:flex; gap:1rem; font-size:.8rem; color:var(--ink); }
 .edit-visibility label{ display:flex; align-items:center; gap:.35rem; cursor:pointer; }
-.edit-actions{ display:flex; gap:.6rem; }
+.edit-modal-footer{
+  display:flex; gap:.6rem;
+  padding:1.1rem 1.6rem;
+  border-top:1px solid var(--hairline);
+  flex-shrink:0;
+}
+.edit-modal-footer .btn-cancel-edit,
+.edit-modal-footer .btn-save-edit{ flex:1; }
 
 .file-input-hidden{
   position:absolute; opacity:0; width:100%; height:100%;
@@ -884,7 +1151,7 @@ const toggleFollow = async () => {
   width:64px; height:64px; border-radius:6px; overflow:hidden;
   border:1px solid var(--hairline); flex-shrink:0;
 }
-.edit-thumb-item img{ width:100%; height:100%; object-fit:cover; display:block; }
+.edit-thumb-item img{ width:100%; height:100%; object-fit:cover; display:block; cursor:zoom-in; }
 .edit-thumb-remove{
   position:absolute; top:2px; right:2px;
   width:18px; height:18px; border-radius:50%;
@@ -901,6 +1168,33 @@ const toggleFollow = async () => {
 }
 .edit-thumb-add:hover{ border-color:var(--plum); color:var(--plum); }
 .edit-photo-hint{ font-size:.72rem; color:var(--ink-soft); margin:0; }
+
+.edit-field-label{ font-size:.8rem; font-weight:700; color:var(--ink); }
+.edit-search-bar{
+  display:flex; align-items:center; gap:.4rem;
+  border:1px solid var(--hairline); border-radius:4px;
+  padding:.4rem .7rem; background:var(--paper);
+}
+.edit-search-input{
+  flex:1; border:none; outline:none; font-size:.82rem; color:var(--ink); background:transparent;
+}
+.edit-search-clear{ background:none; border:none; color:var(--ink-soft); font-size:.75rem; }
+
+.tag-chip.selectable{
+  background:var(--paper); border:1px solid var(--hairline); color:var(--ink);
+  cursor:pointer; transition:all .18s ease;
+}
+.tag-chip.selectable:hover{ border-color:var(--plum); color:var(--plum); }
+.tag-chip.selectable.active{ background:var(--plum); border-color:var(--plum); color:#fff; }
+.tag-empty{ font-size:.76rem; color:var(--ink-soft); }
+
+.tag-preview{ display:flex; flex-wrap:wrap; gap:.4rem; }
+.tag-chip.selected-chip{
+  background:var(--plum); border:1px solid var(--plum); color:#fff;
+  display:inline-flex; align-items:center; gap:.35rem;
+}
+.chip-remove{ background:none; border:none; color:#fff; font-size:.68rem; line-height:1; opacity:.8; }
+.chip-remove:hover{ opacity:1; }
 .btn-cancel-edit{
   flex:1;
   background:transparent; color:var(--ink-soft);
@@ -915,6 +1209,38 @@ const toggleFollow = async () => {
   transition:background .18s ease;
 }
 .btn-save-edit:hover{ background:var(--plum-deep); }
+
+/*
+  燈箱（lightbox）：點編輯表單裡的縮圖時，把原圖放大顯示在最上層。
+  一樣用 Teleport 搬到 <body> 下面，所以這裡也要重新宣告一次顏色變數，
+  理由跟上面 .edit-modal-overlay 註解講的一樣——不過燈箱本身用到的顏色不多，
+  這裡只是保險加上，之後如果燈箱樣式要用到 var(--xxx) 也不會抓空值。
+*/
+.lightbox-overlay{
+  --ink:#2A2420;
+  position:fixed; inset:0;
+  background:rgba(20,16,14,.88);
+  display:flex; align-items:center; justify-content:center;
+  z-index:1100;
+  padding:2rem;
+  cursor:zoom-out;
+}
+.lightbox-image{
+  max-width:90vw; max-height:88vh;
+  object-fit:contain;
+  border-radius:6px;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
+  cursor:default; /* 圖片本身不算「背景」，不用跟著顯示可以關閉的游標 */
+}
+.lightbox-close{
+  position:fixed; top:1.5rem; right:1.8rem;
+  width:38px; height:38px; border-radius:50%;
+  border:none; background:rgba(255,255,255,.15); color:#fff;
+  font-size:1rem; line-height:1; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .18s ease;
+}
+.lightbox-close:hover{ background:rgba(255,255,255,.3); }
 
 
 /* ---------- 其他頁籤空狀態 ---------- */
