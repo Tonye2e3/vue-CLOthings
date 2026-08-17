@@ -1,29 +1,55 @@
 <script setup>
-// ═══════════════════════════════════════════════
-// 訂單列表頁 Orders
-// 路由：/shop/orders   name: 'orders'
-// 用途：顯示「我的所有訂單」清單，每筆可點進去看詳情
-// ═══════════════════════════════════════════════
-//
-// 【之後要串的 API】
-//   GET /api/orders   取得目前使用者的所有訂單，顯示成清單
-//
-// 之後的資料流：
-//   本頁 onMounted → GET /api/orders → 拿到訂單陣列 → v-for 列出每筆
-//   點某一筆 → router.push 到 /shop/orders/:id（訂單詳情頁）
-//
-// 目前為骨架階段，尚無邏輯，script 先留空。
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import api from '@/services/api'   // 組員的 api（自動帶 token）
+
+const router = useRouter()
+const orders = ref([])   // 存訂單清單
+
+// 頁面載入 → 打 API 拿我的訂單
+onMounted(async () => {
+  try {
+    const response = await api.get('/order')   // GET /api/order（帶 token）
+    orders.value = response.data
+  } catch (error) {
+    console.error('載入訂單失敗：', error)
+  }
+})
+
+// 日期格式化：把長長的日期變好讀
+function formatDate(dateString) {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('zh-TW')   // 變成 2026/8/17
+}
+
+// 點訂單 → 進詳情頁
+function goDetail(orderId) {
+  router.push({ name: 'orderDetail', params: { id: orderId } })
+}
 </script>
 
 <template>
   <div class="orders-view">
     <h1 class="page-title">我的訂單</h1>
 
-    <!-- 訂單清單：之後串 GET /api/orders，用 v-for 列出每一筆 -->
-    <section class="placeholder-block">
-      <p>（此區之後顯示訂單清單，串接 GET /api/orders）</p>
-      <p>（每一筆訂單可點擊，導向 /shop/orders/:id 看詳情）</p>
-    </section>
+    <!-- 沒有訂單 -->
+    <div v-if="orders.length === 0" class="text-muted py-5 text-center">
+      還沒有訂單，快去逛逛吧！
+    </div>
+
+    <!-- 訂單清單 -->
+    <div v-else>
+      <div v-for="order in orders" :key="order.orderId" class="order-card" @click="goDetail(order.orderId)">
+        <div class="order-header">
+          <span class="order-id">訂單 #{{ order.orderId }}</span>
+          <span class="order-status">{{ order.status }}</span>
+        </div>
+        <div class="order-body">
+          <span class="order-date">{{ formatDate(order.orderDate) }}</span>
+          <span class="order-total">NT$ {{ order.total.toLocaleString() }}</span>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -33,14 +59,49 @@
   margin: 0 auto;
   padding: 24px;
 }
+
 .page-title {
   font-size: 1.75rem;
   margin-bottom: 24px;
 }
+
 .placeholder-block {
   border: 1px dashed #ccc;
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 16px;
+}
+.order-card {
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease;
+  background-color: #fff;
+}
+.order-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.order-id {
+  font-weight: 700;
+}
+.order-status {
+  color: #e60012;
+  font-size: 0.9rem;
+}
+.order-body {
+  display: flex;
+  justify-content: space-between;
+  color: #666;
+}
+.order-total {
+  font-weight: 700;
+  color: #111;
 }
 </style>
