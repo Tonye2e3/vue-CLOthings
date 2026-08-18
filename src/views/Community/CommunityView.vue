@@ -695,7 +695,6 @@ const toggleFollow = async (creator) => {
               <div class="stat-row">
                 <span>♥ {{ formatCount(featurePost.likesCount) }}</span>
                 <span>💬 {{ formatCount(featurePost.commentsCount) }}</span>
-                <a href="#" class="link-out">查看單品 →</a>
               </div>
             </div>
           </div>
@@ -1032,8 +1031,10 @@ const toggleFollow = async (creator) => {
   font-family:var(--font-serif);
   font-size:1.3rem; font-weight:700; line-height:1.5; margin-bottom:.6rem;
   flex:1;
-  /* content 現在是合併過的完整內文，比原本的短標題長很多，用 line-clamp 限制最多顯示 5 行 */
-  display:-webkit-box; -webkit-line-clamp:5; -webkit-box-orient:vertical; overflow:hidden;
+  /* content 是合併過的完整內文，原本用 line-clamp:5 讓封面故事卡看起來還是塞了一大段文字，
+     跟旁邊 line-clamp-2 的網格卡片比起來重點不夠突出——改成一樣只顯示前 2 行，
+     完整內容点進貼文詳情頁看就好，卡片這裡只留一眼看得完的重點。 */
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
 }
 
 .stat-row{
