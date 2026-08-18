@@ -22,9 +22,23 @@ import {
 const authStore = useAuthStore()
 const router = useRouter()
 
-function logout() {
-  authStore.clearAuth()
-  router.push({ name: 'login' })
+// ⭐ 修改：改成 async，因為現在要呼叫後端
+async function logout() {
+  try {
+    // ⭐ 新增：通知後端撤銷 Refresh Token
+    await api.post('/User/logout')
+  } catch (error) {
+    // ⭐ 新增：
+    // 就算後端 Logout 發生問題
+    // 前端還是要清除登入狀態
+    console.error('Logout API 發生錯誤：', error)
+  } finally {
+    // 原本就有：清除 Pinia 的 Access Token / 使用者資料
+    authStore.clearAuth()
+
+    // 原本就有：回登入頁
+    router.push({ name: 'login' })
+  }
 }
 
 async function testRefresh() {
@@ -111,14 +125,6 @@ async function testRefresh() {
             <FontAwesomeIcon :icon="faRightFromBracket" />
             登出
           </button>
-        </div>
-        <div style="font-size: 30px">
-          <i class="fa-solid fa-user"></i>
-          <i class="fa-solid fa-house"></i>
-          <i class="fa-solid fa-heart"></i>
-          <i class="fa-solid fa-star"></i>
-          <i class="fa-solid fa-check"></i>
-          <i class="fa-solid fa-xmark"></i>
         </div>
       </aside>
 
