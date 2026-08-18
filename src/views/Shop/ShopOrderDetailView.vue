@@ -59,7 +59,11 @@ onMounted(async () => {
       <span class="total-amount">NT$ {{ order.total.toLocaleString() }}</span>
     </section>
 
-    <button class="btn-back" @click="$router.push({ name: 'orders' })">← 回訂單列表</button>
+    <button class="btn-back me-3" @click="$router.push({ name: 'orders' })">← 回訂單列表</button>
+    <!-- 訂單詳情頁加這個按鈕 -->
+    <button class="btn-back" @click="$router.push({ name: 'return', params: { id: order.orderId } })">
+      申請退貨
+    </button>
   </div>
 </template>
 
@@ -69,10 +73,12 @@ onMounted(async () => {
   margin: 0 auto;
   padding: 24px;
 }
+
 .page-title {
   font-size: 1.75rem;
   margin-bottom: 24px;
 }
+
 .section-title {
   font-size: 1.1rem;
   font-weight: 700;
@@ -80,19 +86,23 @@ onMounted(async () => {
   padding-bottom: 8px;
   border-bottom: 2px solid #111;
 }
+
 .info-block {
   margin-bottom: 32px;
 }
+
 .info-row {
   display: flex;
   justify-content: space-between;
   padding: 8px 0;
   color: #444;
 }
+
 .status {
   color: #e60012;
   font-weight: 600;
 }
+
 .item-row {
   display: flex;
   justify-content: space-between;
@@ -100,23 +110,28 @@ onMounted(async () => {
   padding: 12px 0;
   border-bottom: 1px solid #eee;
 }
+
 .item-name {
   flex: 1;
   font-weight: 600;
 }
+
 .item-spec {
   color: #888;
   font-size: 0.85rem;
   font-weight: 400;
   margin-left: 8px;
 }
+
 .item-qty {
   color: #666;
   margin: 0 24px;
 }
+
 .item-price {
   font-weight: 700;
 }
+
 .total-block {
   display: flex;
   justify-content: space-between;
@@ -125,9 +140,11 @@ onMounted(async () => {
   font-size: 1.2rem;
   font-weight: 700;
 }
+
 .total-amount {
   color: #e60012;
 }
+
 .btn-back {
   margin-top: 24px;
   padding: 10px 20px;
