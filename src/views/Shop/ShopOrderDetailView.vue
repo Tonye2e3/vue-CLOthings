@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import api from '@/services/api'
 
 const route = useRoute()
-const order = ref(null)   // 訂單詳情，先空的
+const order = ref(null) // 訂單詳情，先空的
 
 // 日期格式化（跟訂單清單頁一樣）
 function formatDate(dateString) {
@@ -13,13 +13,24 @@ function formatDate(dateString) {
 
 onMounted(async () => {
   try {
-    const id = route.params.id   // 從網址拿訂單 id
-    const response = await api.get(`/order/${id}`)   // GET /api/order/{id}（帶 token）
+    const id = route.params.id // 從網址拿訂單 id
+    const response = await api.get(`/order/${id}`) // GET /api/order/{id}（帶 token）
     order.value = response.data
   } catch (error) {
     console.error('載入訂單詳情失敗：', error)
   }
 })
+async function goPay() {
+  try {
+    const response = await api.post(`/payment/${order.value.orderId}`)
+    // 開新視窗，寫入綠界 form（會自動送出跳綠界）
+    const win = window.open('', '_self')
+    win.document.write(response.data)
+  } catch (error) {
+    console.error('付款失敗：', error)
+    alert('付款啟動失敗')
+  }
+}
 </script>
 
 <template>
@@ -33,11 +44,21 @@ onMounted(async () => {
     <!-- 訂單基本資訊 -->
     <section class="info-block">
       <h2 class="section-title">訂單資訊</h2>
-      <div class="info-row"><span>狀態</span><span class="status">{{ order.status }}</span></div>
-      <div class="info-row"><span>下單日期</span><span>{{ formatDate(order.orderDate) }}</span></div>
-      <div class="info-row"><span>收件人</span><span>{{ order.shipName }}</span></div>
-      <div class="info-row"><span>收件地址</span><span>{{ order.shipAddress }}</span></div>
-      <div class="info-row"><span>聯絡電話</span><span>{{ order.shipPhone }}</span></div>
+      <div class="info-row">
+        <span>狀態</span><span class="status">{{ order.status }}</span>
+      </div>
+      <div class="info-row">
+        <span>下單日期</span><span>{{ formatDate(order.orderDate) }}</span>
+      </div>
+      <div class="info-row">
+        <span>收件人</span><span>{{ order.shipName }}</span>
+      </div>
+      <div class="info-row">
+        <span>收件地址</span><span>{{ order.shipAddress }}</span>
+      </div>
+      <div class="info-row">
+        <span>聯絡電話</span><span>{{ order.shipPhone }}</span>
+      </div>
     </section>
 
     <!-- 商品明細 -->
@@ -61,7 +82,11 @@ onMounted(async () => {
 
     <button class="btn-back me-3" @click="$router.push({ name: 'orders' })">← 回訂單列表</button>
     <!-- 訂單詳情頁加這個按鈕 -->
-    <button class="btn-back" @click="$router.push({ name: 'return', params: { id: order.orderId } })">
+    <button v-if="order.status === '待付款'" @click="goPay" class="btn-pay me-3">前往付款</button>
+    <button
+      class="btn-back"
+      @click="$router.push({ name: 'return', params: { id: order.orderId } })"
+    >
       申請退貨
     </button>
   </div>
@@ -152,5 +177,15 @@ onMounted(async () => {
   background: #fff;
   cursor: pointer;
   border-radius: 6px;
+}
+
+.btn-pay {
+  padding: 12px 32px;
+  background: #f57c00;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 16px;
 }
 </style>

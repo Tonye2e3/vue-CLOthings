@@ -1,15 +1,15 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import api from '@/services/api'   // 組員的 api（自動帶 token）
+import api from '@/services/api' // 組員的 api（自動帶 token）
 
 const router = useRouter()
-const orders = ref([])   // 存訂單清單
+const orders = ref([]) // 存訂單清單
 
 // 頁面載入 → 打 API 拿我的訂單
 onMounted(async () => {
   try {
-    const response = await api.get('/order')   // GET /api/order（帶 token）
+    const response = await api.get('/order') // GET /api/order（帶 token）
     orders.value = response.data
   } catch (error) {
     console.error('載入訂單失敗：', error)
@@ -19,7 +19,7 @@ onMounted(async () => {
 // 日期格式化：把長長的日期變好讀
 function formatDate(dateString) {
   const date = new Date(dateString)
-  return date.toLocaleDateString('zh-TW')   // 變成 2026/8/17
+  return date.toLocaleDateString('zh-TW') // 變成 2026/8/17
 }
 
 // 點訂單 → 進詳情頁
@@ -39,7 +39,12 @@ function goDetail(orderId) {
 
     <!-- 訂單清單 -->
     <div v-else>
-      <div v-for="order in orders" :key="order.orderId" class="order-card" @click="goDetail(order.orderId)">
+      <div
+        v-for="order in orders"
+        :key="order.orderId"
+        class="order-card"
+        @click="goDetail(order.orderId)"
+      >
         <div class="order-header">
           <span class="order-id">訂單 #{{ order.orderId }}</span>
           <span class="order-status">{{ order.status }}</span>
