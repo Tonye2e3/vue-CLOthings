@@ -52,6 +52,11 @@ const router = createRouter({
       component: () => import('../views/Shop/ShopOrderDetailView.vue'),
     },
     {
+      path: '/shop/service',
+      name: 'service',
+      component: () => import('../views/Shop/ShopCustomerService.vue'),
+    },
+    {
       path: '/shop/checkout',
       name: 'checkout',
       component: () => import('../views/Shop/ShopCheckoutView.vue'),
@@ -153,6 +158,23 @@ const router = createRouter({
       path: '/community/post/:id',
       name: 'PostDetail',
       component: () => import('@/views/Community/PostDetailView.vue'),
+    },
+    // 聊天室：/community/messages 是「打開訊息頁但還沒選任何對話」，
+    // /community/messages/:userId 是「打開訊息頁，直接跳到跟某個人的對話」——
+    // 例如從 UserProfileView.vue 的「訊息」按鈕點過來就是走這條、帶著對方的 userId。
+    // 兩條路由共用同一個元件 ChatView.vue，元件自己用 route.params.userId 判斷要不要
+    // 自動開啟某段對話。
+    {
+      path: '/community/messages',
+      name: 'CommunityMessages',
+      component: () => import('@/views/Community/ChatView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/community/messages/:userId',
+      name: 'CommunityMessagesWith',
+      component: () => import('@/views/Community/ChatView.vue'),
+      meta: { requiresAuth: true },
     },
     // 社群後台管理（管理者用，不是給一般使用者看的）
     {

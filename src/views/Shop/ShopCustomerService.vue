@@ -1,29 +1,11 @@
 <script setup>
-import { ref } from 'vue'
-import api from '@/services/api'
-
-const form = ref({ name: '', email: '', phone: '', title: '', content: '' })
-const sent = ref(false)
-
-async function submitForm() {
-  if (!form.value.name || !form.value.email || !form.value.content) {
-    alert('請填寫姓名、Email 和內容')
-    return
-  }
-  try {
-    await api.post('/customerservice', form.value)
-    sent.value = true
-    form.value = { name: '', email: '', phone: '', title: '', content: '' }
-  } catch (error) {
-    console.error('送出失敗：', error)
-    alert('送出失敗，請稍後再試')
-  }
-}
+// 客服 email（換成你們真實的）
 const email = 'sandy881133@gmail.com'
 
+// 用 encodeURIComponent 避免中文亂碼
 function mailtoLink(subject) {
   const s = encodeURIComponent(subject)
-  const body = encodeURIComponent('您好，我想詢問：')
+  const body = encodeURIComponent('您好，我想詢問：\n\n（請描述您的問題）')
   return `mailto:${email}?subject=${s}&body=${body}`
 }
 </script>
@@ -33,7 +15,7 @@ function mailtoLink(subject) {
     <h1 class="page-title">客服中心</h1>
     <p class="subtitle">有任何問題嗎？我們很樂意為您服務</p>
 
-    <!-- 聯絡資訊 -->
+    <!-- 聯絡方式 -->
     <section class="contact-block">
       <div class="contact-item">
         <span class="label">📧 電子郵件</span>
@@ -45,7 +27,7 @@ function mailtoLink(subject) {
       </div>
     </section>
 
-    <!-- 依主題寄信 -->
+    <!-- 依主題寄信（帶不同主旨）-->
     <section class="topic-block">
       <h2 class="block-title">選擇諮詢主題</h2>
       <div class="topic-grid">
@@ -65,22 +47,6 @@ function mailtoLink(subject) {
           <span class="topic-icon">💬</span>
           <span>其他問題</span>
         </a>
-      </div>
-      <p class="mail-hint">點擊後將開啟您的信箱軟體，收件人與主旨已帶好</p>
-    </section>
-
-    <section class="form-block">
-      <h2 class="block-title">或直接留言給我們</h2>
-
-      <div v-if="sent" class="success-msg">✅ 已收到您的訊息，我們會盡快回覆！</div>
-
-      <div v-else class="form">
-        <input v-model="form.name" placeholder="姓名 *" class="input" />
-        <input v-model="form.email" placeholder="Email *" class="input" />
-        <input v-model="form.phone" placeholder="電話" class="input" />
-        <input v-model="form.title" placeholder="主旨" class="input" />
-        <textarea v-model="form.content" placeholder="問題內容 *" rows="4" class="input"></textarea>
-        <button @click="submitForm" class="btn-submit">送出</button>
       </div>
     </section>
   </div>
@@ -151,42 +117,6 @@ function mailtoLink(subject) {
 }
 .topic-icon {
   font-size: 1.5rem;
-}
-.mail-hint {
-  margin-top: 16px;
-  font-size: 0.85rem;
-  color: #888;
-  text-align: center;
-}
-
-.form-block {
-  margin-top: 32px;
-}
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.input {
-  padding: 12px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  font-family: inherit;
-}
-.btn-submit {
-  padding: 12px;
-  background: #111;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.success-msg {
-  padding: 24px;
-  background: #f0f9f0;
-  border-radius: 8px;
-  text-align: center;
-  color: #2a7a2a;
 }
 @media (max-width: 480px) {
   .topic-grid {

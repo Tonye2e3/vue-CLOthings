@@ -199,7 +199,7 @@ export const toggleSavePost = async (post) => {
 // ============================================================
 // 這裡開始是這個頁面「自己專屬」的邏輯，不會被其他檔案拿去用
 // ============================================================
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 
 // authStore：只用來讀 isAdmin，決定要不要顯示「管理後台」入口按鈕。
 // useAuthStore 已經在上面那個 <script>（非 setup）區塊 import 過了，這裡直接呼叫就好。
@@ -439,6 +439,39 @@ const isSearching = computed(() => searchQuery.value.trim() !== '')
 // featurePost：如果正在搜尋，就沒有封面故事（回傳 null，也就是「什麼都沒有」）；
 // 如果沒有在搜尋，就拿 filteredPosts 陣列的第 0 筆（陣列的第一筆，程式裡都是從 0 開始算）當封面故事。
 const featurePost = computed(() => (isSearching.value ? null : filteredPosts.value[0]))
+
+// ============================================================
+// 貼文照片輪播（封面故事卡 + 網格卡片都可以左右切換多張照片）
+// ============================================================
+
+// featureImageIndex：封面故事卡目前顯示第幾張照片（從 0 開始）。封面故事同一時間只有一張卡片，
+// 用單一個 ref 記錄就夠了，跟 PostDetailView.vue 主圖輪播的邏輯是同一套。
+const featureImageIndex = ref(0)
+const prevFeatureImage = () => {
+  const len = featurePost.value.images.length
+  featureImageIndex.value = (featureImageIndex.value - 1 + len) % len
+}
+const nextFeatureImage = () => {
+  const len = featurePost.value.images.length
+  featureImageIndex.value = (featureImageIndex.value + 1) % len
+}
+
+// cardImageIndex：網格卡片目前顯示第幾張照片，用 post.communityPostId 當 key 分別記錄。
+// 因為畫面上同時會有很多張卡片（v-for 跑出來的），不能像 featureImageIndex 那樣只用一個 ref，
+// 要幫「每一張卡片」各自存一份「目前是第幾張」，所以改用 reactive 物件、依貼文 id 查。
+const cardImageIndex = reactive({})
+const getCardImageIndex = (postId) => cardImageIndex[postId] || 0
+const prevCardImage = (post) => {
+  const len = post.images.length
+  const cur = getCardImageIndex(post.communityPostId)
+  cardImageIndex[post.communityPostId] = (cur - 1 + len) % len
+}
+const nextCardImage = (post) => {
+  const len = post.images.length
+  const cur = getCardImageIndex(post.communityPostId)
+  cardImageIndex[post.communityPostId] = (cur + 1) % len
+}
+
 // gridPosts：如果正在搜尋，網格就顯示全部搜尋結果；
 // 如果沒有搜尋，網格就顯示「除了第一篇以外」的其他貼文
 // （.slice(1) 的意思是「從陣列的第 1 筆開始，取到最後」，等於跳過第 0 筆）。
@@ -466,6 +499,12 @@ const loadMoreGridPosts = () => {
 // 不然從「熱門」切到「最新」，網格會用上一個分頁殘留的展開數量，可能一次跳出一大堆貼文。
 watch([currentTab, searchQuery], () => {
   visibleGridCount.value = GRID_PAGE_SIZE
+})
+
+// 換了一篇不同的貼文當封面故事時（例如切分頁），輪播位置重設回第一張，
+// 不然可能會卡在「上一篇封面故事」切到的第 3 張，但新的這篇根本沒有第 3 張圖。
+watch(() => featurePost.value?.communityPostId, () => {
+  featureImageIndex.value = 0
 })
 
 // 點擊追蹤按鈕時呼叫：把該達人的 isFollowing 改成相反的值。
@@ -538,7 +577,7 @@ const toggleFollow = async (creator) => {
             type="text"
             v-model="searchQuery"
             class="search-input"
-            placeholder="搜尋穿搭、單品或用戶..."
+            placeholder="搜尋穿搭、標籤或用戶..."
           />
           <!--
             v-if="searchQuery"：只有搜尋框裡有文字的時候，才顯示這個「清除」按鈕。
@@ -602,10 +641,42 @@ const toggleFollow = async (creator) => {
             這時候這整塊就不會出現，搜尋結果會全部乖乖排在下面的網格裡。
           -->
           <div class="feature-card" v-if="featurePost">
-            <router-link :to="`/community/post/${featurePost.communityPostId}`" class="feature-media d-block text-decoration-none">
-              <span class="tag-label">{{ currentTabCopy.ribbon }}</span>
-              <img :src="featurePost.images[0]?.url" :alt="featurePost.content" />
-            </router-link>
+            <!--
+              feature-media 現在是一個普通的 div，不是 router-link 了——
+              因為裡面要放輪播箭頭／圓點按鈕，如果整塊還是 router-link，
+              點箭頭會被瀏覽器當成「點到連結」一起觸發跳轉。
+              改成：router-link 只包住圖片本身（點圖片才會跳轉到貼文詳情），
+              箭頭、圓點則是跟 router-link 平級的兄弟元素，點下去不會觸發跳轉。
+            -->
+            <div class="feature-media">
+              <router-link :to="`/community/post/${featurePost.communityPostId}`" class="feature-media-link d-block text-decoration-none">
+                <span class="tag-label">{{ currentTabCopy.ribbon }}</span>
+                <img :src="featurePost.images[featureImageIndex]?.url" :alt="featurePost.content" />
+              </router-link>
+
+              <!-- 只有超過 1 張照片才顯示箭頭／圓點，單張照片顯示輪播控制項沒意義 -->
+              <template v-if="featurePost.images.length > 1">
+                <button class="media-arrow media-arrow-prev" @click.stop="prevFeatureImage" aria-label="上一張">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                  </svg>
+                </button>
+                <button class="media-arrow media-arrow-next" @click.stop="nextFeatureImage" aria-label="下一張">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </button>
+                <div class="media-dots">
+                  <button
+                    v-for="(img, idx) in featurePost.images"
+                    :key="idx"
+                    class="media-dot"
+                    :class="{ active: idx === featureImageIndex }"
+                    @click.stop="featureImageIndex = idx"
+                  ></button>
+                </div>
+              </template>
+            </div>
             <div class="feature-body">
               <router-link :to="`/community/profile/${featurePost.userId}`" class="author-row text-decoration-none">
                 <img class="avatar" :src="featurePost.user.avatar" alt="avatar" @error="onAvatarError($event, featurePost.user.name)" />
@@ -624,7 +695,6 @@ const toggleFollow = async (creator) => {
               <div class="stat-row">
                 <span>♥ {{ formatCount(featurePost.likesCount) }}</span>
                 <span>💬 {{ formatCount(featurePost.commentsCount) }}</span>
-                <a href="#" class="link-out">查看單品 →</a>
               </div>
             </div>
           </div>
@@ -638,7 +708,7 @@ const toggleFollow = async (creator) => {
             就改顯示 currentTabCopy.empty 這個針對目前分頁寫好的提示文字。
           -->
           <div class="empty-state" v-if="filteredPosts.length === 0">
-            {{ isSearching ? `找不到符合「${searchQuery}」的穿搭、單品或用戶，換個關鍵字試試。` : currentTabCopy.empty }}
+            {{ isSearching ? `找不到符合「${searchQuery}」的穿搭、標籤或用戶，換個關鍵字試試。` : currentTabCopy.empty }}
           </div>
 
           <!--
@@ -650,18 +720,46 @@ const toggleFollow = async (creator) => {
           <div class="post-grid" v-if="gridPosts.length">
             <div v-for="post in visibleGridPosts" :key="post.communityPostId" class="post-card">
 
-              <router-link :to="`/community/post/${post.communityPostId}`" class="post-media d-block text-decoration-none">
-                <span class="tag-label" v-if="post.taggedProducts && post.taggedProducts[0]">
-                  {{ post.taggedProducts[0].name }}
-                </span>
-                <!--
-                  post.images[0]?.url：images 是一個陣列（對應資料庫 Post_Images 表，
-                  一篇貼文可以有多張圖），這裡先固定拿「第一張」當卡片縮圖。
-                  ?. 叫做「可選鏈」，如果 post.images 是空陣列、抓不到第 0 張，
-                  就不會整個報錯，只會安靜地回傳 undefined。
-                -->
-                <img :src="post.images[0]?.url" :alt="post.content" />
-              </router-link>
+              <!--
+                跟上面封面故事卡一樣的道理：post-media 改成普通 div，
+                router-link 只包住圖片，箭頭／圓點是平級的兄弟元素，
+                點箭頭切換照片才不會被當成「點到卡片」一起跳轉到貼文詳情。
+              -->
+              <div class="post-media">
+                <router-link :to="`/community/post/${post.communityPostId}`" class="post-media-link d-block text-decoration-none">
+                  <span class="tag-label" v-if="post.taggedProducts && post.taggedProducts[0]">
+                    {{ post.taggedProducts[0].name }}
+                  </span>
+                  <!--
+                    post.images[getCardImageIndex(post.communityPostId)]?.url：
+                    跟固定顯示 images[0] 不一樣，改成依這張卡片「目前切到第幾張」動態抓圖，
+                    getCardImageIndex 找不到這篇貼文的紀錄時預設是第 0 張（第一張）。
+                  -->
+                  <img :src="post.images[getCardImageIndex(post.communityPostId)]?.url" :alt="post.content" />
+                </router-link>
+
+                <template v-if="post.images.length > 1">
+                  <button class="media-arrow media-arrow-prev" @click.stop="prevCardImage(post)" aria-label="上一張">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                  </button>
+                  <button class="media-arrow media-arrow-next" @click.stop="nextCardImage(post)" aria-label="下一張">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                  </button>
+                  <div class="media-dots">
+                    <button
+                      v-for="(img, idx) in post.images"
+                      :key="idx"
+                      class="media-dot"
+                      :class="{ active: idx === getCardImageIndex(post.communityPostId) }"
+                      @click.stop="cardImageIndex[post.communityPostId] = idx"
+                    ></button>
+                  </div>
+                </template>
+              </div>
 
               <div class="post-body">
                 <router-link :to="`/community/profile/${post.userId}`" class="post-author text-decoration-none">
@@ -884,8 +982,35 @@ const toggleFollow = async (creator) => {
 }
 .feature-card:hover{ box-shadow:0 18px 34px -22px rgba(42,36,32,.35); }
 .feature-media{ position:relative; overflow:hidden; min-height:320px; background:var(--hairline); }
+.feature-media-link{ display:block; width:100%; height:100%; }
 .feature-media img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform .6s ease; }
 .feature-card:hover .feature-media img{ transform:scale(1.04); }
+
+/*
+  media-arrow／media-dots：跟 PostDetailView.vue 主圖輪播是同一套樣式（尺寸、位置、
+  互動效果都一樣），這裡複製一份過來是因為兩個檔案是各自獨立的 <style scoped>，
+  樣式不會互相共用。
+*/
+.media-arrow{
+  position:absolute; top:50%; transform:translateY(-50%); z-index:3;
+  width:36px; height:36px; border-radius:50%;
+  background:rgba(0,0,0,.45); color:#fff; border:none; padding:0;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .18s ease;
+}
+.media-arrow:hover{ background:rgba(0,0,0,.7); }
+.media-arrow-prev{ left:12px; }
+.media-arrow-next{ right:12px; }
+.media-dots{
+  position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:3;
+  display:flex; gap:.4rem;
+}
+.media-dot{
+  width:7px; height:7px; border-radius:50%;
+  background:rgba(255,255,255,.55); border:none; padding:0;
+  transition:background .18s ease, transform .18s ease;
+}
+.media-dot.active{ background:#fff; transform:scale(1.25); }
 
 .tag-label{
   position:absolute; top:16px; left:16px; z-index:2;
@@ -906,8 +1031,10 @@ const toggleFollow = async (creator) => {
   font-family:var(--font-serif);
   font-size:1.3rem; font-weight:700; line-height:1.5; margin-bottom:.6rem;
   flex:1;
-  /* content 現在是合併過的完整內文，比原本的短標題長很多，用 line-clamp 限制最多顯示 5 行 */
-  display:-webkit-box; -webkit-line-clamp:5; -webkit-box-orient:vertical; overflow:hidden;
+  /* content 是合併過的完整內文，原本用 line-clamp:5 讓封面故事卡看起來還是塞了一大段文字，
+     跟旁邊 line-clamp-2 的網格卡片比起來重點不夠突出——改成一樣只顯示前 2 行，
+     完整內容点進貼文詳情頁看就好，卡片這裡只留一眼看得完的重點。 */
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
 }
 
 .stat-row{
@@ -926,9 +1053,16 @@ const toggleFollow = async (creator) => {
 }
 .post-card:hover{ transform:translateY(-4px) rotate(-0.3deg); box-shadow:0 16px 30px -20px rgba(42,36,32,.4); }
 .post-media{ position:relative; display:block; aspect-ratio:4/3; overflow:hidden; background:var(--hairline); }
+.post-media-link{ display:block; width:100%; height:100%; }
 .post-media img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform .5s ease; }
 .post-card:hover .post-media img{ transform:scale(1.06); }
 .post-media .tag-label{ font-size:.66rem; padding:.24rem .7rem; top:12px; left:12px; }
+/* 網格卡片比封面故事卡小很多，箭頭、圓點跟著縮小一點，不會佔掉太多圖片空間 */
+.post-media .media-arrow{ width:26px; height:26px; }
+.post-media .media-arrow-prev{ left:8px; }
+.post-media .media-arrow-next{ right:8px; }
+.post-media .media-dots{ bottom:8px; }
+.post-media .media-dot{ width:5px; height:5px; }
 
 .post-body{ padding:1rem 1.1rem 1.2rem; }
 .post-author{ display:flex; align-items:center; gap:.5rem; margin-bottom:.6rem; color:var(--ink); }
