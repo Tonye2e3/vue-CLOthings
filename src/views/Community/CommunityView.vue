@@ -199,7 +199,10 @@ export const toggleSavePost = async (post) => {
 // ============================================================
 // 這裡開始是這個頁面「自己專屬」的邏輯，不會被其他檔案拿去用
 // ============================================================
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+// animate：anime.js v4 的動畫函式。這裡用來做貼文卡片的捲動進場動畫——
+// 卡片捲動到看得見的範圍內才淡入＋往上滑一點點，不是一渲染出來就播。
+import { animate } from 'animejs'
 
 // authStore：只用來讀 isAdmin，決定要不要顯示「管理後台」入口按鈕。
 // useAuthStore 已經在上面那個 <script>（非 setup）區塊 import 過了，這裡直接呼叫就好。
@@ -503,8 +506,95 @@ watch([currentTab, searchQuery], () => {
 
 // 換了一篇不同的貼文當封面故事時（例如切分頁），輪播位置重設回第一張，
 // 不然可能會卡在「上一篇封面故事」切到的第 3 張，但新的這篇根本沒有第 3 張圖。
+const featureCardEl = ref(null)
 watch(() => featurePost.value?.communityPostId, () => {
   featureImageIndex.value = 0
+})
+
+// ============================================================
+// 捲動觸發進場動畫：卡片不是「一渲染出來就播動畫」，而是真的捲動到
+// 看得見的範圍內，才淡入＋往上滑一點點。用瀏覽器內建的 IntersectionObserver
+// 判斷「這個元素現在有沒有進入可視範圍」，交給 anime.js 的 animate() 做實際的動畫效果。
+// ============================================================
+
+// scrollAnimatedIds：記錄「已經播過捲動進場動畫」的貼文 id，避免同一張卡片捲出畫面
+// 又捲回來時重複播放（每張卡片只在第一次進入視窗時播一次，之後就維持顯示狀態）。
+const scrollAnimatedIds = new Set()
+
+// runRevealAnimation：實際播放淡入＋上滑的動畫，並在動畫播完後把 anime.js 留下的
+// 行內 opacity／transform 樣式清掉——原因跟之前貼文卡片進場動畫一樣：這幾張卡片本身
+// 有 :hover 效果會用到 transform（滑鼠移上去卡片往上浮），行內樣式的優先權比 CSS
+// class 高，動畫播完後如果不清掉，transform 會一直卡在動畫結束的值，蓋掉 hover 效果。
+const runRevealAnimation = (el, translateFrom = 20, duration = 500) => {
+  animate(el, {
+    opacity: [0, 1],
+    translateY: [translateFrom, 0],
+    duration,
+    ease: 'outQuad',
+    onComplete: () => {
+      el.style.opacity = ''
+      el.style.transform = ''
+    }
+  })
+}
+
+// cardObserver：只建立一次的 IntersectionObserver 實例，之後所有卡片都共用同一個，
+// 不用每張卡片各自 new 一個觀察器，比較省資源。
+// threshold: .15：卡片至少露出 15% 才算「進入畫面」，不用等整張卡片完全捲進來才觸發。
+// rootMargin 的 -40px：讓觸發點往上收一點，卡片還沒完全貼到畫面最底部就開始播動畫，
+// 使用者往下捲的時候比較不會覺得「動畫慢半拍」。
+let cardObserver = null
+const getCardObserver = () => {
+  if (cardObserver) return cardObserver
+  cardObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return
+      runRevealAnimation(entry.target)
+      // unobserve：這張卡片已經播過動畫了，不用繼續盯著它的捲動狀態，
+      // 節省效能，也確保「只在第一次進入畫面時播放一次」。
+      cardObserver.unobserve(entry.target)
+    })
+  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' })
+  return cardObserver
+}
+
+// observeGridCards：把「目前畫面上、還沒被觀察過」的卡片元素交給 IntersectionObserver
+// 盯著——呼叫時機是 visibleGridPosts 改變的時候（見下面的 watch）：不管是第一次載入、
+// 切換分頁、搜尋結果改變，還是按「載入更多穿搭」多顯示出幾篇，都會經過這裡。
+// 卡片本身一開始不會播動畫，是先把 opacity 設成 0（用行內樣式暫時藏起來），
+// 真正捲進畫面、被 IntersectionObserver 偵測到的那一刻，才會播放淡入效果。
+const observeGridCards = () => {
+  const observer = getCardObserver()
+  document.querySelectorAll('.post-grid .post-card').forEach((el, idx) => {
+    const post = visibleGridPosts.value[idx]
+    if (!post || scrollAnimatedIds.has(post.communityPostId)) return
+    scrollAnimatedIds.add(post.communityPostId)
+    el.style.opacity = '0'
+    observer.observe(el)
+  })
+}
+
+// flush: 'post'：這個 watch 的 callback 會在 Vue 把畫面（DOM）真正更新完之後才執行，
+// 不用自己再包一層 nextTick(...) 去等畫面更新——observeGridCards 裡面要用
+// document.querySelectorAll 抓真正畫出來的 <div class="post-card">，一定要等
+// DOM 更新完成才抓得到剛渲染出來的新卡片。
+watch(visibleGridPosts, () => {
+  observeGridCards()
+}, { flush: 'post' })
+
+// 封面故事卡片也用同一套邏輯，只是它只有單獨一張，直接用 featureCardEl 這個範本參照，
+// 不用像網格卡片那樣批次抓 DOM，動畫細節（滑動距離、時長）跟網格卡片共用同一顆
+// runRevealAnimation，維持一致的節奏感。
+watch(featureCardEl, (el) => {
+  if (!el) return
+  el.style.opacity = '0'
+  getCardObserver().observe(el)
+})
+
+// onUnmounted：離開這個頁面時，把 IntersectionObserver 停掉，
+// 不然使用者離開頁面後，這個觀察器還留在記憶體裡繼續運作，是不必要的資源浪費。
+onUnmounted(() => {
+  if (cardObserver) cardObserver.disconnect()
 })
 
 // 點擊追蹤按鈕時呼叫：把該達人的 isFollowing 改成相反的值。
@@ -649,7 +739,7 @@ const toggleFollow = async (creator) => {
             還記得上面 script 裡的邏輯嗎？正在搜尋的時候 featurePost 會是 null，
             這時候這整塊就不會出現，搜尋結果會全部乖乖排在下面的網格裡。
           -->
-          <div class="feature-card" v-if="featurePost">
+          <div class="feature-card" v-if="featurePost" ref="featureCardEl">
             <!--
               feature-media 現在是一個普通的 div，不是 router-link 了——
               因為裡面要放輪播箭頭／圓點按鈕，如果整塊還是 router-link，
@@ -709,7 +799,7 @@ const toggleFollow = async (creator) => {
                 -->
                 <span>
                   <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 21s-7.5-4.6-10-9.3C.5 8.2 2.4 5 5.8 5c2 0 3.4 1.1 4.2 2.4C10.8 6.1 12.2 5 14.2 5c3.4 0 5.3 3.2 3.8 6.7C20.5 16.4 12 21 12 21z" />
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                   </svg>
                   {{ formatCount(featurePost.likesCount) }}
                 </span>
@@ -804,7 +894,7 @@ const toggleFollow = async (creator) => {
                   -->
                   <span>
                     <svg class="icon-inline" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M12 21s-7.5-4.6-10-9.3C.5 8.2 2.4 5 5.8 5c2 0 3.4 1.1 4.2 2.4C10.8 6.1 12.2 5 14.2 5c3.4 0 5.3 3.2 3.8 6.7C20.5 16.4 12 21 12 21z" />
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                     </svg>
                     {{ formatCount(post.likesCount) }}
                   </span>

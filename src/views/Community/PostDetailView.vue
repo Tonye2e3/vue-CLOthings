@@ -15,6 +15,9 @@ import api from '@/services/api'
 // 統一起來風格才會一致，也不用再依賴外部 CDN 載入 Font Awesome 的品牌圖示子集。
 import IconFacebook from '@/components/icons/IconFacebook.vue'
 import IconLine from '@/components/icons/IconLine.vue'
+// animate：anime.js v4 的動畫函式，這裡用來讓按讚愛心在點下去的瞬間做一個「彈跳」效果，
+// 跟 CommunityView.vue 貼文卡片的進場動畫是同一個套件、同一套用法。
+import { animate } from 'animejs'
 
 // 收藏功能共用資料（跟 UserProfileView.vue 共用同一份收藏清單，直接 import 那個檔案）
 // savedPosts：目前所有收藏的貼文清單（雖然這裡沒有直接用到它本身，
@@ -239,8 +242,26 @@ const likesNumber = ref(1248) // 對應原本的 '1,248'
 // 自動幫數字加上千分位逗號。
 const likesDisplay = computed(() => likesNumber.value.toLocaleString())
 
+// likeIconEl：按讚按鈕裡那顆心形 SVG 圖示的 DOM 參照，animateLikeIcon 需要直接抓到
+// 這個元素才能對它播放動畫。
+const likeIconEl = ref(null)
+
+// animateLikeIcon：心形圖示的「彈跳」效果——不管這次是要按讚還是取消讚，
+// 點下去都先給一個小小的放大再彈回去的回饋，操作起來比較有「按到了」的實感。
+// 這個動畫純粹是視覺回饋，跟後面 API 呼叫成功與否無關，所以放在 toggleLike 最開頭、
+// 立刻執行，不用等 API 回應。
+const animateLikeIcon = () => {
+  if (!likeIconEl.value) return
+  animate(likeIconEl.value, {
+    scale: [1, 1.4, 1],
+    duration: 380,
+    ease: 'outBack'
+  })
+}
+
 // toggleLike：按下愛心按鈕時執行。改成 async，因為裡面要 await 打 API。
 const toggleLike = async () => {
+  animateLikeIcon()
   if (post.value.isLiked) {
     // 目前是「已按讚」狀態 → 這次是要取消讚 → 打 DELETE，刪掉 myLikeId 那筆紀錄
     try {
@@ -655,10 +676,18 @@ const addComment = async () => {
                   @click="toggleLike"：點下去執行上面 script 定義的 toggleLike 函式。
                 -->
                 <button class="action-btn" :class="{ liked: post.isLiked }" @click="toggleLike">
-                  ♥ {{ likesDisplay }}
+                  <!-- fill="currentColor" 只有 isLiked 是 true 時才套用：已按讚時整顆心是實心的紅色，
+                       跟大部分社群 App「按讚＝實心愛心」的視覺習慣一致；還沒按讚時維持空心線條。 -->
+                  <svg ref="likeIconEl" class="icon-inline" viewBox="0 0 24 24" width="16" height="16" :fill="post.isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                  {{ likesDisplay }}
                 </button>
                 <button class="action-btn">
-                  💬 {{ post.commentsCount }}
+                  <svg class="icon-inline" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" />
+                  </svg>
+                  {{ post.commentsCount }}
                 </button>
                 <!--
                   share-wrapper：包住分享按鈕跟下拉選單的容器，加 position:relative，
@@ -1002,6 +1031,10 @@ const addComment = async () => {
 .action-btn:hover{ color:var(--ink); }
 .action-btn.liked{ color:#B4453A; font-weight:600; }
 .action-btn.saved{ color:var(--ochre); font-weight:600; }
+/* icon-inline：跟文字並排的小圖示共用樣式，顏色跟著所在文字走（currentColor），
+   跟 CommunityView.vue 的 .icon-inline 是同一個概念，各自獨立的 <style scoped> 沒辦法共用，
+   所以這裡也宣告一次。 */
+.icon-inline{ flex-shrink:0; }
 
 /*
   分享選單：
