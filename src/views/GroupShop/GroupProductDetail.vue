@@ -62,6 +62,8 @@ const product = ref({
   tiers: [],
   orderedQty: 0
 })
+const loading = ref(true)
+const notFound = ref(false)
 
 onMounted(async () => {
   // 管理員（Admin）沒有購物車權限，fetchCart 會回 403，
@@ -72,7 +74,14 @@ onMounted(async () => {
     // 忽略，購物車數量顯示 0 即可
   }
   const id = Number(route.params.id)
-  product.value = await getGroupProduct(id)
+  try {
+    product.value = await getGroupProduct(id)
+  } catch (err) {
+    // 商品不存在，或已經被後台下架（下架商品買家端一律當 404 處理）
+    notFound.value = true
+  } finally {
+    loading.value = false
+  }
 })
 
 // 讀取購物車裡此商品目前的數量
@@ -133,8 +142,13 @@ const handleJoin = async () => {
     return
   }
 
-  await cartStore.addItem({ id: product.value.id })
-  router.push('/GroupShop/checkout') // 加入後直接到購物車頁面
+  try {
+    await cartStore.addItem({ id: product.value.id })
+    router.push('/GroupShop/checkout') // 加入後直接到購物車頁面
+  } catch (err) {
+    // 例如商品剛好在使用者停留在這頁的時候被後台下架了，加入購物車那一刻後端會擋下來
+    alert(err.response?.data || '加入購物車失敗，請稍後再試')
+  }
 }
 </script>
 
@@ -178,31 +192,6 @@ const handleJoin = async () => {
               </span>
               <span>{{ item.label }}</span>
             </router-link>
-            <div v-else class="nav-item">
-              <span class="nav-icon">
-                <!-- 顯示對應的嵌入式 SVG 圖示 -->
-                <svg v-if="item.icon === 'user'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-                <svg v-else-if="item.icon === 'history'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="1 4 1 10 7 10"></polyline>
-                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                </svg>
-                <svg v-else-if="item.icon === 'box'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
-                  <polyline points="3.29 7 12 12 20.71 7"></polyline>
-                  <line x1="12" y1="22" x2="12" y2="12"></line>
-                </svg>
-                <svg v-else-if="item.icon === 'clipboard'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                  <line x1="9" y1="12" x2="15" y2="12"></line>
-                  <line x1="9" y1="16" x2="15" y2="16"></line>
-                </svg>
-              </span>
-              <span>{{ item.label }}</span>
-            </div>
           </template>
         </nav>
 
@@ -213,7 +202,16 @@ const handleJoin = async () => {
     <router-link to="/GroupShop" class="back-link mb-3">
       ← 返回商品列表
     </router-link>
-    <div class="row g-4">
+
+    <!-- 商品不存在，或已經被後台下架：顯示提示，不要顯示空殼商品資料 -->
+    <div v-if="notFound" class="text-center py-5">
+      <p class="text-muted mb-3">找不到這個商品，可能已經下架或不存在</p>
+      <router-link to="/GroupShop" class="btn btn-main">返回商品列表</router-link>
+    </div>
+    <div v-else-if="loading" class="text-center py-5 text-muted">
+      載入中...
+    </div>
+    <div v-else class="row g-4">
       <!-- 左側：主商品 -->
       <div class="col-lg-8">
         <div class="hero-card">
