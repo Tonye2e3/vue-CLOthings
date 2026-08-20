@@ -9,6 +9,9 @@ import api from '@/services/api'
 // 從 CommunityView.vue 匯出，全站共用同一份「目前登入者是誰」的狀態，不用重複打 API。
 import { currentUserId, loadCurrentUserId } from '@/views/Community/CommunityView.vue'
 import { connectChat, disconnectChat, onReceiveMessage, offReceiveMessage, sendChatMessage } from '@/services/chatHub'
+// animate：anime.js v4 的動畫函式，這裡用來讓「即時收到的新訊息」滑入畫面，
+// 跟 CommunityView.vue 貼文卡片的捲動進場動畫是同一個套件、同一套用法。
+import { animate } from 'animejs'
 
 const route = useRoute()
 const router = useRouter()
@@ -142,6 +145,10 @@ const handleReceiveMessage = (dto) => {
     (dto.senderId === activeOtherUserId.value || dto.receiverId === activeOtherUserId.value)
 
   if (isForActiveConversation) {
+    // pendingSlideInIds：記下這則訊息是「即時收到的」，等一下畫出來的時候要播放滑入動畫。
+    // 一開始用 fetchMessages 載入的歷史訊息不會經過這裡，只有透過 ChatHub 即時推送進來的
+    // 新訊息才會被標記，這樣歷史訊息就不會跟著一起播動畫，只有真的「剛收到」的才會滑入。
+    pendingSlideInIds.add(dto.chatMessageId)
     messages.value.push(dto)
     scrollToBottom()
   }
@@ -150,6 +157,45 @@ const handleReceiveMessage = (dto) => {
   // 「未讀數字」保持最新——重新打一次 API 最單純，不用手動在前端拼湊排序、去重的邏輯。
   fetchConversations()
 }
+
+// ============================================================
+// 新訊息滑入動畫：只有「即時收到的新訊息」（handleReceiveMessage 標記過的）才會播放，
+// 一開始載入的歷史訊息維持直接顯示，不會整批一起滑動，那樣反而不像「剛收到」的感覺。
+// ============================================================
+
+// pendingSlideInIds：等著播放滑入動畫的訊息 id 清單。
+const pendingSlideInIds = new Set()
+
+// animatePendingBubbles：把「畫面上剛渲染出來、還在等著播動畫」的訊息氣泡抓出來播放。
+// 自己傳的訊息（.mine）從右邊滑入，對方傳來的訊息從左邊滑入，方向跟氣泡本身靠左靠右一致，
+// 感覺像是「這則訊息真的從那個方向冒出來」。
+const animatePendingBubbles = () => {
+  if (pendingSlideInIds.size === 0) return
+  document.querySelectorAll('.chat-bubble-row').forEach(el => {
+    const id = Number(el.dataset.messageId)
+    if (!pendingSlideInIds.has(id)) return
+    pendingSlideInIds.delete(id)
+    const isMine = el.classList.contains('mine')
+    animate(el, {
+      opacity: [0, 1],
+      translateX: [isMine ? 24 : -24, 0],
+      duration: 380,
+      ease: 'outQuad',
+      // onComplete：清掉 anime.js 留下的行內 opacity／transform 樣式，避免卡住
+      // 之後任何跟 transform 有關的效果（目前氣泡本身沒有用到，純粹是保險習慣）。
+      onComplete: () => {
+        el.style.opacity = ''
+        el.style.transform = ''
+      }
+    })
+  })
+}
+
+// flush: 'post'：等 Vue 把新訊息真正畫到畫面上（DOM 更新完）之後才執行，
+// 這樣 document.querySelectorAll 才抓得到剛渲染出來的新氣泡。
+watch(messages, () => {
+  animatePendingBubbles()
+}, { flush: 'post' })
 
 // handlePickImage：使用者從檔案選擇視窗選好圖片之後執行（可以一次選很多張，也可以分次
 //加選）——這裡只做「本地預覽」，還沒真的上傳到伺服器，上傳的動作留到按下「送出」的那一刻
@@ -305,6 +351,7 @@ watch(() => route.params.userId, (newVal) => {
               <div
                 v-for="m in messages"
                 :key="m.chatMessageId"
+                :data-message-id="m.chatMessageId"
                 class="chat-bubble-row"
                 :class="{ mine: m.senderId === currentUserId }"
               >
