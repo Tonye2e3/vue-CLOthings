@@ -22,29 +22,27 @@ import {
 const authStore = useAuthStore()
 const router = useRouter()
 
-function logout() {
-  authStore.clearAuth()
-  router.push({ name: 'login' })
-}
-
-async function testRefresh() {
+// ⭐ 修改：改成 async，因為現在要呼叫後端
+async function logout() {
   try {
-    const resp = await api.post('/User/refresh')
-
-    console.log('Refresh 成功')
-    console.log('新的 Access Token：', resp.data.token)
+    // ⭐ 新增：通知後端撤銷 Refresh Token
+    await api.post('/User/logout')
   } catch (error) {
-    console.error('Refresh 失敗：', error)
-    console.log('Status：', error.response?.status)
-    console.log('Response：', error.response?.data)
+    // ⭐ 新增：
+    // 就算後端 Logout 發生問題
+    // 前端還是要清除登入狀態
+    console.error('Logout API 發生錯誤：', error)
+  } finally {
+    // 原本就有：清除 Pinia 的 Access Token / 使用者資料
+    authStore.clearAuth()
+
+    // 原本就有：回登入頁
+    router.push({ name: 'login' })
   }
 }
 </script>
 
 <template>
-  <button class="btn btn-danger" @click="testRefresh">
-    測試 Refresh Token
-  </button>
   <div class="user-page">
     <div class="user-container">
       <!-- ============================= -->
@@ -60,7 +58,7 @@ async function testRefresh() {
           <!-- 帳戶資料 -->
           <a href="#account" class="nav-item">
             <span class="nav-icon">
-              <font-awesome-icon :icon="faUser" />
+              <FontAwesomeIcon :icon="faUser" />
             </span>
 
             <div>
@@ -72,7 +70,7 @@ async function testRefresh() {
           <!-- 個人資料 -->
           <a href="#profile" class="nav-item">
             <span class="nav-icon">
-              <font-awesome-icon :icon="faIdCard" />
+              <FontAwesomeIcon :icon="faIdCard" />
             </span>
 
             <div>
@@ -84,7 +82,7 @@ async function testRefresh() {
           <!-- 收件資料 -->
           <a href="#address" class="nav-item">
             <span class="nav-icon">
-              <font-awesome-icon :icon="faHouse" />
+              <FontAwesomeIcon :icon="faHouse" />
             </span>
 
             <div>
@@ -96,7 +94,7 @@ async function testRefresh() {
           <!-- 第三方登入 -->
           <a href="#oauth" class="nav-item">
             <span class="nav-icon">
-              <font-awesome-icon :icon="faLink" />
+              <FontAwesomeIcon :icon="faLink" />
             </span>
 
             <div>
@@ -108,17 +106,9 @@ async function testRefresh() {
 
         <div class="sidebar-footer">
           <button type="button" class="logout-btn" @click="logout">
-            <font-awesome-icon :icon="faRightFromBracket" />
+            <FontAwesomeIcon :icon="faRightFromBracket" />
             登出
           </button>
-        </div>
-        <div style="font-size: 30px">
-          <i class="fa-solid fa-user"></i>
-          <i class="fa-solid fa-house"></i>
-          <i class="fa-solid fa-heart"></i>
-          <i class="fa-solid fa-star"></i>
-          <i class="fa-solid fa-check"></i>
-          <i class="fa-solid fa-xmark"></i>
         </div>
       </aside>
 

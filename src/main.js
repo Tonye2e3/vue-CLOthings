@@ -27,7 +27,7 @@ pinia.use(piniaPluginPersistedstate) // 讓 pinia 使用持久化套件
 app.use(pinia) // 再把 pinia 給 app 用
 
 // 全域註冊 Font Awesome
-app.component('font-awesome-icon', FontAwesomeIcon)
+app.component('FontAwesomeIcon', FontAwesomeIcon)
 
 // app.use(createPinia())
 
