@@ -351,9 +351,15 @@ watch(() => route.params.userId, (newVal) => {
           <div class="chat-input-row">
             <!-- 圖片按鈕本身是一個包住隱藏 file input 的 label，點按鈕視覺上是點圖示，
                  實際觸發的是底下那個看不見的 <input type="file">，開出系統的檔案選擇視窗。
-                 multiple：可以一次選很多張圖片，也可以分好幾次加選。 -->
+                 multiple：可以一次選很多張圖片，也可以分好幾次加選。
+                 這裡跟 CreatePostView.vue、CommunityView.vue 一起把 Font Awesome 圖示換成
+                 專案自己的 SVG 線條圖示，理由一樣：不吃字型／CDN，風格也統一。 -->
             <label class="chat-image-btn" title="傳送圖片">
-              <i class="fa-solid fa-image" style="color: rgb(122, 75, 84);"></i>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <circle cx="8.5" cy="9.5" r="1.5" />
+                <path d="M21 15l-5-5-4 4-3-3-6 6" />
+              </svg>
               <input
                 type="file"
                 accept="image/*"
@@ -568,9 +574,9 @@ watch(() => route.params.userId, (newVal) => {
 .chat-image-btn{
   position:relative;
   width:38px; height:38px; border-radius:50%;
-  background:var(--cream); flex-shrink:0;
+  background:var(--cream); flex-shrink:0; color:var(--plum);
   display:flex; align-items:center; justify-content:center;
-  font-size:1.1rem; cursor:pointer;
+  cursor:pointer;
   transition:background .18s ease;
 }
 .chat-image-btn:hover{ background:var(--hairline); }

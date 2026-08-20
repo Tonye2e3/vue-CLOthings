@@ -616,12 +616,21 @@ const toggleFollow = async (creator) => {
 
         <div class="d-flex align-items-center gap-2">
           <!-- 管理後台入口：只有登入者是管理員才會出現。放在這裡（社群首頁）是因為
-               管理員帳號沒有自己的個人頁可以放這顆按鈕，但每個登入的人本來就會經過這頁。 -->
+               管理員帳號沒有自己的個人頁可以放這顆按鈕，但每個登入的人本來就會經過這頁。
+               原本這裡是用 emoji（🛠）當圖示，跟之前 ChatView.vue 相機按鈕、
+               UserProfileView.vue 收藏空狀態圖示消失是同一類風險：emoji 靠字型渲染，
+               換一台電腦、換個瀏覽器字型設定就可能跑掉或消失。這裡也一起換成 SVG
+               扳手圖示，統一整個 Community 的圖示風格。 -->
           <router-link
             v-if="authStore.isAdmin"
             to="/admin/community/posts"
             class="btn-admin-entry text-decoration-none"
-          >🛠 管理後台</router-link>
+          >
+            <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.8 2.8-2-2 2.8-2.8z" />
+            </svg>
+            管理後台
+          </router-link>
           <router-link to="/community/create" class="btn-share text-decoration-none">
             ＋ 分享我的穿搭
           </router-link>
@@ -693,8 +702,23 @@ const toggleFollow = async (creator) => {
                 <h3>{{ featurePost.content }}</h3>
               </router-link>
               <div class="stat-row">
-                <span>♥ {{ formatCount(featurePost.likesCount) }}</span>
-                <span>💬 {{ formatCount(featurePost.commentsCount) }}</span>
+                <!--
+                  ♥、💬 原本是文字符號／emoji，這裡跟其他圖示一起換成 SVG 心形、對話框圖示，
+                  不吃字型、風格也跟輪播箭頭這類線條圖示一致。icon-inline 這個共用 class
+                  負責讓圖示跟旁邊的數字文字對齊。
+                -->
+                <span>
+                  <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 21s-7.5-4.6-10-9.3C.5 8.2 2.4 5 5.8 5c2 0 3.4 1.1 4.2 2.4C10.8 6.1 12.2 5 14.2 5c3.4 0 5.3 3.2 3.8 6.7C20.5 16.4 12 21 12 21z" />
+                  </svg>
+                  {{ formatCount(featurePost.likesCount) }}
+                </span>
+                <span>
+                  <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" />
+                  </svg>
+                  {{ formatCount(featurePost.commentsCount) }}
+                </span>
               </div>
             </div>
           </div>
@@ -776,9 +800,20 @@ const toggleFollow = async (creator) => {
                     formatCount(...)：post.likesCount／commentsCount 現在存的是純數字
                     （例如 1200），不是寫死的 '1.2k' 字串，畫面顯示時才呼叫 formatCount
                     轉換成縮寫格式。這樣資料本身仍然是「可以排序、可以比大小」的數字。
+                    ♥、💬 一樣換成跟封面故事卡同樣的 SVG 圖示，兩邊風格才會一致。
                   -->
-                  <span>♥ {{ formatCount(post.likesCount) }}</span>
-                  <span>💬 {{ formatCount(post.commentsCount) }}</span>
+                  <span>
+                    <svg class="icon-inline" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 21s-7.5-4.6-10-9.3C.5 8.2 2.4 5 5.8 5c2 0 3.4 1.1 4.2 2.4C10.8 6.1 12.2 5 14.2 5c3.4 0 5.3 3.2 3.8 6.7C20.5 16.4 12 21 12 21z" />
+                    </svg>
+                    {{ formatCount(post.likesCount) }}
+                  </span>
+                  <span>
+                    <svg class="icon-inline" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" />
+                    </svg>
+                    {{ formatCount(post.commentsCount) }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -1042,7 +1077,11 @@ const toggleFollow = async (creator) => {
   border-top:1px dashed var(--hairline); padding-top:1rem; margin-top:1rem;
   font-size:.85rem; color:var(--ink-soft);
 }
+.stat-row span{ display:inline-flex; align-items:center; gap:.3rem; }
 .stat-row .link-out{ margin-left:auto; color:var(--plum); font-weight:600; text-decoration:none; border-bottom:1px solid var(--plum); }
+/* icon-inline：跟文字並排的小圖示共用樣式（心形、對話框、扳手），顏色跟著所在文字的
+   顏色走（currentColor），不用每個地方各自寫一次顏色。 */
+.icon-inline{ flex-shrink:0; }
 
 /* ---------- 貼文網格 ---------- */
 .post-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:1.4rem; }
@@ -1074,6 +1113,7 @@ const toggleFollow = async (creator) => {
   padding-top:.8rem; border-top:1px solid var(--hairline);
   font-size:.8rem; color:var(--ink-soft);
 }
+.post-foot span{ display:inline-flex; align-items:center; gap:.3rem; }
 .post-foot a{ margin-left:auto; color:var(--plum); text-decoration:none; font-weight:600; }
 
 .line-clamp-2{

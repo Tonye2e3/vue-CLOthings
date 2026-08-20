@@ -9,6 +9,13 @@ import { useRoute } from 'vue-router'
 // token 帶進 Authorization header，跟直接 import axios from 'axios' 不一樣。
 import api from '@/services/api'
 
+// IconFacebook、IconLine：分享選單裡「分享到 Facebook／LINE」原本是用 Font Awesome
+// 的品牌圖示（<i class="fa-brands fa-facebook">），改成專案裡自己準備的 SVG 圖示元件
+// （src/components/icons/），畫面上其他地方（例如頁尾社群連結）也是用同一套元件，
+// 統一起來風格才會一致，也不用再依賴外部 CDN 載入 Font Awesome 的品牌圖示子集。
+import IconFacebook from '@/components/icons/IconFacebook.vue'
+import IconLine from '@/components/icons/IconLine.vue'
+
 // 收藏功能共用資料（跟 UserProfileView.vue 共用同一份收藏清單，直接 import 那個檔案）
 // savedPosts：目前所有收藏的貼文清單（雖然這裡沒有直接用到它本身，
 // 但 isPostSaved 內部會去讀它，所以還是要 import 進來）
@@ -677,10 +684,10 @@ const addComment = async () => {
                       <i class="fa-solid fa-link"></i> {{ linkCopied ? '已複製！' : '複製連結' }}
                     </button>
                     <button type="button" class="share-menu-item" @click="shareToLine">
-                      <i class="fa-brands fa-line"></i> 分享到 LINE
+                      <IconLine /> 分享到 LINE
                     </button>
                     <button type="button" class="share-menu-item" @click="shareToFacebook">
-                      <i class="fa-brands fa-facebook"></i> 分享到 Facebook
+                      <IconFacebook /> 分享到 Facebook
                     </button>
                   </div>
                 </div>
@@ -1024,6 +1031,10 @@ const addComment = async () => {
 }
 .share-menu-item:hover{ background:var(--cream); }
 .share-menu-item i{ width:16px; text-align:center; color:var(--ink-soft); }
+/* IconFacebook、IconLine 這兩個元件畫出來的是 <svg>，不是 <i>，套用同一套尺寸／顏色設定，
+   跟旁邊 fa-solid 的 <i> 圖示（系統分享、複製連結）對齊、看起來風格一致。
+   currentColor：SVG 元件內部用 fill="currentColor"，顏色會直接跟著這裡設定的 color 走。 */
+.share-menu-item svg{ width:16px; height:16px; flex-shrink:0; color:var(--ink-soft); }
 
 /* ---------- 內文 ---------- */
 .post-content{

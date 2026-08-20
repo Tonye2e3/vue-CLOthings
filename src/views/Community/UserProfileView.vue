@@ -796,7 +796,18 @@ const toggleFollow = async () => {
 
         <!-- v-else（搭配上面裡層的 v-if）：收藏清單是空的時候，顯示這個提示，而不是一片空白 -->
         <div v-else class="empty-state">
-          <div class="empty-icon">📁</div>
+          <!--
+            原本這裡是用 emoji（📁）當圖示，跟之前 ChatView.vue 的相機按鈕圖示消失
+            是同一類風險：emoji 靠字型渲染，換一台電腦、換個瀏覽器字型設定就可能跑掉或消失；
+            這裡也還沒踩到問題，但既然已經在處理圖示一致性，先換成 SVG 畫的線條圖示——
+            不吃字型，風格上也比較貼近網站其他地方（搜尋圖示、輪播箭頭）用的線條風。
+          -->
+          <svg class="empty-icon" viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 8l2.5-4h11L20 8" />
+            <path d="M4 8v10a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 18V8" />
+            <path d="M4 8h16" />
+            <path d="M9.5 12h5" />
+          </svg>
           <p class="empty-note">「還沒有收藏任何穿搭，去社群逛逛按個收藏吧。」</p>
         </div>
       </div>
@@ -1247,7 +1258,7 @@ const toggleFollow = async () => {
   background:var(--paper); border:1px solid var(--hairline); border-radius:22px;
   padding:3.5rem 2rem; text-align:center; margin-top:2rem;
 }
-.empty-icon{ font-size:2.2rem; margin-bottom:.8rem; opacity:.7; }
+.empty-icon{ display:block; margin:0 auto .8rem; color:var(--ink-soft); opacity:.7; }
 .empty-note{
   font-family:'Noto Serif TC', serif; font-style:italic;
   color:var(--ink-soft); font-size:.95rem; margin:0;
