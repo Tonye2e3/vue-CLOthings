@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import axios from 'axios'
+import api from '@/services/api'
 import Review from '@/components/Shop/ProductReview.vue'
 import Post from '@/components/Shop/ProductPost.vue'
 import { useCartStore } from '@/stores/ShopCart'
@@ -28,20 +28,16 @@ const selectedColor = ref(null) //預設沒選顏色
 const selectedSize = ref(null) //預設沒選尺寸
 
 //==== 按鈕區，收藏、加入購物車、立即結帳====
-// 當前選的規格，有沒有在收藏裡？（去問收藏 store）
+// 這個「商品」有沒有在收藏裡？（用 productId 判斷）
 const isCurrentFavorite = computed(() => {
-  // 還沒選規格，就當作沒收藏
-  if (!selectedSpec.value) {
-    return false
-  }
-  // 問收藏 store：這個 productSpecificationId 在收藏清單裡嗎？
-  return favoriteStore.isFavorite(selectedSpec.value.productSpecificationId)
+  if (!product.value) return false
+  return favoriteStore.isFavorite(product.value.productId)
 })
 
 onMounted(async () => {
   try {
     const id = route.params.id // 從網址拿 id（例如 /shop/product/5 → "5"）
-    const response = await axios.get(`${API_BASE}/api/product/${id}`)
+    const response = await api.get(`${API_BASE}/api/product/${id}`)
     product.value = response.data
     // 資料來了之後，才設定主圖（用 images 的第一張）
     if (product.value.images && product.value.images.length > 0) {
@@ -50,23 +46,23 @@ onMounted(async () => {
   } catch (error) {
     console.error('載入商品失敗：', error)
   }
+  await favoriteStore.loadFavorites()
 })
 
 //切換收藏狀態
-function toggleFavorite() {
-  if (!selectedColor.value || !selectedSize.value) {
-    alert('請先選擇顏色和尺寸')
-    return
+async function toggleFavorite() {
+  const productId = product.value.productId
+
+  if (favoriteStore.isFavorite(productId)) {
+    // 已收藏 → 找出 customerFavoriteId 來移除
+    const fav = favoriteStore.favorites.find((f) => f.productId === productId)
+    if (fav) {
+      await favoriteStore.removeFavorite(fav.customerFavoriteId)
+    }
+  } else {
+    // 沒收藏 → 加入
+    await favoriteStore.addFavorite(productId)
   }
-  favoriteStore.toggleFavorite({
-    productSpecificationId: selectedSpec.value.productSpecificationId,
-    productId: product.value.productId,
-    productName: product.value.productName,
-    price: product.value.price,
-    color: selectedSpec.value.color,
-    size: selectedSpec.value.size,
-    image: currentImage.value,
-  })
 }
 
 // 加入購物車

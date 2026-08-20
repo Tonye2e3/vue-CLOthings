@@ -32,7 +32,7 @@ const router = createRouter({
       component: () => import('../views/Shop/ShopFavoriteView.vue'),
     },
     {
-      path: '/shop/product',
+      path: '/shop/product/:id',
       name: 'product',
       component: () => import('../views/Shop/ProductView.vue'),
     },
@@ -50,6 +50,11 @@ const router = createRouter({
       path: '/shop/orders/:id',
       name: 'orderDetail',
       component: () => import('../views/Shop/ShopOrderDetailView.vue'),
+    },
+    {
+      path: '/shop/service',
+      name: 'service',
+      component: () => import('../views/Shop/ShopCustomerService.vue'),
     },
     {
       path: '/shop/checkout',

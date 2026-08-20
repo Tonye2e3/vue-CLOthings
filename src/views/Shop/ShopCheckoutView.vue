@@ -51,6 +51,7 @@ async function submitOrder() {
   // ③ 打 API 建立訂單
   try {
     const response = await api.post('/order', orderData)
+    await cartStore.loadCart()   // 重新載入購物車（後端已清，前端同步）
     alert('訂單建立成功！訂單編號：' + response.data.orderId)
     // ④ 成功後：跳到訂單頁（或首頁）
     router.push({ name: 'orders' })
