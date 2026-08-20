@@ -134,31 +134,6 @@ const handleCheckout = () => {
               </span>
               <span>{{ item.label }}</span>
             </router-link>
-            <div v-else class="nav-item">
-              <span class="nav-icon">
-                <!-- 依 item.icon 的值，顯示對應的嵌入式 SVG 圖示（v-if / v-else-if 只會顯示符合條件的那一個） -->
-                <svg v-if="item.icon === 'user'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-                <svg v-else-if="item.icon === 'history'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="1 4 1 10 7 10"></polyline>
-                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                </svg>
-                <svg v-else-if="item.icon === 'box'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
-                  <polyline points="3.29 7 12 12 20.71 7"></polyline>
-                  <line x1="12" y1="22" x2="12" y2="12"></line>
-                </svg>
-                <svg v-else-if="item.icon === 'clipboard'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                  <line x1="9" y1="12" x2="15" y2="12"></line>
-                  <line x1="9" y1="16" x2="15" y2="16"></line>
-                </svg>
-              </span>
-              <span>{{ item.label }}</span>
-            </div>
           </template>
         </nav>
 
