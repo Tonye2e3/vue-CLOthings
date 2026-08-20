@@ -66,6 +66,11 @@ const router = createRouter({
       name: 'service',
       component: () => import('../views/Shop/ShopServiceView.vue'),
     },
+    {
+      path: '/shop/payment-result',
+      name: 'paymentResult',
+      component: () => import('../views/Shop/ShopPaymentResult.vue'),
+    },
 
     //GroupShop 在註解之間新增個人使用的路由 名字自行修改
     //GroupShop 在註解之間新增個人使用的路由 名字自行修改
