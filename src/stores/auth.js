@@ -3,13 +3,19 @@ import { defineStore } from 'pinia'
 
 // 設定 pinia 的持久化儲存
 export const useAuthStore = defineStore(
-  'auth', //狀態名稱
+  'auth',
   () => {
+    // =========================
+    // 登入狀態
+    // =========================
     const token = ref('')
     const name = ref('')
     const account = ref('')
-    const role = ref('') // "member" | "admin"
+    const role = ref('')
 
+    // =========================
+    // 登入成功
+    // =========================
     function setAuth(data) {
       token.value = data.token
       name.value = data.name
@@ -17,6 +23,17 @@ export const useAuthStore = defineStore(
       role.value = data.role
     }
 
+    // =========================
+    // Refresh Token 成功
+    // 只更新新的 Access Token
+    // =========================
+    function setToken(newToken) {
+      token.value = newToken
+    }
+
+    // =========================
+    // 清除登入資料
+    // =========================
     function clearAuth() {
       token.value = ''
       name.value = ''
@@ -24,7 +41,11 @@ export const useAuthStore = defineStore(
       role.value = ''
     }
 
+    // =========================
+    // Computed
+    // =========================
     const isLoggedIn = computed(() => token.value !== '')
+
     const isAdmin = computed(() => role.value === 'Admin' || role.value === 'SuperAdmin')
 
     return {
@@ -32,11 +53,17 @@ export const useAuthStore = defineStore(
       name,
       account,
       role,
+
       isLoggedIn,
       isAdmin,
+
       setAuth,
+      setToken, // ⭐ 新增
       clearAuth,
     }
   },
-  { persist: true },
+
+  {
+    persist: true,
+  },
 )

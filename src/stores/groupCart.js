@@ -66,12 +66,16 @@ export const useGroupCartStore = defineStore('groupCart', {
     },
 
     // 修改購物車某一項的數量（購物車頁的數量輸入框會用到）
+    // 團購單價是「已成立訂單件數 + 購物車件數」一起算出來的，改自己的數量有可能連帶讓
+    // 自己（甚至購物車裡同商品不同規格的其他品項）跨過門檻、單價跟著變，
+    // 所以後端存檔成功後要整包重新 fetchCart()，不能只手動改本地這一項的 qty，
+    // 不然畫面上顯示的單價／小計會是改之前的舊值，跟結帳頁最後算出來的金額對不上
     async updateQty(id, qty) {
       const item = this.items.find(i => i.id === id)
       if (!item) return
       const safeQty = Math.max(1, qty)
       await updateGroupCartQty(item.groupCartId, safeQty)
-      item.qty = safeQty
+      await this.fetchCart()
     },
 
     // 從購物車移除某個商品

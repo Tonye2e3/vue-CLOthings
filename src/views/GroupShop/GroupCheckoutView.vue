@@ -1,6 +1,6 @@
 <script setup>
 
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGroupCartStore } from '@/stores/groupCart'
 import { useAuthStore } from '@/stores/auth'
@@ -55,6 +55,13 @@ const subtotal = computed(() =>
 const freight = computed(() => (subtotal.value >= 1000 ? 0 : 60))
 const grandTotal = computed(() => subtotal.value + freight.value)
 
+// 購物車總件數：超商取貨的箱子/包裹大小、重量都有限制，件數太多門市塞不下、
+// 也可能超過物流商單一包裹的重量上限，這裡先用一個簡單的件數門檻擋掉，
+// 這個數字目前是先抓一個合理值，之後如果要依商品實際的重量/材積來判斷，可以再調整
+const CVS_MAX_QTY = 10
+const cartTotalQty = computed(() => cartItems.value.reduce((sum, i) => sum + i.qty, 0))
+const cvsPickupExceeded = computed(() => cartTotalQty.value > CVS_MAX_QTY)
+
 // 收件人資訊
 const orderInfo = reactive({
   shipName: '',
@@ -94,6 +101,15 @@ if (route.query.cvsStoreId) {
   orderInfo.shipAddress = cvsStore.address
 }
 
+// 購物車件數超過超商取貨的門檻時，如果目前選的剛好是超商取貨，自動切回宅配到府並提示，
+// 避免使用者選好門市之後，又回商品頁多加了幾件到購物車，結果送出時後端才擋下來
+watch(cartTotalQty, (qty) => {
+  if (qty > CVS_MAX_QTY && orderInfo.pickupMethod === '超商取貨') {
+    orderInfo.pickupMethod = '宅配到府'
+    alert(`購物車已達 ${qty} 件，超過超商取貨上限（${CVS_MAX_QTY} 件），已自動改為宅配到府`)
+  }
+})
+
 // 從 LINE Pay 取消或付款失敗導回來的話，網址上會帶 linepay=cancelled / fail，顯示一下提示
 if (route.query.linepay === 'cancelled') {
   alert('已取消 LINE Pay 付款，購物車內容仍保留')
@@ -120,6 +136,11 @@ const handleSubmit = async () => {
   // 選了超商取貨，但還沒選門市，不能送出
   if (orderInfo.pickupMethod === '超商取貨' && !cvsStore.storeId) {
     alert('請先選擇取貨門市')
+    return
+  }
+  // 購物車件數超過超商取貨上限，不能送出（正常情況下 UI 會先自動切回宅配，這裡是最後一道防線）
+  if (orderInfo.pickupMethod === '超商取貨' && cvsPickupExceeded.value) {
+    alert(`購物車已達 ${cartTotalQty.value} 件，超過超商取貨上限（${CVS_MAX_QTY} 件），請改選宅配到府`)
     return
   }
   // 購物車是空的也不能送出訂單
@@ -200,31 +221,6 @@ const handleSubmit = async () => {
               </span>
               <span>{{ item.label }}</span>
             </router-link>
-            <div v-else class="nav-item">
-              <span class="nav-icon">
-                <!-- 顯示對應的嵌入式 SVG 圖示 -->
-                <svg v-if="item.icon === 'user'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-                <svg v-else-if="item.icon === 'history'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="1 4 1 10 7 10"></polyline>
-                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                </svg>
-                <svg v-else-if="item.icon === 'box'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
-                  <polyline points="3.29 7 12 12 20.71 7"></polyline>
-                  <line x1="12" y1="22" x2="12" y2="12"></line>
-                </svg>
-                <svg v-else-if="item.icon === 'clipboard'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                  <line x1="9" y1="12" x2="15" y2="12"></line>
-                  <line x1="9" y1="16" x2="15" y2="16"></line>
-                </svg>
-              </span>
-              <span>{{ item.label }}</span>
-            </div>
           </template>
         </nav>
       </aside>
@@ -267,8 +263,13 @@ const handleSubmit = async () => {
                   <label class="form-label">取貨方式</label>
                   <select v-model="orderInfo.pickupMethod" class="form-select">
                     <option value="宅配到府">宅配到府</option>
-                    <option value="超商取貨">超商取貨</option>
+                    <option value="超商取貨" :disabled="cvsPickupExceeded">
+                      超商取貨{{ cvsPickupExceeded ? '（件數過多，不支援）' : '' }}
+                    </option>
                   </select>
+                  <p v-if="cvsPickupExceeded" class="small text-muted mt-1 mb-0">
+                    購物車已達 {{ cartTotalQty }} 件，超過超商取貨上限（{{ CVS_MAX_QTY }} 件），請選擇宅配到府
+                  </p>
                 </div>
                 <div class="col-md-6 mb-3">
                   <label class="form-label">付款方式</label>

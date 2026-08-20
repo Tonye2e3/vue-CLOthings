@@ -28,7 +28,6 @@ app.use(pinia) // 再把 pinia 給 app 用
 
 // 全域註冊 Font Awesome
 app.component('FontAwesomeIcon', FontAwesomeIcon)
-
 // app.use(createPinia())
 
 app.use(router)
