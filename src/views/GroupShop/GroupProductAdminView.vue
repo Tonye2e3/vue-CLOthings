@@ -192,14 +192,28 @@
               </thead>
               <tbody>
                 <tr v-for="t in tiers" :key="t.groupDiscountStandardId">
-                  <td>{{ t.tierLevel }}</td>
-                  <td>{{ t.thresholdCount }}</td>
-                  <td>{{ t.discountRate }}</td>
-                  <td class="text-end">
-                    <button type="button" class="btn btn-sm btn-outline-danger" @click="handleDeleteTier(t)">
-                      刪除
-                    </button>
-                  </td>
+                  <template v-if="editingTierId === t.groupDiscountStandardId">
+                    <td><input type="text" class="form-control form-control-sm" v-model="tierEditForm.tierLevel" /></td>
+                    <td><input type="number" class="form-control form-control-sm" v-model.number="tierEditForm.thresholdCount" min="1" /></td>
+                    <td><input type="number" class="form-control form-control-sm" v-model.number="tierEditForm.discountRate" step="0.01" min="0" max="1" /></td>
+                    <td class="text-end">
+                      <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="saveTierEdit(t)">儲存</button>
+                      <button type="button" class="btn btn-sm btn-outline-secondary" @click="cancelEditTier">取消</button>
+                    </td>
+                  </template>
+                  <template v-else>
+                    <td>{{ t.tierLevel }}</td>
+                    <td>{{ t.thresholdCount }}</td>
+                    <td>{{ t.discountRate }}</td>
+                    <td class="text-end">
+                      <button type="button" class="btn btn-sm btn-outline-secondary me-1" @click="startEditTier(t)">
+                        編輯
+                      </button>
+                      <button type="button" class="btn btn-sm btn-outline-danger" @click="handleDeleteTier(t)">
+                        刪除
+                      </button>
+                    </td>
+                  </template>
                 </tr>
               </tbody>
             </table>
@@ -219,6 +233,42 @@
             </div>
           </div>
           <p v-else class="text-muted small">先儲存商品基本資料後，才能設定團購階層。</p>
+
+          <!-- 商品規格管理（尺寸/顏色）：跟團購階層一樣，只有編輯已存在的商品時才能設定 -->
+          <div v-if="editingId" class="mb-3">
+            <label class="form-label fw-semibold">商品規格（尺寸/顏色）</label>
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>尺寸</th>
+                  <th>顏色</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="s in specs" :key="s.groupProductSpecificationId">
+                  <td>{{ s.size }}</td>
+                  <td>{{ s.color }}</td>
+                  <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-outline-danger" @click="handleDeleteSpec(s)">
+                      刪除
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="row g-2">
+              <div class="col">
+                <input type="text" class="form-control form-control-sm" placeholder="尺寸，例如 M" v-model="newSpec.size" />
+              </div>
+              <div class="col">
+                <input type="text" class="form-control form-control-sm" placeholder="顏色，例如 黑色" v-model="newSpec.color" />
+              </div>
+              <div class="col-auto">
+                <button type="button" class="btn btn-sm btn-outline-primary" @click="handleAddSpec">新增規格</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="modal-footer">
@@ -229,7 +279,7 @@
     </div>
   </div>
 
-  <!-- 從產品選擇 Modal（TODO：目前用假資料 mockProductList，等後端 API 好了要替換成真的查詢） -->
+  <!-- 從產品選擇 Modal：向一般商店的 Shop/ProductController 查真正的產品清單 -->
   <div v-if="showPickProductModal" class="modal-backdrop fade show"></div>
   <div
     v-if="showPickProductModal"
@@ -253,7 +303,7 @@
           />
           <div class="list-group" style="max-height: 400px; overflow-y: auto">
             <button
-              v-for="prod in filteredMockProducts"
+              v-for="prod in filteredPickProducts"
               :key="prod.id"
               type="button"
               class="list-group-item list-group-item-action d-flex align-items-center gap-3"
@@ -263,7 +313,10 @@
               <span class="fw-semibold">{{ prod.name }}</span>
               <span class="text-muted ms-auto">NT$ {{ formatCurrency(prod.price) }}</span>
             </button>
-            <p v-if="filteredMockProducts.length === 0" class="text-muted text-center py-3 mb-0">
+            <p v-if="pickProductLoading" class="text-muted text-center py-3 mb-0">
+              載入產品清單中...
+            </p>
+            <p v-else-if="filteredPickProducts.length === 0" class="text-muted text-center py-3 mb-0">
               找不到符合的產品
             </p>
           </div>
@@ -379,7 +432,11 @@ import {
   deleteProduct,
   getTiers,
   addTier,
+  updateTier,
   deleteTier,
+  getSpecifications,
+  addSpecification,
+  deleteSpecification,
   getCategories,
   createCategory,
   updateCategory,
@@ -388,7 +445,8 @@ import {
   createSupplier,
   updateSupplier,
   deleteSupplier,
-  uploadProductImage
+  uploadProductImage,
+  getShopProducts
 } from '@/api/groupShopAdmin'
 // 圖片網址工具：後端上傳圖片回傳的是相對路徑（例如 /images/group-products/xxx.jpg），
 // 舊示範資料則是完整網址（例如 https://picsum.photos/...），這裡統一組成完整網址
@@ -608,36 +666,103 @@ const resetForm = () => {
 const tiers = ref([])
 const newTier = reactive({ tierLevel: '', thresholdCount: null, discountRate: null })
 
+// 團購階層：編輯既有階層
+const editingTierId = ref(null)
+const tierEditForm = reactive({ tierLevel: '', thresholdCount: null, discountRate: null })
+const startEditTier = (t) => {
+  editingTierId.value = t.groupDiscountStandardId
+  tierEditForm.tierLevel = t.tierLevel
+  tierEditForm.thresholdCount = t.thresholdCount
+  tierEditForm.discountRate = t.discountRate
+}
+const cancelEditTier = () => {
+  editingTierId.value = null
+}
+const saveTierEdit = async (t) => {
+  if (!tierEditForm.tierLevel || !tierEditForm.thresholdCount || tierEditForm.discountRate == null) {
+    alert('請完整填寫階層名稱、門檻件數與折扣')
+    return
+  }
+  await updateTier(t.groupDiscountStandardId, { ...tierEditForm })
+  Object.assign(t, { ...tierEditForm })
+  editingTierId.value = null
+}
+
+// 商品規格（尺寸/顏色）
+const specs = ref([])
+const newSpec = reactive({ size: '', color: '' })
+const loadSpecs = async (productId) => {
+  specs.value = await getSpecifications(productId)
+}
+const handleAddSpec = async () => {
+  if (!newSpec.size.trim() || !newSpec.color.trim()) {
+    alert('請完整填寫尺寸與顏色')
+    return
+  }
+  const saved = await addSpecification(editingId.value, { ...newSpec })
+  specs.value.push(saved)
+  newSpec.size = ''
+  newSpec.color = ''
+}
+const handleDeleteSpec = async (s) => {
+  if (!confirm('確定要刪除這個規格嗎？')) return
+  try {
+    await deleteSpecification(s.groupProductSpecificationId)
+    specs.value = specs.value.filter(x => x.groupProductSpecificationId !== s.groupProductSpecificationId)
+  } catch (err) {
+    alert(err.response?.data || '這個規格已經被購物車或訂單使用過，不能刪除')
+  }
+}
+
 const openCreateModal = () => {
   editingId.value = null
   resetForm()
   tiers.value = []
+  specs.value = []
+  editingTierId.value = null
   pickedProductName.value = ''
   showModal.value = true
 }
 
-// ---- 從產品選擇（目前用假資料，等後端有「查詢產品列表」的 API 後，把 mockProductList 換成 API 呼叫即可） ----
-const mockProductList = ref([
-  { id: 'P001', name: '黑色棉質圓領 T 恤', imageUrl: 'https://placehold.co/100x100?text=T-Shirt', price: 390 },
-  { id: 'P002', name: '刷色直筒牛仔褲', imageUrl: 'https://placehold.co/100x100?text=Jeans', price: 890 },
-  { id: 'P003', name: '碎花洋裝', imageUrl: 'https://placehold.co/100x100?text=Dress', price: 690 },
-  { id: 'P004', name: '針織開襟外套', imageUrl: 'https://placehold.co/100x100?text=Cardigan', price: 750 },
-  { id: 'P005', name: '百褶中長裙', imageUrl: 'https://placehold.co/100x100?text=Skirt', price: 590 }
-])
+// ---- 從產品選擇：向一般商店的 Shop/ProductController 查真正的產品清單 ----
+// 商品圖片欄位是 productImgFile（只有檔名，例如 abc.jpg），
+// 一般商店頁面組網址的方式是 `${API_BASE}/images/product/${檔名}`，
+// 跟團購自己商品的 resolveImageUrl（已經是完整相對路徑）不一樣，這裡先組好路徑再交給 resolveImageUrl 補上網域
+const pickProductList = ref([])
+const pickProductLoading = ref(false)
+const pickProductLoaded = ref(false) // 只在第一次打開 Modal 時打 API，之後重複開啟不用重複查詢
 
 const showPickProductModal = ref(false)
 const pickProductQuery = ref('')
 const pickedProductName = ref('')
 
-const filteredMockProducts = computed(() => {
+const filteredPickProducts = computed(() => {
   const q = pickProductQuery.value.trim().toLowerCase()
-  if (!q) return mockProductList.value
-  return mockProductList.value.filter(p => p.name.toLowerCase().includes(q))
+  if (!q) return pickProductList.value
+  return pickProductList.value.filter(p => p.name.toLowerCase().includes(q))
 })
 
-const openPickProductModal = () => {
+const openPickProductModal = async () => {
   pickProductQuery.value = ''
   showPickProductModal.value = true
+
+  if (pickProductLoaded.value) return
+
+  pickProductLoading.value = true
+  try {
+    const rows = await getShopProducts()
+    pickProductList.value = rows.map(p => ({
+      id: p.productId,
+      name: p.productName,
+      price: p.price,
+      imageUrl: p.productImgFile ? `/images/product/${p.productImgFile}` : ''
+    }))
+    pickProductLoaded.value = true
+  } catch (err) {
+    alert('查詢產品清單失敗，請稍後再試')
+  } finally {
+    pickProductLoading.value = false
+  }
 }
 
 // 選定產品後自動帶入名稱、圖片與售價，帶入後使用者仍可在表單裡手動修改
@@ -661,6 +786,8 @@ const openEditModal = async (p) => {
   form.description = detail.description
 
   tiers.value = await getTiers(p.id)
+  editingTierId.value = null
+  await loadSpecs(p.id)
   showModal.value = true
 }
 
@@ -683,8 +810,9 @@ const handleSave = async () => {
   await loadProducts()
 
   if (isCreating) {
-    // 新增商品：不關閉視窗，留在原地讓使用者接著設定團購階層
+    // 新增商品：不關閉視窗，留在原地讓使用者接著設定團購階層與規格
     tiers.value = await getTiers(editingId.value)
+    await loadSpecs(editingId.value)
   } else {
     // 編輯既有商品：儲存後直接關閉視窗
     showModal.value = false
