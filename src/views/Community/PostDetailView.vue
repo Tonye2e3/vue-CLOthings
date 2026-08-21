@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 // useRoute：Vue Router 提供的功能，讓我們可以在 <script> 裡面讀到「目前網址」的資訊，
 // 例如網址上帶的動態參數。router/index.js 裡這個頁面對應的路由是
 // path: '/community/post/:id'，所以網址上 :id 那一段的值，
@@ -93,10 +93,47 @@ const currentImageIndex = ref(0)
 const prevImage = () => {
   const len = post.value.images.length
   currentImageIndex.value = (currentImageIndex.value - 1 + len) % len
+  restartAutoplay() // 使用者自己手動切過圖了，計時器重新算，不然可能手動切完馬上又被自動播放跳走
 }
 const nextImage = () => {
   const len = post.value.images.length
   currentImageIndex.value = (currentImageIndex.value + 1) % len
+  restartAutoplay()
+}
+
+// ============================================================
+// 主圖自動輪播：不用一直手動點箭頭，超過 1 張照片時會每隔幾秒自動切下一張。
+// ============================================================
+
+const AUTOPLAY_INTERVAL = 4000 // 每 4 秒切一張
+let autoplayTimer = null
+
+// stopAutoplay：把目前的計時器停掉並清乾淨。每次要重新啟動之前都要先呼叫這個，
+// 不然舊的計時器沒清掉、又設了一個新的，會變成同時有兩個計時器同時在跑，
+// 圖片會跳得比預期快兩倍。
+const stopAutoplay = () => {
+  if (autoplayTimer) {
+    clearInterval(autoplayTimer)
+    autoplayTimer = null
+  }
+}
+
+// startAutoplay：只有超過 1 張照片時才需要自動播放（只有 1 張的話，
+// 切來切去都是同一張，設計時器只是白白浪費資源）。
+const startAutoplay = () => {
+  stopAutoplay()
+  if (post.value.images.length <= 1) return
+  autoplayTimer = setInterval(() => {
+    const len = post.value.images.length
+    currentImageIndex.value = (currentImageIndex.value + 1) % len
+  }, AUTOPLAY_INTERVAL)
+}
+
+// restartAutoplay：使用者自己按了箭頭或點了圓點手動切圖時呼叫，
+// 把計時器重新算一次——不然使用者才剛手動切到某一張，計時器可能下一秒就到了，
+// 畫面又自動跳走，體感上會覺得「我明明剛剛才選了這張」。
+const restartAutoplay = () => {
+  startAutoplay()
 }
 
 const fetchPost = async () => {
@@ -145,6 +182,10 @@ const fetchPost = async () => {
     // ?? 0：如果 p.likesCount 是 undefined 或 null，就用 0 代替，
     // 避免後端這個欄位漏帶或叫別的名字時，讓 likesNumber 變成 undefined 把整頁弄壞。
     likesNumber.value = p.likesCount ?? 0
+
+    // 圖片資料确定載入完成、真的知道這篇貼文有幾張圖之後，才能開始自動輪播——
+    // 不能提早在 fetchPost 呼叫之前就開始，那時候 post.value.images 還是預設的假資料。
+    startAutoplay()
 
     // fetchFollowStatus 要用到 post.value.userId，一定要等上面 post.value 設定完才能呼叫，
     // 不能跟 fetchPost() 平行呼叫（那樣 userId 還是初始值 null，會查到錯的人）。
@@ -200,10 +241,17 @@ watch(() => route.params.id, () => {
   newComment.value = '' // 清空還沒送出的留言草稿，避免帶到別篇貼文底下去
   replyingTo.value = null // 取消原本在回覆的狀態，避免對新貼文的留言用到舊貼文的 parentCommentId
   currentImageIndex.value = 0 // 換到新貼文時輪播歸零，從第一張開始顯示
+  stopAutoplay() // 換貼文了，先把舊貼文的自動輪播計時器停掉，fetchPost 拿到新資料後會重新啟動
   fetchPost()
   fetchComments()
   fetchLikeStatus()
   fetchSimilarPosts()
+})
+
+// onUnmounted：離開這個頁面時，把自動輪播的計時器停掉，
+// 不然使用者已經離開頁面了，計時器還留在背景繼續跑，是不必要的資源浪費。
+onUnmounted(() => {
+  stopAutoplay()
 })
 
 // formatTimeAgo：把一個 ISO 時間字串，轉換成「N 小時前」這種給人看的相對時間文字。
@@ -618,7 +666,10 @@ const addComment = async () => {
 
             <!-- 主圖：改成可以左右切換的輪播，顯示 CreatePostView.vue 上傳時選的每一張照片，
                  不再固定只顯示第一張。currentImageIndex 記錄現在顯示第幾張（從 0 開始）。 -->
-            <div class="post-media">
+            <!-- @mouseenter/@mouseleave：滑鼠移到主圖上面時暫停自動輪播，方便使用者
+                 好好看清楚正在顯示的這張圖，不會看到一半突然自動跳到下一張；
+                 滑鼠移開再恢復自動播放。 -->
+            <div class="post-media" @mouseenter="stopAutoplay" @mouseleave="startAutoplay">
               <span class="tag-label" v-if="post.taggedProducts[0]">封面故事</span>
               <img :src="post.images[currentImageIndex]?.url" class="post-image" alt="post image" />
 
@@ -648,7 +699,7 @@ const addComment = async () => {
                     :key="idx"
                     class="media-dot"
                     :class="{ active: idx === currentImageIndex }"
-                    @click="currentImageIndex = idx"
+                    @click="currentImageIndex = idx; restartAutoplay()"
                   ></button>
                 </div>
               </template>
@@ -661,7 +712,7 @@ const addComment = async () => {
                 :key="idx"
                 class="post-thumb-item"
                 :class="{ active: idx === currentImageIndex }"
-                @click="currentImageIndex = idx"
+                @click="currentImageIndex = idx; restartAutoplay()"
               >
                 <img :src="img.url" alt="縮圖" />
               </button>

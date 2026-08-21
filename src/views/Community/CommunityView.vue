@@ -475,6 +475,47 @@ const nextCardImage = (post) => {
   cardImageIndex[post.communityPostId] = (cur + 1) % len
 }
 
+// ============================================================
+// 滑鼠移上去才自動輪播（預覽用）：跟 PostDetailView.vue 主圖那種「進頁面就自動一直播」
+// 不一樣，這裡是一個上面同時會出現很多張卡片的動態牆，如果每張卡片自己就自動一直輪播，
+// 畫面會變得很雜亂。改成只有滑鼠正在看的那張卡片才會動，移開就停下來、
+// 回到第一張（封面圖）——跟很多購物網站「滑過商品圖預覽其他角度」的邏輯一樣。
+// ============================================================
+
+// cardAutoplayTimers：目前正在自動播放的網格卡片，用 Map 記錄「哪篇貼文對應哪個計時器」，
+// 因為同時可能有好幾張卡片被滑過，需要各自獨立的計時器（不能只用一個共用的）。
+const cardAutoplayTimers = new Map()
+const CARD_AUTOPLAY_INTERVAL = 1200
+
+const startCardAutoplay = (post) => {
+  if (post.images.length <= 1) return
+  const timer = setInterval(() => nextCardImage(post), CARD_AUTOPLAY_INTERVAL)
+  cardAutoplayTimers.set(post.communityPostId, timer)
+}
+const stopCardAutoplay = (post) => {
+  const timer = cardAutoplayTimers.get(post.communityPostId)
+  if (timer) {
+    clearInterval(timer)
+    cardAutoplayTimers.delete(post.communityPostId)
+  }
+  // 滑鼠移開後歸零，回到封面圖（第一張），不要停在滑到一半的那張。
+  cardImageIndex[post.communityPostId] = 0
+}
+
+// 封面故事卡只有單獨一張，邏輯一樣但不用像網格卡片那樣用 Map 記，單一個計時器變數就夠了。
+let featureAutoplayTimer = null
+const startFeatureAutoplay = () => {
+  if (!featurePost.value || featurePost.value.images.length <= 1) return
+  featureAutoplayTimer = setInterval(nextFeatureImage, CARD_AUTOPLAY_INTERVAL)
+}
+const stopFeatureAutoplay = () => {
+  if (featureAutoplayTimer) {
+    clearInterval(featureAutoplayTimer)
+    featureAutoplayTimer = null
+  }
+  featureImageIndex.value = 0
+}
+
 // gridPosts：如果正在搜尋，網格就顯示全部搜尋結果；
 // 如果沒有搜尋，網格就顯示「除了第一篇以外」的其他貼文
 // （.slice(1) 的意思是「從陣列的第 1 筆開始，取到最後」，等於跳過第 0 筆）。
@@ -591,10 +632,14 @@ watch(featureCardEl, (el) => {
   getCardObserver().observe(el)
 })
 
-// onUnmounted：離開這個頁面時，把 IntersectionObserver 停掉，
-// 不然使用者離開頁面後，這個觀察器還留在記憶體裡繼續運作，是不必要的資源浪費。
+// onUnmounted：離開這個頁面時，把 IntersectionObserver 跟所有還在跑的卡片自動輪播
+// 計時器都停掉，不然使用者離開頁面後，這些觀察器／計時器還留在記憶體裡繼續運作，
+// 是不必要的資源浪費。
 onUnmounted(() => {
   if (cardObserver) cardObserver.disconnect()
+  cardAutoplayTimers.forEach(timer => clearInterval(timer))
+  cardAutoplayTimers.clear()
+  if (featureAutoplayTimer) clearInterval(featureAutoplayTimer)
 })
 
 // 點擊追蹤按鈕時呼叫：把該達人的 isFollowing 改成相反的值。
@@ -747,7 +792,7 @@ const toggleFollow = async (creator) => {
               改成：router-link 只包住圖片本身（點圖片才會跳轉到貼文詳情），
               箭頭、圓點則是跟 router-link 平級的兄弟元素，點下去不會觸發跳轉。
             -->
-            <div class="feature-media">
+            <div class="feature-media" @mouseenter="startFeatureAutoplay" @mouseleave="stopFeatureAutoplay">
               <router-link :to="`/community/post/${featurePost.communityPostId}`" class="feature-media-link d-block text-decoration-none">
                 <span class="tag-label">{{ currentTabCopy.ribbon }}</span>
                 <img :src="featurePost.images[featureImageIndex]?.url" :alt="featurePost.content" />
@@ -839,7 +884,7 @@ const toggleFollow = async (creator) => {
                 router-link 只包住圖片，箭頭／圓點是平級的兄弟元素，
                 點箭頭切換照片才不會被當成「點到卡片」一起跳轉到貼文詳情。
               -->
-              <div class="post-media">
+              <div class="post-media" @mouseenter="startCardAutoplay(post)" @mouseleave="stopCardAutoplay(post)">
                 <router-link :to="`/community/post/${post.communityPostId}`" class="post-media-link d-block text-decoration-none">
                   <span class="tag-label" v-if="post.taggedProducts && post.taggedProducts[0]">
                     {{ post.taggedProducts[0].name }}
