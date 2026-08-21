@@ -761,11 +761,28 @@ const addComment = async () => {
                   -->
                   <div v-if="showShareMenu" class="share-menu-backdrop" @click="closeShareMenu"></div>
                   <div v-if="showShareMenu" class="share-menu">
+                    <!--
+                      這兩顆原本用 Font Awesome 的 fa-share-nodes、fa-link，這次也一起換成
+                      SVG——跟其他檔案陸續脫離 Font Awesome 是同一個理由（不吃字型／CDN，
+                      不用擔心某些網路環境擋掉外部字型 CDN 導致圖示變成空白方框），
+                      現在整個 Community 已經沒有任何地方在用 Font Awesome 了。
+                    -->
                     <button v-if="canNativeShare" type="button" class="share-menu-item" @click="nativeShare">
-                      <i class="fa-solid fa-share-nodes"></i> 系統分享
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="18" cy="5" r="3" />
+                        <circle cx="6" cy="12" r="3" />
+                        <circle cx="18" cy="19" r="3" />
+                        <path d="M8.6 13.5l6.8 4" />
+                        <path d="M15.4 6.5l-6.8 4" />
+                      </svg>
+                      系統分享
                     </button>
                     <button type="button" class="share-menu-item" @click="copyLink">
-                      <i class="fa-solid fa-link"></i> {{ linkCopied ? '已複製！' : '複製連結' }}
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                      </svg>
+                      {{ linkCopied ? '已複製！' : '複製連結' }}
                     </button>
                     <button type="button" class="share-menu-item" @click="shareToLine">
                       <IconLine /> 分享到 LINE
@@ -781,16 +798,14 @@ const addComment = async () => {
                 @click="toggleSave"：呼叫上面 script 定義的 toggleSave 函式，
                 這個函式會去更新「共用的收藏清單」，而不是只改這個頁面自己的一個變數，
                 這樣 UserProfileView.vue 的收藏頁籤才看得到剛剛收藏的貼文。
-                :class="{ saved: isSaved }" 跟 <i> 裡的 isSaved，
-                都是讀上面那個 computed，會自動反映「這篇貼文現在是不是在收藏清單裡」。
-                <i :class="['fa-bookmark', isSaved ? 'fa-solid' : 'fa-regular']">：
-                這裡的 :class 綁定的是一個「陣列」，陣列裡每一項都會變成一個 class。
-                'fa-bookmark' 固定會加上；第二項用三元運算子決定，
-                如果已收藏，用實心的 fa-solid 樣式圖示；還沒收藏，用空心的 fa-regular 樣式圖示，
-                點一下就能明顯看到書籤圖示「被收起來」的視覺變化。
+                書籤圖示原本是 Font Awesome 的 fa-bookmark（依 isSaved 切換 fa-solid／
+                fa-regular），一起換成 SVG，用 :fill 動態切換實心／空心，
+                跟按讚愛心「已讚=實心」是同一套做法。
               -->
               <button class="action-btn" :class="{ saved: isSaved }" @click="toggleSave">
-                <i :class="['fa-bookmark', isSaved ? 'fa-solid' : 'fa-regular']"></i>
+                <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" :fill="isSaved ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                </svg>
                 {{ isSaved ? '已收藏' : '收藏' }}
               </button>
             </div>
@@ -940,7 +955,6 @@ const addComment = async () => {
 </template>
 
 <style scoped>
-@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
 .community-page {
   width: 100%;
   min-height: 100vh;
@@ -1118,10 +1132,8 @@ const addComment = async () => {
   transition:background .15s ease;
 }
 .share-menu-item:hover{ background:var(--cream); }
-.share-menu-item i{ width:16px; text-align:center; color:var(--ink-soft); }
-/* IconFacebook、IconLine 這兩個元件畫出來的是 <svg>，不是 <i>，套用同一套尺寸／顏色設定，
-   跟旁邊 fa-solid 的 <i> 圖示（系統分享、複製連結）對齊、看起來風格一致。
-   currentColor：SVG 元件內部用 fill="currentColor"，顏色會直接跟著這裡設定的 color 走。 */
+/* 系統分享、複製連結、LINE、Facebook 現在全部都是 SVG（沒有任何 <i> 圖示了），
+   統一用同一條規則控制尺寸／顏色，currentColor 會直接跟著這裡設定的 color 走。 */
 .share-menu-item svg{ width:16px; height:16px; flex-shrink:0; color:var(--ink-soft); }
 
 /* ---------- 內文 ---------- */
