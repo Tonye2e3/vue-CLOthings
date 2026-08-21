@@ -814,22 +814,23 @@ const addComment = async () => {
             <p class="post-content">{{ post.content }}</p>
 
             <!--
-              標記商品：原本是浮在照片上的定位標籤，現在改成貼文下方的一排標籤。
-              v-if="post.taggedProducts.length"：陣列裡有東西才顯示這一整塊。
-              這裡先用 <span> 不用 <a>：因為現在是要給老師看前台畫面，
-              productRoute 目前只是假的路徑（例如 /shop/product/101），
-              真的點下去會導到不存在的頁面，demo 階段先不要讓它跳轉，
-              只保留視覺樣式（看起來像標籤）。之後商城的商品頁做好、
-              productRoute 是真的網址時，把 <span> 換回 <a :href="tag.productRoute">就可以了。
+              標記商品：點下去會跳到社群首頁，並帶上 ?tag=商品名稱 這個查詢字串，
+              CommunityView.vue 那邊已經改成會讀這個查詢字串、自動塞進搜尋框，
+              等於「幫使用者按下這個商品名稱去搜尋」，畫面上就會看到其他標記過同一件
+              商品的貼文——跟右側欄「熱門商品標籤」點下去的效果是同一套邏輯。
+              之前先用 <span>（不能點）是因為那時候想接的是「商品頁」，但 productRoute
+              還是假資料；現在改成連到「相關貼文」，不需要真的商品頁網址，
+              所以可以先做。
             -->
             <div class="tagged-products" v-if="post.taggedProducts.length">
               <span class="tagged-label">標記商品</span>
               <div class="tag-cloud">
-                <span
+                <router-link
                   v-for="tag in post.taggedProducts"
                   :key="tag.postTaggedProductId"
+                  :to="`/community?tag=${encodeURIComponent(tag.name)}`"
                   class="tag-chip"
-                >#{{ tag.name }}</span>
+                >#{{ tag.name }}</router-link>
               </div>
             </div>
 

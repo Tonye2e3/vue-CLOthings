@@ -200,9 +200,14 @@ export const toggleSavePost = async (post) => {
 // 這裡開始是這個頁面「自己專屬」的邏輯，不會被其他檔案拿去用
 // ============================================================
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+// useRoute：讀網址上的查詢字串（例如從 PostDetailView.vue 點某個標記商品的標籤
+// 跳過來時，網址會帶 ?tag=商品名稱），讓這個頁面一打開就自動用那個商品名稱篩選貼文。
+import { useRoute } from 'vue-router'
 // animate：anime.js v4 的動畫函式。這裡用來做貼文卡片的捲動進場動畫——
 // 卡片捲動到看得見的範圍內才淡入＋往上滑一點點，不是一渲染出來就播。
 import { animate } from 'animejs'
+
+const route = useRoute()
 
 // authStore：只用來讀 isAdmin，決定要不要顯示「管理後台」入口按鈕。
 // useAuthStore 已經在上面那個 <script>（非 setup）區塊 import 過了，這裡直接呼叫就好。
@@ -403,7 +408,16 @@ const tabPosts = computed(() => {
 
 // 搜尋（可搜尋貼文標題、標籤商品、用戶名），在目前分頁的結果之上再過濾一次
 // searchQuery：使用者在搜尋框打的文字，會透過 v-model 自動雙向同步（下面 template 會看到）。
-const searchQuery = ref('')
+const searchQuery = ref(route.query.tag || '')
+
+// 從 PostDetailView.vue 點某個標記商品的標籤跳過來時，網址是 /community?tag=商品名稱，
+// 上面已經在宣告 searchQuery 的當下讀了一次網址的初始值；但如果使用者本來就已經在
+// 社群首頁，又點了另一篇貼文裡不同商品的標籤，Vue Router 會直接重用同一個元件
+// （不會整個重新整理、重新掛載），上面那個初始值只會套用一次，之後網址查詢字串
+// 再怎麼變都不會自動反映。這裡另外監看 route.query.tag，之後變了就同步更新搜尋框。
+watch(() => route.query.tag, (newTag) => {
+  if (newTag) searchQuery.value = newTag
+})
 
 const filteredPosts = computed(() => {
   // .trim()：把文字前後多餘的空白刪掉。
