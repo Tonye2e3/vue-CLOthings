@@ -7,10 +7,10 @@
   </div>
 
   <div class="mb-3 d-flex gap-2">
-    <button type="button" class="btn btn-outline-secondary" @click="openShipperManageModal">
+    <button type="button" class="btn btn-outline-secondary go-btn-tap" @click="openShipperManageModal">
       物流商管理
     </button>
-    <button type="button" class="btn btn-outline-secondary" @click="openServiceListModal">
+    <button type="button" class="btn btn-outline-secondary go-btn-tap" @click="openServiceListModal">
       客服紀錄查詢
     </button>
   </div>
@@ -33,7 +33,7 @@
     />
   </div>
 
-  <div class="card mb-4">
+  <div class="card mb-4 go-fade-in-up">
     <div class="card-header d-flex justify-content-between align-items-center">
       <span class="fw-semibold">訂單列表</span>
       <span>共 {{ filteredOrders.length }} 筆</span>
@@ -61,13 +61,19 @@
             <th></th>
           </tr>
         </thead>
-        <tbody>
+        <!-- 載入中：顯示骨架屏列 -->
+        <tbody v-if="isLoading">
+          <tr v-for="n in 4" :key="n">
+            <td colspan="9"><div class="go-skeleton" style="height: 18px; width: 100%;"></div></td>
+          </tr>
+        </tbody>
+        <tbody v-else>
           <tr v-if="pagedOrders.length === 0">
             <td colspan="9" class="text-center text-muted py-4">
               {{ searchQuery ? '找不到符合搜尋條件的訂單' : '目前尚無訂單資料' }}
             </td>
           </tr>
-          <tr v-for="o in pagedOrders" :key="o.groupOrderId">
+          <tr v-for="o in pagedOrders" :key="o.groupOrderId" class="go-row-hover">
             <td class="fw-bold">#{{ o.groupOrderId }}</td>
             <td>{{ o.userId }}</td>
             <td>{{ o.productName }}</td>
@@ -79,10 +85,10 @@
             <td>{{ o.shipName }}</td>
             <td>{{ o.shipperName || '未指派' }}</td>
             <td class="text-end">
-              <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="openStatusModal(o)">
+              <button type="button" class="btn btn-sm btn-outline-primary me-1 go-btn-tap" @click="openStatusModal(o)">
                 改狀態
               </button>
-              <button type="button" class="btn btn-sm btn-outline-secondary" @click="openShipperModal(o)">
+              <button type="button" class="btn btn-sm btn-outline-secondary go-btn-tap" @click="openShipperModal(o)">
                 指派物流
               </button>
             </td>
@@ -95,7 +101,7 @@
       <nav>
         <ul class="pagination pagination-sm mb-0">
           <li class="page-item" :class="{ disabled: currentPage === 1 }">
-            <button type="button" class="page-link" @click="goToPage(currentPage - 1)">上一頁</button>
+            <button type="button" class="page-link go-btn-tap" @click="goToPage(currentPage - 1)">上一頁</button>
           </li>
           <li
             v-for="n in totalPages"
@@ -103,10 +109,10 @@
             class="page-item"
             :class="{ active: n === currentPage }"
           >
-            <button type="button" class="page-link" @click="goToPage(n)">{{ n }}</button>
+            <button type="button" class="page-link go-btn-tap" @click="goToPage(n)">{{ n }}</button>
           </li>
           <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-            <button type="button" class="page-link" @click="goToPage(currentPage + 1)">下一頁</button>
+            <button type="button" class="page-link go-btn-tap" @click="goToPage(currentPage + 1)">下一頁</button>
           </li>
         </ul>
       </nav>
@@ -114,19 +120,22 @@
   </div>
 
   <!-- 更新狀態 Modal（直接寫死的 Bootstrap Modal，不依賴額外元件） -->
-  <div v-if="showStatusModal" class="modal-backdrop fade show"></div>
-  <div
-    v-if="showStatusModal"
-    class="modal fade show d-block"
-    tabindex="-1"
-    role="dialog"
-    aria-modal="true"
-  >
+  <Transition name="go-fade">
+    <div v-if="showStatusModal" class="modal-backdrop fade show"></div>
+  </Transition>
+  <Transition name="go-pop">
+    <div
+      v-if="showStatusModal"
+      class="modal fade show d-block"
+      tabindex="-1"
+      role="dialog"
+      aria-modal="true"
+    >
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title fw-bold mb-0">更新訂單狀態 #{{ activeOrder?.groupOrderId }}</h5>
-          <button type="button" class="btn-close" aria-label="Close" @click="showStatusModal = false"></button>
+          <button type="button" class="btn-close go-icon-tap" aria-label="Close" @click="showStatusModal = false"></button>
         </div>
         <div class="modal-body">
           <div class="mb-3">
@@ -140,27 +149,34 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="showStatusModal = false">取消</button>
-          <button type="button" class="btn btn-primary" @click="handleSaveStatus">儲存</button>
+          <button type="button" class="btn btn-secondary go-btn-tap" @click="showStatusModal = false">取消</button>
+          <button type="button" class="btn btn-primary go-btn-tap" :disabled="isSavingStatus" @click="handleSaveStatus">
+            <span v-if="isSavingStatus" class="go-spinner me-2"></span>
+            儲存
+          </button>
         </div>
       </div>
     </div>
-  </div>
+    </div>
+  </Transition>
 
   <!-- 指派物流 Modal（直接寫死的 Bootstrap Modal，不依賴額外元件） -->
-  <div v-if="showShipperModal" class="modal-backdrop fade show"></div>
-  <div
-    v-if="showShipperModal"
-    class="modal fade show d-block"
-    tabindex="-1"
-    role="dialog"
-    aria-modal="true"
-  >
+  <Transition name="go-fade">
+    <div v-if="showShipperModal" class="modal-backdrop fade show"></div>
+  </Transition>
+  <Transition name="go-pop">
+    <div
+      v-if="showShipperModal"
+      class="modal fade show d-block"
+      tabindex="-1"
+      role="dialog"
+      aria-modal="true"
+    >
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title fw-bold mb-0">指派物流 #{{ activeOrder?.groupOrderId }}</h5>
-          <button type="button" class="btn-close" aria-label="Close" @click="showShipperModal = false"></button>
+          <button type="button" class="btn-close go-icon-tap" aria-label="Close" @click="showShipperModal = false"></button>
         </div>
         <div class="modal-body">
           <div class="mb-3">
@@ -174,34 +190,41 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="showShipperModal = false">取消</button>
-          <button type="button" class="btn btn-primary" @click="handleSaveShipper">儲存</button>
+          <button type="button" class="btn btn-secondary go-btn-tap" @click="showShipperModal = false">取消</button>
+          <button type="button" class="btn btn-primary go-btn-tap" :disabled="isSavingShipper" @click="handleSaveShipper">
+            <span v-if="isSavingShipper" class="go-spinner me-2"></span>
+            儲存
+          </button>
         </div>
       </div>
     </div>
-  </div>
+    </div>
+  </Transition>
 
   <!-- ============ 物流商管理 Modal ============ -->
-  <div v-if="showShipperManageModal" class="modal-backdrop fade show"></div>
-  <div
-    v-if="showShipperManageModal"
-    class="modal fade show d-block"
-    tabindex="-1"
-    role="dialog"
-    aria-modal="true"
-  >
+  <Transition name="go-fade">
+    <div v-if="showShipperManageModal" class="modal-backdrop fade show"></div>
+  </Transition>
+  <Transition name="go-pop">
+    <div
+      v-if="showShipperManageModal"
+      class="modal fade show d-block"
+      tabindex="-1"
+      role="dialog"
+      aria-modal="true"
+    >
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title fw-bold mb-0">物流商管理</h5>
-          <button type="button" class="btn-close" aria-label="Close" @click="showShipperManageModal = false"></button>
+          <button type="button" class="btn-close go-icon-tap" aria-label="Close" @click="showShipperManageModal = false"></button>
         </div>
         <div class="modal-body">
           <ul class="list-group mb-2">
             <li
               v-for="s in shippers"
               :key="s.groupShipperId"
-              class="list-group-item d-flex justify-content-between align-items-center"
+              class="list-group-item d-flex justify-content-between align-items-center go-row-hover"
             >
               <template v-if="editingShipperId === s.groupShipperId">
                 <div class="flex-grow-1 me-2">
@@ -210,8 +233,8 @@
                   <input type="text" class="form-control form-control-sm" placeholder="地址" v-model="shipperEditForm.address" />
                 </div>
                 <div class="d-flex flex-column gap-1">
-                  <button type="button" class="btn btn-sm btn-primary" @click="saveShipperEdit(s)">存</button>
-                  <button type="button" class="btn btn-sm btn-secondary" @click="editingShipperId = null">取消</button>
+                  <button type="button" class="btn btn-sm btn-primary go-btn-tap" @click="saveShipperEdit(s)">存</button>
+                  <button type="button" class="btn btn-sm btn-secondary go-btn-tap" @click="editingShipperId = null">取消</button>
                 </div>
               </template>
               <template v-else>
@@ -220,8 +243,8 @@
                   <div class="text-muted small">{{ s.email }}｜{{ s.address }}</div>
                 </div>
                 <div class="d-flex gap-1">
-                  <button type="button" class="btn btn-sm btn-outline-secondary" @click="startEditShipper(s)">編輯</button>
-                  <button type="button" class="btn btn-sm btn-outline-danger" @click="handleDeleteShipper(s)">刪除</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary go-btn-tap" @click="startEditShipper(s)">編輯</button>
+                  <button type="button" class="btn btn-sm btn-outline-danger go-btn-tap" @click="handleDeleteShipper(s)">刪除</button>
                 </div>
               </template>
             </li>
@@ -243,29 +266,33 @@
               <input type="text" class="form-control form-control-sm" placeholder="地址" v-model="newShipperForm.address" />
             </div>
           </div>
-          <button type="button" class="btn btn-outline-primary btn-sm mt-2" @click="handleCreateShipper">新增</button>
+          <button type="button" class="btn btn-outline-primary btn-sm mt-2 go-btn-tap" @click="handleCreateShipper">新增</button>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="showShipperManageModal = false">關閉</button>
+          <button type="button" class="btn btn-secondary go-btn-tap" @click="showShipperManageModal = false">關閉</button>
         </div>
       </div>
     </div>
-  </div>
+    </div>
+  </Transition>
 
   <!-- ============ 客服紀錄查詢 Modal ============ -->
-  <div v-if="showServiceListModal" class="modal-backdrop fade show"></div>
-  <div
-    v-if="showServiceListModal"
-    class="modal fade show d-block"
-    tabindex="-1"
-    role="dialog"
-    aria-modal="true"
-  >
+  <Transition name="go-fade">
+    <div v-if="showServiceListModal" class="modal-backdrop fade show"></div>
+  </Transition>
+  <Transition name="go-pop">
+    <div
+      v-if="showServiceListModal"
+      class="modal fade show d-block"
+      tabindex="-1"
+      role="dialog"
+      aria-modal="true"
+    >
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title fw-bold mb-0">客服紀錄查詢</h5>
-          <button type="button" class="btn-close" aria-label="Close" @click="showServiceListModal = false"></button>
+          <button type="button" class="btn-close go-icon-tap" aria-label="Close" @click="showServiceListModal = false"></button>
         </div>
         <div class="modal-body">
           <table class="table table-sm align-middle mb-0">
@@ -281,7 +308,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="r in allServiceRecords" :key="r.groupCustomerServiceId">
+              <tr v-for="r in allServiceRecords" :key="r.groupCustomerServiceId" class="go-row-hover">
                 <td>#{{ r.groupOrderId }}</td>
                 <td>{{ r.name }}</td>
                 <td>{{ r.email }}｜{{ r.phone }}</td>
@@ -295,7 +322,7 @@
                   <span v-else class="text-muted small">尚未回覆</span>
                 </td>
                 <td>
-                  <button type="button" class="btn btn-sm btn-outline-primary" @click="openReplyModal(r)">
+                  <button type="button" class="btn btn-sm btn-outline-primary go-btn-tap" @click="openReplyModal(r)">
                     {{ r.replyContent ? '編輯回覆' : '回覆' }}
                   </button>
                 </td>
@@ -307,26 +334,30 @@
           </table>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="showServiceListModal = false">關閉</button>
+          <button type="button" class="btn btn-secondary go-btn-tap" @click="showServiceListModal = false">關閉</button>
         </div>
       </div>
     </div>
-  </div>
+    </div>
+  </Transition>
 
   <!-- ============ 回覆客服 Modal ============ -->
-  <div v-if="showReplyModal" class="modal-backdrop fade show"></div>
-  <div
-    v-if="showReplyModal"
-    class="modal fade show d-block"
-    tabindex="-1"
-    role="dialog"
-    aria-modal="true"
-  >
+  <Transition name="go-fade">
+    <div v-if="showReplyModal" class="modal-backdrop fade show"></div>
+  </Transition>
+  <Transition name="go-pop">
+    <div
+      v-if="showReplyModal"
+      class="modal fade show d-block"
+      tabindex="-1"
+      role="dialog"
+      aria-modal="true"
+    >
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title fw-bold mb-0">回覆客服：{{ replyTarget?.title }}</h5>
-          <button type="button" class="btn-close" aria-label="Close" @click="showReplyModal = false"></button>
+          <button type="button" class="btn-close go-icon-tap" aria-label="Close" @click="showReplyModal = false"></button>
         </div>
         <div class="modal-body">
           <p class="text-muted small mb-2">買家提問：{{ replyTarget?.content }}</p>
@@ -336,12 +367,16 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="showReplyModal = false">取消</button>
-          <button type="button" class="btn btn-primary" @click="handleSendReply">送出回覆</button>
+          <button type="button" class="btn btn-secondary go-btn-tap" @click="showReplyModal = false">取消</button>
+          <button type="button" class="btn btn-primary go-btn-tap" :disabled="isSendingReply" @click="handleSendReply">
+            <span v-if="isSendingReply" class="go-spinner me-2"></span>
+            送出回覆
+          </button>
         </div>
       </div>
     </div>
-  </div>
+    </div>
+  </Transition>
 </template>
 
 <script setup>
@@ -361,9 +396,16 @@ import {
 const orders = ref([])
 const shippers = ref([])
 const statusFilter = ref('')
+// 訂單列表是否還在載入中：true 時表格顯示骨架屏列
+const isLoading = ref(true)
 
 const loadOrders = async () => {
-  orders.value = await getAllOrders(statusFilter.value)
+  isLoading.value = true
+  try {
+    orders.value = await getAllOrders(statusFilter.value)
+  } finally {
+    isLoading.value = false
+  }
 }
 
 onMounted(async () => {
@@ -430,17 +472,25 @@ const openReplyModal = (record) => {
   showReplyModal.value = true
 }
 
+// 送出回覆是否處理中：true 時「送出回覆」按鈕顯示 spinner
+const isSendingReply = ref(false)
+
 const handleSendReply = async () => {
   if (!replyContent.value.trim()) {
     alert('請填寫回覆內容')
     return
   }
-  const updated = await replyCustomerService(replyTarget.value.groupCustomerServiceId, replyContent.value)
-  const idx = allServiceRecords.value.findIndex(r => r.groupCustomerServiceId === updated.groupCustomerServiceId)
-  if (idx !== -1) {
-    allServiceRecords.value[idx] = updated
+  isSendingReply.value = true
+  try {
+    const updated = await replyCustomerService(replyTarget.value.groupCustomerServiceId, replyContent.value)
+    const idx = allServiceRecords.value.findIndex(r => r.groupCustomerServiceId === updated.groupCustomerServiceId)
+    if (idx !== -1) {
+      allServiceRecords.value[idx] = updated
+    }
+    showReplyModal.value = false
+  } finally {
+    isSendingReply.value = false
   }
-  showReplyModal.value = false
 }
 
 // ---- 搜尋（商品名稱 或 訂單編號） ----
@@ -535,10 +585,18 @@ const openStatusModal = (o) => {
   showStatusModal.value = true
 }
 
+// 更新狀態是否處理中：true 時「儲存」按鈕顯示 spinner
+const isSavingStatus = ref(false)
+
 const handleSaveStatus = async () => {
-  await updateOrderStatus(activeOrder.value.groupOrderId, statusForm.status)
-  activeOrder.value.status = statusForm.status
-  showStatusModal.value = false
+  isSavingStatus.value = true
+  try {
+    await updateOrderStatus(activeOrder.value.groupOrderId, statusForm.status)
+    activeOrder.value.status = statusForm.status
+    showStatusModal.value = false
+  } finally {
+    isSavingStatus.value = false
+  }
 }
 
 // ---- 指派物流 ----
@@ -551,15 +609,23 @@ const openShipperModal = (o) => {
   showShipperModal.value = true
 }
 
+// 指派物流是否處理中：true 時「儲存」按鈕顯示 spinner
+const isSavingShipper = ref(false)
+
 const handleSaveShipper = async () => {
   if (!shipperForm.groupShipperId) {
     alert('請選擇物流商')
     return
   }
-  await assignShipper(activeOrder.value.groupOrderId, { groupShipperId: shipperForm.groupShipperId })
-  const shipper = shippers.value.find(s => s.groupShipperId === shipperForm.groupShipperId)
-  activeOrder.value.shipperName = shipper?.shipperName
-  showShipperModal.value = false
+  isSavingShipper.value = true
+  try {
+    await assignShipper(activeOrder.value.groupOrderId, { groupShipperId: shipperForm.groupShipperId })
+    const shipper = shippers.value.find(s => s.groupShipperId === shipperForm.groupShipperId)
+    activeOrder.value.shipperName = shipper?.shipperName
+    showShipperModal.value = false
+  } finally {
+    isSavingShipper.value = false
+  }
 }
 </script>
 <style scoped>
@@ -572,5 +638,79 @@ const handleSaveShipper = async () => {
 .back-link:hover {
   color: #212529;
   text-decoration: underline;
+}
+
+/* ============ 本頁用到的特效樣式（進場動畫／懸停／按鈕微動效／載入動畫），class 一律以 go- 開頭 ============ */
+@keyframes goFadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.go-fade-in-up { animation: goFadeInUp 0.5s ease both; }
+
+/* <Transition name="go-fade"> 用：淡入淡出 */
+.go-fade-enter-active, .go-fade-leave-active { transition: opacity 0.25s ease; }
+.go-fade-enter-from, .go-fade-leave-to { opacity: 0; }
+
+/* <Transition name="go-pop"> 用：彈出效果（Modal） */
+.go-pop-enter-active { transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.go-pop-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
+.go-pop-enter-from, .go-pop-leave-to { opacity: 0; transform: scale(0.92); }
+
+.go-row-hover { transition: background-color 0.15s ease, transform 0.15s ease; }
+.go-row-hover:hover { background-color: var(--color-hover-bg, #f1e7de); }
+
+.go-btn-tap { transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease; }
+.go-btn-tap:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: 0 6px 14px rgba(74, 62, 61, 0.18);
+}
+.go-btn-tap:active:not(:disabled) {
+  transform: scale(0.94);
+  filter: brightness(0.97);
+}
+
+.go-icon-tap { transition: transform 0.15s ease, background-color 0.15s ease; }
+.go-icon-tap:hover { transform: scale(1.08); }
+.go-icon-tap:active { transform: scale(0.9); }
+
+@keyframes goShimmer {
+  0%   { background-position: -300px 0; }
+  100% { background-position: 300px 0; }
+}
+
+.go-skeleton {
+  position: relative;
+  background: linear-gradient(90deg, #ece3d8 25%, #f6f0e8 37%, #ece3d8 63%);
+  background-size: 600px 100%;
+  animation: goShimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+  color: transparent !important;
+}
+
+@keyframes goSpin {
+  to { transform: rotate(360deg); }
+}
+
+.go-spinner {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  vertical-align: -2px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: goSpin 0.7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .go-fade-in-up,
+  .go-btn-tap,
+  .go-icon-tap,
+  .go-skeleton,
+  .go-spinner {
+    animation-duration: 0.001s !important;
+    transition-duration: 0.001s !important;
+  }
 }
 </style>

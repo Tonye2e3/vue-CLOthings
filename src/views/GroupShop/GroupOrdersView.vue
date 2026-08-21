@@ -16,6 +16,23 @@ const authStore = useAuthStore()
 // 一般管理員（Admin）前台只能看不能操作，SuperAdmin 不受限
 const isReadOnly = computed(() => authStore.role === 'Admin')
 
+// 左側選單：一般會員只看得到「專案瀏覽」「團購紀錄」，
+// Admin / SuperAdmin 登入時，「團購紀錄」下面會多出後台管理的兩個項目
+const navItems = computed(() => {
+  const items = [
+    { label: '專案瀏覽', icon: 'user', to: '/GroupShop' },
+    { label: '團購紀錄', icon: 'history', to: '/GroupShop/orders' }
+  ]
+  if (authStore.isAdmin) {
+    items.push(
+      { label: '團購商品管理', icon: 'box', to: '/GroupShop/admin/products' },
+      { label: '團購訂單管理', icon: 'clipboard', to: '/GroupShop/admin/orders' }
+    )
+  }
+  return items
+})
+const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : route.path.startsWith(to))
+
 // 會員名稱：登入狀態統一用 useAuthStore()，尚未登入則顯示預設值
 const memberName = computed(() => authStore.name || '會員')
 // 購物車商品數量
@@ -25,18 +42,25 @@ const cartCount = computed(() => cartStore.items.length)
 // 欄位對應後端 GroupOrderListDTO，這裡把 groupOrderId 轉成 id，template 才不用改
 const myOrders = reactive([])
 
+// 訂單列表是否還在載入中：true 時表格顯示骨架屏列
+const isLoading = ref(true)
+
 const loadOrders = async () => {
-  // UserId 不用帶了，後端一律從 JWT 判斷是誰的訂單
-  const rows = await getGroupOrders()
-  const mapped = rows.map(r => ({
-    id: r.groupOrderId,
-    productName: r.productName,
-    status: r.status,
-    totalPrice: r.totalPrice,
-    orderDate: r.orderDate,
-    shipName: r.shipName
-  }))
-  myOrders.splice(0, myOrders.length, ...mapped)
+  try {
+    // UserId 不用帶了，後端一律從 JWT 判斷是誰的訂單
+    const rows = await getGroupOrders()
+    const mapped = rows.map(r => ({
+      id: r.groupOrderId,
+      productName: r.productName,
+      status: r.status,
+      totalPrice: r.totalPrice,
+      orderDate: r.orderDate,
+      shipName: r.shipName
+    }))
+    myOrders.splice(0, myOrders.length, ...mapped)
+  } finally {
+    isLoading.value = false
+  }
 }
 
 onMounted(() => {
@@ -107,6 +131,9 @@ const closeEditModal = () => {
 
 // 按下 Modal 裡的「儲存」時執行的動作：改成呼叫後端編輯 API，
 // 團購價、運費怎麼重算都交給後端處理，前端不用再自己算一次
+// 儲存編輯是否處理中：true 時「儲存」按鈕顯示 spinner
+const isSaving = ref(false)
+
 const saveEdit = async () => {
   const order = myOrders.find(o => o.id === editingOrderId.value)
   if (!order) return
@@ -120,17 +147,22 @@ const saveEdit = async () => {
     return
   }
 
-  const updated = await editGroupOrder(editingOrderId.value, {
-    shipName: editForm.shipName.trim(),
-    items: editForm.items.map(i => ({ groupProductId: i.id, quantity: i.qty }))
-  })
+  isSaving.value = true
+  try {
+    const updated = await editGroupOrder(editingOrderId.value, {
+      shipName: editForm.shipName.trim(),
+      items: editForm.items.map(i => ({ groupProductId: i.id, quantity: i.qty }))
+    })
 
-  // 把後端算好的結果寫回這筆訂單
-  order.shipName = updated.shipName
-  order.productName = updated.productName
-  order.totalPrice = updated.totalPrice
+    // 把後端算好的結果寫回這筆訂單
+    order.shipName = updated.shipName
+    order.productName = updated.productName
+    order.totalPrice = updated.totalPrice
 
-  showEditModal.value = false
+    showEditModal.value = false
+  } finally {
+    isSaving.value = false
+  }
 }
 
 // 把數字格式化成千分位顯示（例如 1234 -> 1,234）
@@ -164,23 +196,31 @@ const closeServiceModal = () => {
 }
 
 // 按下「送出」時執行的動作：呼叫後端新增一筆客服紀錄，成功後加進畫面上的清單
+// 送出客服單是否處理中：true 時「送出」按鈕顯示 spinner
+const isSubmittingService = ref(false)
+
 const submitService = async () => {
   if (!serviceForm.title.trim() || !serviceForm.content.trim()) {
     alert('請填寫標題與內容')
     return
   }
 
-  const saved = await createCustomerService(activeServiceOrderId.value, {
-    name: serviceForm.name,
-    email: serviceForm.email,
-    phone: serviceForm.phone,
-    title: serviceForm.title.trim(),
-    content: serviceForm.content.trim()
-  })
+  isSubmittingService.value = true
+  try {
+    const saved = await createCustomerService(activeServiceOrderId.value, {
+      name: serviceForm.name,
+      email: serviceForm.email,
+      phone: serviceForm.phone,
+      title: serviceForm.title.trim(),
+      content: serviceForm.content.trim()
+    })
 
-  serviceRecords.value.push(saved)
-  serviceForm.title = ''
-  serviceForm.content = ''
+    serviceRecords.value.push(saved)
+    serviceForm.title = ''
+    serviceForm.content = ''
+  } finally {
+    isSubmittingService.value = false
+  }
 }
 </script>
 
@@ -188,6 +228,45 @@ const submitService = async () => {
   <div class="clo-shell">
     <!-- 購物車圖示改為右下角浮動按鈕，見頁面最下方 -->
     <div class="clo-body">
+      <!-- ============ 左側選單 ============ -->
+      <aside class="clo-sidebar">
+        <nav class="sidebar-nav">
+          <template v-for="item in navItems" :key="item.label">
+            <router-link
+              v-if="item.to"
+              :to="item.to"
+              class="nav-item"
+              :class="{ active: isActive(item.to) }"
+            >
+              <span class="nav-icon">
+                <!-- 依 item.icon 的值，顯示對應的嵌入式 SVG 圖示（v-if / v-else-if 只會顯示符合條件的那一個） -->
+                <svg v-if="item.icon === 'user'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <svg v-else-if="item.icon === 'history'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="1 4 1 10 7 10"></polyline>
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                </svg>
+                <svg v-else-if="item.icon === 'box'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
+                  <polyline points="3.29 7 12 12 20.71 7"></polyline>
+                  <line x1="12" y1="22" x2="12" y2="12"></line>
+                </svg>
+                <svg v-else-if="item.icon === 'clipboard'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                  <line x1="9" y1="12" x2="15" y2="12"></line>
+                  <line x1="9" y1="16" x2="15" y2="16"></line>
+                </svg>
+              </span>
+              <span>{{ item.label }}</span>
+            </router-link>
+          </template>
+        </nav>
+
+      </aside>
+
       <!-- ============ 主要內容區：訂單列表 ============ -->
       <main class="clo-main">
     <div class="page-header mb-4">
@@ -195,7 +274,7 @@ const submitService = async () => {
       <p class="text-muted small mb-0">追蹤您參與的所有團購專案與運送進度</p>
     </div>
 
-    <div class="card shadow-sm border-0 rounded-3 overflow-hidden">
+    <div class="card shadow-sm border-0 rounded-3 overflow-hidden go-fade-in-up">
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
           <thead>
@@ -209,9 +288,15 @@ const submitService = async () => {
               <th>操作</th>
             </tr>
           </thead>
-          <tbody>
-            <!-- v-for 把 myOrders 陣列裡每一筆訂單，重複產生一列表格資料 -->
-            <tr v-for="order in myOrders" :key="order.id">
+          <!-- 載入中：顯示 3 列骨架屏 -->
+          <tbody v-if="isLoading">
+            <tr v-for="n in 3" :key="n">
+              <td colspan="7"><div class="go-skeleton" style="height: 18px; width: 100%;"></div></td>
+            </tr>
+          </tbody>
+          <!-- v-for 把 myOrders 陣列裡每一筆訂單，重複產生一列表格資料；TransitionGroup 讓列表淡入更自然 -->
+          <TransitionGroup v-else tag="tbody" name="go-fade">
+            <tr v-for="order in myOrders" :key="order.id" class="go-row-hover">
               <td class="fw-bold text-main">#{{ order.id }}</td>
               <td class="fw-bold">{{ order.productName }}</td>
               <td>
@@ -226,43 +311,46 @@ const submitService = async () => {
               <td>
                 <div class="action-buttons">
                   <button
-                    class="edit-btn"
+                    class="edit-btn go-btn-tap"
                     :disabled="order.status.includes('已取消') || isReadOnly"
                     @click="openEditModal(order.id)"
                   >編輯</button>
                   <button
-                    class="cancel-btn"
+                    class="cancel-btn go-btn-tap"
                     :disabled="order.status.includes('已取消') || isReadOnly"
                     @click="cancelOrder(order.id)"
                   >取消</button>
                   <button
-                    class="service-btn"
+                    class="service-btn go-btn-tap"
                     :disabled="isReadOnly"
                     @click="openServiceModal(order.id)"
                   >聯絡客服</button>
                 </div>
               </td>
             </tr>
-          </tbody>
+          </TransitionGroup>
         </table>
       </div>
     </div>
 
     <!-- ============ 編輯訂單 Modal ============ -->
     <!-- 背景遮罩：showEditModal 為 true 時顯示，讓後面的內容變暗、不能點擊 -->
-    <div v-if="showEditModal" class="modal-backdrop fade show"></div>
-    <div
-      v-if="showEditModal"
-      class="modal fade show d-block"
-      tabindex="-1"
-      role="dialog"
-      aria-modal="true"
-    >
+    <Transition name="go-fade">
+      <div v-if="showEditModal" class="modal-backdrop fade show"></div>
+    </Transition>
+    <Transition name="go-pop">
+      <div
+        v-if="showEditModal"
+        class="modal fade show d-block"
+        tabindex="-1"
+        role="dialog"
+        aria-modal="true"
+      >
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title fw-bold mb-0">編輯訂單</h5>
-            <button type="button" class="btn-close" aria-label="Close" @click="closeEditModal"></button>
+            <button type="button" class="btn-close go-icon-tap" aria-label="Close" @click="closeEditModal"></button>
           </div>
           <div class="modal-body">
             <div class="mb-3">
@@ -288,27 +376,34 @@ const submitService = async () => {
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" @click="closeEditModal">取消</button>
-            <button type="button" class="btn btn-primary" @click="saveEdit">儲存</button>
+            <button type="button" class="btn btn-outline-secondary go-btn-tap" @click="closeEditModal">取消</button>
+            <button type="button" class="btn btn-primary go-btn-tap" :disabled="isSaving" @click="saveEdit">
+              <span v-if="isSaving" class="go-spinner me-2"></span>
+              儲存
+            </button>
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </Transition>
 
     <!-- ============ 聯絡客服 Modal ============ -->
-    <div v-if="showServiceModal" class="modal-backdrop fade show"></div>
-    <div
-      v-if="showServiceModal"
-      class="modal fade show d-block"
-      tabindex="-1"
-      role="dialog"
-      aria-modal="true"
-    >
+    <Transition name="go-fade">
+      <div v-if="showServiceModal" class="modal-backdrop fade show"></div>
+    </Transition>
+    <Transition name="go-pop">
+      <div
+        v-if="showServiceModal"
+        class="modal fade show d-block"
+        tabindex="-1"
+        role="dialog"
+        aria-modal="true"
+      >
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title fw-bold mb-0">聯絡客服 #{{ activeServiceOrderId }}</h5>
-            <button type="button" class="btn-close" aria-label="Close" @click="closeServiceModal"></button>
+            <button type="button" class="btn-close go-icon-tap" aria-label="Close" @click="closeServiceModal"></button>
           </div>
           <div class="modal-body">
             <div class="row g-2 mb-2">
@@ -333,7 +428,10 @@ const submitService = async () => {
               <label class="form-label small">內容</label>
               <textarea class="form-control" rows="3" v-model="serviceForm.content" placeholder="請詳細描述您的問題"></textarea>
             </div>
-            <button type="button" class="btn btn-primary btn-sm mb-3" @click="submitService">送出</button>
+            <button type="button" class="btn btn-primary btn-sm mb-3 go-btn-tap" :disabled="isSubmittingService" @click="submitService">
+              <span v-if="isSubmittingService" class="go-spinner me-2"></span>
+              送出
+            </button>
 
             <hr />
             <p class="small fw-bold mb-2">過去的客服紀錄</p>
@@ -348,16 +446,17 @@ const submitService = async () => {
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" @click="closeServiceModal">關閉</button>
+            <button type="button" class="btn btn-outline-secondary go-btn-tap" @click="closeServiceModal">關閉</button>
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </Transition>
       </main>
     </div>
 
     <!-- ============ 浮動購物車按鈕（右下角，點擊直接跳到購物車畫面） ============ -->
-    <router-link to="/GroupShop/checkout" class="floating-cart" aria-label="前往購物車">
+    <router-link to="/GroupShop/checkout" class="floating-cart go-btn-tap" aria-label="前往購物車">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="9" cy="21" r="1"></circle>
         <circle cx="20" cy="21" r="1"></circle>
@@ -515,9 +614,132 @@ table tbody td {
   align-items: flex-start;
 }
 
+.clo-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  min-height: calc(100vh - 65px);
+  background-color: var(--color-bg-page);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 20px 0;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: 0.92rem;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+.nav-item:hover {
+  background-color: var(--color-hover-bg);
+}
+.nav-item.active {
+  color: var(--color-text);
+  font-weight: 700;
+  background-color: var(--color-active-bg);
+  border-left-color: var(--color-accent);
+}
+.nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+}
+
 .clo-main {
   flex: 1;
   padding: 28px 32px;
   min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .clo-sidebar { width: 72px; }
+  .nav-item span:last-child { display: none; }
+}
+
+/* ============ 本頁用到的特效樣式（進場動畫／懸停／按鈕微動效／載入動畫），class 一律以 go- 開頭 ============ */
+@keyframes goFadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.go-fade-in-up { animation: goFadeInUp 0.5s ease both; }
+
+/* <Transition name="go-fade"> 用：淡入淡出 */
+.go-fade-enter-active, .go-fade-leave-active { transition: opacity 0.25s ease; }
+.go-fade-enter-from, .go-fade-leave-to { opacity: 0; }
+
+/* <Transition name="go-pop"> 用：彈出效果（Modal） */
+.go-pop-enter-active { transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.go-pop-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
+.go-pop-enter-from, .go-pop-leave-to { opacity: 0; transform: scale(0.92); }
+
+.go-row-hover { transition: background-color 0.15s ease, transform 0.15s ease; }
+.go-row-hover:hover { background-color: var(--color-hover-bg, #f1e7de); }
+
+.go-btn-tap { transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease; }
+.go-btn-tap:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: 0 6px 14px rgba(74, 62, 61, 0.18);
+}
+.go-btn-tap:active:not(:disabled) {
+  transform: scale(0.94);
+  filter: brightness(0.97);
+}
+
+.go-icon-tap { transition: transform 0.15s ease, background-color 0.15s ease; }
+.go-icon-tap:hover { transform: scale(1.08); }
+.go-icon-tap:active { transform: scale(0.9); }
+
+@keyframes goShimmer {
+  0%   { background-position: -300px 0; }
+  100% { background-position: 300px 0; }
+}
+
+.go-skeleton {
+  position: relative;
+  background: linear-gradient(90deg, #ece3d8 25%, #f6f0e8 37%, #ece3d8 63%);
+  background-size: 600px 100%;
+  animation: goShimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+  color: transparent !important;
+}
+
+@keyframes goSpin {
+  to { transform: rotate(360deg); }
+}
+
+.go-spinner {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  vertical-align: -2px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: goSpin 0.7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .go-fade-in-up,
+  .go-btn-tap,
+  .go-icon-tap,
+  .go-skeleton,
+  .go-spinner {
+    animation-duration: 0.001s !important;
+    transition-duration: 0.001s !important;
+  }
 }
 </style>

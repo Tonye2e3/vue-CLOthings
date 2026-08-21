@@ -7,15 +7,15 @@
   </div>
 
   <div class="mb-4 d-flex gap-2">
-    <button type="button" class="btn btn-success" @click="openCreateModal">
+    <button type="button" class="btn btn-success go-btn-tap" @click="openCreateModal">
       新增團購商品
     </button>
-    <button type="button" class="btn btn-outline-secondary" @click="openLookupModal">
+    <button type="button" class="btn btn-outline-secondary go-btn-tap" @click="openLookupModal">
       分類 / 供應商管理
     </button>
   </div>
 
-  <div class="card mb-4">
+  <div class="card mb-4 go-fade-in-up">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
       <span class="fw-semibold">商品列表</span>
       <div class="d-flex align-items-center gap-2">
@@ -48,13 +48,19 @@
             <th></th>
           </tr>
         </thead>
-        <tbody>
+        <!-- 載入中：顯示骨架屏列 -->
+        <tbody v-if="isLoading">
+          <tr v-for="n in 4" :key="n">
+            <td colspan="7"><div class="go-skeleton" style="height: 18px; width: 100%;"></div></td>
+          </tr>
+        </tbody>
+        <tbody v-else>
           <tr v-if="pagedProducts.length === 0">
             <td colspan="7" class="text-center text-muted py-4">
               {{ searchQuery ? '找不到符合搜尋條件的商品' : '目前尚無商品資料' }}
             </td>
           </tr>
-          <tr v-for="p in pagedProducts" :key="p.id">
+          <tr v-for="p in pagedProducts" :key="p.id" class="go-row-hover">
             <td class="text-body-secondary small">{{ p.id }}</td>
             <td><img :src="resolveImageUrl(p.imageUrl)" class="img-thumbnail" style="width: 60px" /></td>
             <td class="fw-semibold">{{ p.name }}</td>
@@ -64,10 +70,10 @@
             <td class="text-end">NT$ {{ formatCurrency(p.listPrice) }}</td>
             <td class="text-center">{{ p.orderedQty }}</td>
             <td class="text-end">
-              <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="openEditModal(p)">
+              <button type="button" class="btn btn-sm btn-outline-primary me-1 go-btn-tap" @click="openEditModal(p)">
                 編輯
               </button>
-              <button type="button" class="btn btn-sm btn-outline-danger" @click="handleDelete(p)">
+              <button type="button" class="btn btn-sm btn-outline-danger go-btn-tap" @click="handleDelete(p)">
                 刪除
               </button>
             </td>
@@ -80,7 +86,7 @@
       <nav>
         <ul class="pagination pagination-sm mb-0">
           <li class="page-item" :class="{ disabled: currentPage === 1 }">
-            <button type="button" class="page-link" @click="goToPage(currentPage - 1)">上一頁</button>
+            <button type="button" class="page-link go-btn-tap" @click="goToPage(currentPage - 1)">上一頁</button>
           </li>
           <li
             v-for="n in totalPages"
@@ -88,10 +94,10 @@
             class="page-item"
             :class="{ active: n === currentPage }"
           >
-            <button type="button" class="page-link" @click="goToPage(n)">{{ n }}</button>
+            <button type="button" class="page-link go-btn-tap" @click="goToPage(n)">{{ n }}</button>
           </li>
           <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-            <button type="button" class="page-link" @click="goToPage(currentPage + 1)">下一頁</button>
+            <button type="button" class="page-link go-btn-tap" @click="goToPage(currentPage + 1)">下一頁</button>
           </li>
         </ul>
       </nav>
@@ -99,25 +105,28 @@
   </div>
 
   <!-- 新增/編輯商品 Modal（直接寫死的 Bootstrap Modal，不依賴額外元件） -->
-  <div v-if="showModal" class="modal-backdrop fade show"></div>
-  <div
-    v-if="showModal"
-    class="modal fade show d-block"
-    tabindex="-1"
-    role="dialog"
-    aria-modal="true"
-  >
+  <Transition name="go-fade">
+    <div v-if="showModal" class="modal-backdrop fade show"></div>
+  </Transition>
+  <Transition name="go-pop">
+    <div
+      v-if="showModal"
+      class="modal fade show d-block"
+      tabindex="-1"
+      role="dialog"
+      aria-modal="true"
+    >
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title fw-bold mb-0">{{ editingId ? '編輯商品' : '新增商品' }}</h5>
-          <button type="button" class="btn-close" aria-label="Close" @click="showModal = false"></button>
+          <button type="button" class="btn-close go-icon-tap" aria-label="Close" @click="showModal = false"></button>
         </div>
 
         <div class="modal-body">
           <!-- 從產品選擇：只有新增商品時顯示，帶入名稱與圖片後仍可手動修改 -->
           <div v-if="!editingId" class="mb-3">
-            <button type="button" class="btn btn-outline-primary btn-sm" @click="openPickProductModal">
+            <button type="button" class="btn btn-outline-primary btn-sm go-btn-tap" @click="openPickProductModal">
               從產品選擇
             </button>
             <span v-if="pickedProductName" class="text-muted small ms-2">
@@ -132,7 +141,7 @@
           <div class="mb-3">
             <label class="form-label">商品圖片</label>
             <input type="file" accept="image/*" class="form-control" @change="handleImageSelect" />
-            <div class="form-text" v-if="uploadingImage">圖片上傳中...</div>
+            <div class="form-text" v-if="uploadingImage"><span class="go-spinner go-spinner-dark me-1"></span>圖片上傳中...</div>
             <img
               v-if="form.productImg"
               :src="resolveImageUrl(form.productImg)"
@@ -191,14 +200,14 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="t in tiers" :key="t.groupDiscountStandardId">
+                <tr v-for="t in tiers" :key="t.groupDiscountStandardId" class="go-row-hover">
                   <template v-if="editingTierId === t.groupDiscountStandardId">
                     <td><input type="text" class="form-control form-control-sm" v-model="tierEditForm.tierLevel" /></td>
                     <td><input type="number" class="form-control form-control-sm" v-model.number="tierEditForm.thresholdCount" min="1" /></td>
                     <td><input type="number" class="form-control form-control-sm" v-model.number="tierEditForm.discountRate" step="0.01" min="0" max="1" /></td>
                     <td class="text-end">
-                      <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="saveTierEdit(t)">儲存</button>
-                      <button type="button" class="btn btn-sm btn-outline-secondary" @click="cancelEditTier">取消</button>
+                      <button type="button" class="btn btn-sm btn-outline-primary me-1 go-btn-tap" @click="saveTierEdit(t)">儲存</button>
+                      <button type="button" class="btn btn-sm btn-outline-secondary go-btn-tap" @click="cancelEditTier">取消</button>
                     </td>
                   </template>
                   <template v-else>
@@ -206,10 +215,10 @@
                     <td>{{ t.thresholdCount }}</td>
                     <td>{{ t.discountRate }}</td>
                     <td class="text-end">
-                      <button type="button" class="btn btn-sm btn-outline-secondary me-1" @click="startEditTier(t)">
+                      <button type="button" class="btn btn-sm btn-outline-secondary me-1 go-btn-tap" @click="startEditTier(t)">
                         編輯
                       </button>
-                      <button type="button" class="btn btn-sm btn-outline-danger" @click="handleDeleteTier(t)">
+                      <button type="button" class="btn btn-sm btn-outline-danger go-btn-tap" @click="handleDeleteTier(t)">
                         刪除
                       </button>
                     </td>
@@ -228,7 +237,7 @@
                 <input type="number" class="form-control form-control-sm" placeholder="折扣，例如 0.9" v-model.number="newTier.discountRate" step="0.01" min="0" max="1" />
               </div>
               <div class="col-auto">
-                <button type="button" class="btn btn-sm btn-outline-primary" @click="handleAddTier">新增階層</button>
+                <button type="button" class="btn btn-sm btn-outline-primary go-btn-tap" @click="handleAddTier">新增階層</button>
               </div>
             </div>
           </div>
@@ -246,11 +255,11 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="s in specs" :key="s.groupProductSpecificationId">
+                <tr v-for="s in specs" :key="s.groupProductSpecificationId" class="go-row-hover">
                   <td>{{ s.size }}</td>
                   <td>{{ s.color }}</td>
                   <td class="text-end">
-                    <button type="button" class="btn btn-sm btn-outline-danger" @click="handleDeleteSpec(s)">
+                    <button type="button" class="btn btn-sm btn-outline-danger go-btn-tap" @click="handleDeleteSpec(s)">
                       刪除
                     </button>
                   </td>
@@ -265,34 +274,41 @@
                 <input type="text" class="form-control form-control-sm" placeholder="顏色，例如 黑色" v-model="newSpec.color" />
               </div>
               <div class="col-auto">
-                <button type="button" class="btn btn-sm btn-outline-primary" @click="handleAddSpec">新增規格</button>
+                <button type="button" class="btn btn-sm btn-outline-primary go-btn-tap" @click="handleAddSpec">新增規格</button>
               </div>
             </div>
           </div>
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="showModal = false">取消</button>
-          <button type="button" class="btn btn-primary" @click="handleSave">儲存</button>
+          <button type="button" class="btn btn-secondary go-btn-tap" @click="showModal = false">取消</button>
+          <button type="button" class="btn btn-primary go-btn-tap" :disabled="isSaving" @click="handleSave">
+            <span v-if="isSaving" class="go-spinner me-2"></span>
+            儲存
+          </button>
         </div>
       </div>
     </div>
-  </div>
+    </div>
+  </Transition>
 
   <!-- 從產品選擇 Modal：向一般商店的 Shop/ProductController 查真正的產品清單 -->
-  <div v-if="showPickProductModal" class="modal-backdrop fade show"></div>
-  <div
-    v-if="showPickProductModal"
-    class="modal fade show d-block"
-    tabindex="-1"
-    role="dialog"
-    aria-modal="true"
-  >
+  <Transition name="go-fade">
+    <div v-if="showPickProductModal" class="modal-backdrop fade show"></div>
+  </Transition>
+  <Transition name="go-pop">
+    <div
+      v-if="showPickProductModal"
+      class="modal fade show d-block"
+      tabindex="-1"
+      role="dialog"
+      aria-modal="true"
+    >
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title fw-bold mb-0">從產品選擇</h5>
-          <button type="button" class="btn-close" aria-label="Close" @click="showPickProductModal = false"></button>
+          <button type="button" class="btn-close go-icon-tap" aria-label="Close" @click="showPickProductModal = false"></button>
         </div>
         <div class="modal-body">
           <input
@@ -306,7 +322,7 @@
               v-for="prod in filteredPickProducts"
               :key="prod.id"
               type="button"
-              class="list-group-item list-group-item-action d-flex align-items-center gap-3"
+              class="list-group-item list-group-item-action d-flex align-items-center gap-3 go-row-hover"
               @click="handlePickProduct(prod)"
             >
               <img :src="resolveImageUrl(prod.imageUrl)" style="width: 48px; height: 48px; object-fit: cover" class="rounded" />
@@ -314,7 +330,7 @@
               <span class="text-muted ms-auto">NT$ {{ formatCurrency(prod.price) }}</span>
             </button>
             <p v-if="pickProductLoading" class="text-muted text-center py-3 mb-0">
-              載入產品清單中...
+              <span class="go-spinner go-spinner-dark me-1"></span>載入產品清單中...
             </p>
             <p v-else-if="filteredPickProducts.length === 0" class="text-muted text-center py-3 mb-0">
               找不到符合的產品
@@ -322,26 +338,30 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="showPickProductModal = false">取消</button>
+          <button type="button" class="btn btn-secondary go-btn-tap" @click="showPickProductModal = false">取消</button>
         </div>
       </div>
     </div>
-  </div>
+    </div>
+  </Transition>
 
   <!-- ============ 分類 / 供應商管理 Modal ============ -->
-  <div v-if="showLookupModal" class="modal-backdrop fade show"></div>
-  <div
-    v-if="showLookupModal"
-    class="modal fade show d-block"
-    tabindex="-1"
-    role="dialog"
-    aria-modal="true"
-  >
+  <Transition name="go-fade">
+    <div v-if="showLookupModal" class="modal-backdrop fade show"></div>
+  </Transition>
+  <Transition name="go-pop">
+    <div
+      v-if="showLookupModal"
+      class="modal fade show d-block"
+      tabindex="-1"
+      role="dialog"
+      aria-modal="true"
+    >
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title fw-bold mb-0">分類 / 供應商管理</h5>
-          <button type="button" class="btn-close" aria-label="Close" @click="showLookupModal = false"></button>
+          <button type="button" class="btn-close go-icon-tap" aria-label="Close" @click="showLookupModal = false"></button>
         </div>
         <div class="modal-body">
           <div class="row g-4">
@@ -352,20 +372,20 @@
                 <li
                   v-for="c in categories"
                   :key="c.groupProductCategoryId"
-                  class="list-group-item d-flex justify-content-between align-items-center"
+                  class="list-group-item d-flex justify-content-between align-items-center go-row-hover"
                 >
                   <template v-if="editingCategoryId === c.groupProductCategoryId">
                     <input type="text" class="form-control form-control-sm me-2" v-model="categoryEditName" />
                     <div class="d-flex gap-1">
-                      <button type="button" class="btn btn-sm btn-primary" @click="saveCategoryEdit(c)">存</button>
-                      <button type="button" class="btn btn-sm btn-secondary" @click="editingCategoryId = null">取消</button>
+                      <button type="button" class="btn btn-sm btn-primary go-btn-tap" @click="saveCategoryEdit(c)">存</button>
+                      <button type="button" class="btn btn-sm btn-secondary go-btn-tap" @click="editingCategoryId = null">取消</button>
                     </div>
                   </template>
                   <template v-else>
                     <span>{{ c.categoryName }}</span>
                     <div class="d-flex gap-1">
-                      <button type="button" class="btn btn-sm btn-outline-secondary" @click="startEditCategory(c)">編輯</button>
-                      <button type="button" class="btn btn-sm btn-outline-danger" @click="handleDeleteCategory(c)">刪除</button>
+                      <button type="button" class="btn btn-sm btn-outline-secondary go-btn-tap" @click="startEditCategory(c)">編輯</button>
+                      <button type="button" class="btn btn-sm btn-outline-danger go-btn-tap" @click="handleDeleteCategory(c)">刪除</button>
                     </div>
                   </template>
                 </li>
@@ -375,7 +395,7 @@
               </ul>
               <div class="input-group input-group-sm">
                 <input type="text" class="form-control" placeholder="新分類名稱" v-model="newCategoryName" />
-                <button type="button" class="btn btn-outline-primary" @click="handleCreateCategory">新增</button>
+                <button type="button" class="btn btn-outline-primary go-btn-tap" @click="handleCreateCategory">新增</button>
               </div>
             </div>
 
@@ -386,20 +406,20 @@
                 <li
                   v-for="s in suppliers"
                   :key="s.groupSupplierId"
-                  class="list-group-item d-flex justify-content-between align-items-center"
+                  class="list-group-item d-flex justify-content-between align-items-center go-row-hover"
                 >
                   <template v-if="editingSupplierId === s.groupSupplierId">
                     <input type="text" class="form-control form-control-sm me-2" v-model="supplierEditName" />
                     <div class="d-flex gap-1">
-                      <button type="button" class="btn btn-sm btn-primary" @click="saveSupplierEdit(s)">存</button>
-                      <button type="button" class="btn btn-sm btn-secondary" @click="editingSupplierId = null">取消</button>
+                      <button type="button" class="btn btn-sm btn-primary go-btn-tap" @click="saveSupplierEdit(s)">存</button>
+                      <button type="button" class="btn btn-sm btn-secondary go-btn-tap" @click="editingSupplierId = null">取消</button>
                     </div>
                   </template>
                   <template v-else>
                     <span>{{ s.supplierName }}</span>
                     <div class="d-flex gap-1">
-                      <button type="button" class="btn btn-sm btn-outline-secondary" @click="startEditSupplier(s)">編輯</button>
-                      <button type="button" class="btn btn-sm btn-outline-danger" @click="handleDeleteSupplier(s)">刪除</button>
+                      <button type="button" class="btn btn-sm btn-outline-secondary go-btn-tap" @click="startEditSupplier(s)">編輯</button>
+                      <button type="button" class="btn btn-sm btn-outline-danger go-btn-tap" @click="handleDeleteSupplier(s)">刪除</button>
                     </div>
                   </template>
                 </li>
@@ -409,17 +429,18 @@
               </ul>
               <div class="input-group input-group-sm">
                 <input type="text" class="form-control" placeholder="新供應商名稱" v-model="newSupplierName" />
-                <button type="button" class="btn btn-outline-primary" @click="handleCreateSupplier">新增</button>
+                <button type="button" class="btn btn-outline-primary go-btn-tap" @click="handleCreateSupplier">新增</button>
               </div>
             </div>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="showLookupModal = false">關閉</button>
+          <button type="button" class="btn btn-secondary go-btn-tap" @click="showLookupModal = false">關閉</button>
         </div>
       </div>
     </div>
-  </div>
+    </div>
+  </Transition>
 </template>
 
 <script setup>
@@ -482,9 +503,15 @@ const handleImageSelect = async (e) => {
 const products = ref([])
 const categories = ref([])
 const suppliers = ref([])
+// 商品列表是否還在載入中：true 時表格顯示骨架屏列
+const isLoading = ref(true)
 
 const loadProducts = async () => {
-  products.value = await getGroupProducts()
+  try {
+    products.value = await getGroupProducts()
+  } finally {
+    isLoading.value = false
+  }
 }
 
 onMounted(async () => {
@@ -791,6 +818,9 @@ const openEditModal = async (p) => {
   showModal.value = true
 }
 
+// 儲存商品是否處理中：true 時「儲存」按鈕顯示 spinner
+const isSaving = ref(false)
+
 // 按下「儲存」：有 editingId 就是編輯，沒有就是新增
 const handleSave = async () => {
   if (!form.productName || !form.groupSupplierId || !form.groupProductCategoryId) {
@@ -800,22 +830,27 @@ const handleSave = async () => {
 
   const isCreating = !editingId.value
 
-  if (editingId.value) {
-    await updateProduct(editingId.value, form)
-  } else {
-    const created = await createProduct(form)
-    editingId.value = created.id // 新增成功後直接可以繼續設定團購階層
-  }
+  isSaving.value = true
+  try {
+    if (editingId.value) {
+      await updateProduct(editingId.value, form)
+    } else {
+      const created = await createProduct(form)
+      editingId.value = created.id // 新增成功後直接可以繼續設定團購階層
+    }
 
-  await loadProducts()
+    await loadProducts()
 
-  if (isCreating) {
-    // 新增商品：不關閉視窗，留在原地讓使用者接著設定團購階層與規格
-    tiers.value = await getTiers(editingId.value)
-    await loadSpecs(editingId.value)
-  } else {
-    // 編輯既有商品：儲存後直接關閉視窗
-    showModal.value = false
+    if (isCreating) {
+      // 新增商品：不關閉視窗，留在原地讓使用者接著設定團購階層與規格
+      tiers.value = await getTiers(editingId.value)
+      await loadSpecs(editingId.value)
+    } else {
+      // 編輯既有商品：儲存後直接關閉視窗
+      showModal.value = false
+    }
+  } finally {
+    isSaving.value = false
   }
 }
 
@@ -865,5 +900,85 @@ const getStatusBadgeClass = (status) => {
 .back-link:hover {
   color: #212529;
   text-decoration: underline;
+}
+
+/* ============ 本頁用到的特效樣式（進場動畫／懸停／按鈕微動效／載入動畫），class 一律以 go- 開頭 ============ */
+@keyframes goFadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.go-fade-in-up { animation: goFadeInUp 0.5s ease both; }
+
+/* <Transition name="go-fade"> 用：淡入淡出 */
+.go-fade-enter-active, .go-fade-leave-active { transition: opacity 0.25s ease; }
+.go-fade-enter-from, .go-fade-leave-to { opacity: 0; }
+
+/* <Transition name="go-pop"> 用：彈出效果（Modal） */
+.go-pop-enter-active { transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.go-pop-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
+.go-pop-enter-from, .go-pop-leave-to { opacity: 0; transform: scale(0.92); }
+
+.go-row-hover { transition: background-color 0.15s ease, transform 0.15s ease; }
+.go-row-hover:hover { background-color: var(--color-hover-bg, #f1e7de); }
+
+.go-btn-tap { transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease; }
+.go-btn-tap:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: 0 6px 14px rgba(74, 62, 61, 0.18);
+}
+.go-btn-tap:active:not(:disabled) {
+  transform: scale(0.94);
+  filter: brightness(0.97);
+}
+
+.go-icon-tap { transition: transform 0.15s ease, background-color 0.15s ease; }
+.go-icon-tap:hover { transform: scale(1.08); }
+.go-icon-tap:active { transform: scale(0.9); }
+
+@keyframes goShimmer {
+  0%   { background-position: -300px 0; }
+  100% { background-position: 300px 0; }
+}
+
+.go-skeleton {
+  position: relative;
+  background: linear-gradient(90deg, #ece3d8 25%, #f6f0e8 37%, #ece3d8 63%);
+  background-size: 600px 100%;
+  animation: goShimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+  color: transparent !important;
+}
+
+@keyframes goSpin {
+  to { transform: rotate(360deg); }
+}
+
+.go-spinner {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  vertical-align: -2px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: goSpin 0.7s linear infinite;
+}
+
+/* 淺底色（白底卡片）用的深色 spinner */
+.go-spinner-dark {
+  border: 2px solid rgba(74, 62, 61, 0.25);
+  border-top-color: var(--color-text, #4a3e3d);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .go-fade-in-up,
+  .go-btn-tap,
+  .go-icon-tap,
+  .go-skeleton,
+  .go-spinner {
+    animation-duration: 0.001s !important;
+    transition-duration: 0.001s !important;
+  }
 }
 </style>
