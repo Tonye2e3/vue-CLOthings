@@ -213,11 +213,16 @@ const authStore = useAuthStore()
 // 有些是佔位用的、對應的檔案還沒真的放上去）。
 // 失敗時把圖片來源換成 dicebear 產生的預設頭像，畫面才不會出現「圖片壞掉」的圖示。
 const onAvatarError = (event, name) => {
-  // 加個保護：如果換成 dicebear 網址後還是失敗（例如完全沒有網路），
-  // 就不要再觸發一次 @error，避免無限迴圈一直重新請求。
-  if (event.target.dataset.fallback) return
-  event.target.dataset.fallback = '1'
-  event.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+  // 用「換過的網址是不是已經是預設圖」來判斷要不要再換一次，而不是用一個存在
+  // DOM 元素上的旗標（dataset.fallback）——原本那種寫法在「單一、被重複使用」的
+  // 大頭貼欄位上（不是 v-for 跑出來的，例如封面故事卡只有一個）會有問題：換了一篇
+  // 不同的貼文當封面故事，Vue 只會更新同一個 <img> 的 src，不會整個重新產生新元素，
+  // 舊的旗標還留著，新網址就算真的載入失敗，也會被舊旗標擋下來、不會真的換成預設圖。
+  // 改成比對「現在這個網址是不是已經是預設圖網址」，不會有這種「換了新資料，
+  // 但舊旗標還卡著」的問題。
+  const fallbackUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+  if (event.target.src === fallbackUrl) return
+  event.target.src = fallbackUrl
 }
 
 // posts 已經在上面的 <script> 區塊宣告並 export，這裡同一個檔案內可以直接使用，不用再 import

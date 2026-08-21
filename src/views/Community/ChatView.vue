@@ -45,9 +45,17 @@ const avatarUrl = (avatarPath, username) => {
     : `https://api.dicebear.com/7.x/avataaars/svg?seed=${username || 'guest'}`
 }
 const onAvatarError = (event, name) => {
-  if (event.target.dataset.fallback) return
-  event.target.dataset.fallback = '1'
-  event.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+  // 用「換過的網址是不是已經是預設圖」來判斷要不要再換一次，而不是用一個存在
+  // DOM 元素上的旗標（例如 dataset.fallback）——這裡的大頭貼是「單一、被重複使用」
+  // 的欄位（不是 v-for 跑出來的），例如切換到不同的聊天對象時，Vue 只會更新同一個
+  // <img> 的 src，不會整個重新產生一個新的 <img> 元素。如果用旗標記錄「這個元素已經
+  // 失敗過、觸發過備援了」，切到下一個對話對象、換了新的大頭貼網址，舊的旗標還留著，
+  // 新網址就算真的載入失敗，也會被那個舊旗標擋下來、不會真的換成預設圖，
+  // 使用者會看到大頭貼一直是破圖。改成比對「現在這個網址是不是已經是預設圖網址」，
+  // 不會有這種「換了新資料，但舊旗標還卡著」的問題。
+  const fallbackUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+  if (event.target.src === fallbackUrl) return
+  event.target.src = fallbackUrl
 }
 
 // formatChatTime：跟 PostDetailView.vue 的 formatDateTime 是同一套「2026-06-06 12:00」固定格式。
@@ -503,10 +511,23 @@ watch(() => route.params.userId, (newVal) => {
   font-size:.78rem; color:var(--ink-soft);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
+/*
+  chat-unread-badge 的脈動效果：這裡改用純 CSS 的 @keyframes，不是 anime.js。
+  這個角標會隨著左側清單重新整理（每次收發訊息都會重打一次 fetchConversations）
+  不斷被 Vue 重新渲染／可能被整批換掉，如果用 anime.js 的 loop:true 持續動畫，
+  要另外處理「元素換掉了、動畫實例要不要重建」這種生命週期管理，反而變複雜；
+  純 CSS 的無限循環動畫，瀏覽器原生處理好這一切，不用寫任何 JS 去維護，
+  也更省效能——這種「持續存在、不需要精準控制播放時機」的效果，CSS 天生就是更適合的工具。
+*/
+@keyframes chat-badge-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(122,75,84,.45); }
+  50% { transform: scale(1.14); box-shadow: 0 0 0 4px rgba(122,75,84,0); }
+}
 .chat-unread-badge{
   background:var(--plum); color:#fff; font-size:.68rem; font-weight:700;
   min-width:18px; height:18px; border-radius:9px; padding:0 .4rem;
   display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  animation: chat-badge-pulse 1.6s ease-in-out infinite;
 }
 
 /* ---------- 右側訊息串 ---------- */

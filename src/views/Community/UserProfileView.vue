@@ -36,11 +36,14 @@ const route = useRoute()
 // 實際上還沒有的檔案），失敗時把圖片來源換成 dicebear 產生的預設頭像，
 // 跟 CommunityView.vue 的 onAvatarError 是同一套邏輯。
 const onAvatarError = (event, name) => {
-  // 加個保護：如果換成 dicebear 網址後還是失敗（例如完全沒有網路），
-  // 就不要再觸發一次 @error，避免無限迴圈一直重新請求。
-  if (event.target.dataset.fallback) return
-  event.target.dataset.fallback = '1'
-  event.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+  // 用「換過的網址是不是已經是預設圖」來判斷要不要再換一次，而不是用一個存在
+  // DOM 元素上的旗標（dataset.fallback）——原因跟 CommunityView.vue 的
+  // onAvatarError 註解一樣：這種寫法在「單一、被重複使用」的欄位上會有問題
+  // （例如這個檔案自己的大頭貼欄位），舊旗標可能卡住新資料的備援。
+  // 改成比對「現在這個網址是不是已經是預設圖網址」，就不會有這種問題。
+  const fallbackUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+  if (event.target.src === fallbackUrl) return
+  event.target.src = fallbackUrl
 }
 
 // currentUserId：目前登入者真正的 userId，跟 CommunityView.vue 共用同一份（import 進來的）。
