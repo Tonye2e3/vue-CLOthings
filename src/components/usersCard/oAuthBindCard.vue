@@ -31,6 +31,8 @@ async function loadBindStatus() {
   try {
     const response = await api.get('/User/google/status')
 
+    console.log('Google 綁定狀態：', response.data) // 🟢【測試用】
+
     isBound.value = response.data.isBound
     boundEmail.value = response.data.email ?? ''
   } catch (error) {
@@ -47,17 +49,27 @@ async function bindAccount() {
   try {
     isLoading.value = true
 
-    // 🟡【暫時】
-    // 下一步會把這裡改成真正啟動 Google OAuth
-    alert('下一步接 Google 綁定流程')
-  } finally {
+    // ① Axios 呼叫
+    // Axios interceptor 會自動帶 JWT
+    const response = await api.post('/User/google/bind/start')
+
+    // ② 後端回傳真正的 OAuth 啟動網址
+    const bindUrl = response.data.url
+
+    console.log('Google Bind URL：', bindUrl)
+
+    // ③ 現在才離開 Vue
+    window.location.href = bindUrl
+  } catch (error) {
+    console.error('啟動 Google 綁定失敗：', error)
+
+    alert(error.response?.data ?? '啟動 Google 綁定失敗')
+
     isLoading.value = false
   }
 }
 
-// ======================================================
-// 🟢【新增】解除綁定
-// ======================================================
+// 解除綁定
 async function unbindAccount() {
   if (props.name !== 'Google') {
     return
@@ -71,7 +83,7 @@ async function unbindAccount() {
     isLoading.value = true
 
     // 🟡【下一步後端要新增】
-    await api.delete('/User/google')
+    await api.delete('/User/google/unbind')
 
     await loadBindStatus()
 
@@ -85,14 +97,12 @@ async function unbindAccount() {
   }
 }
 
-// ======================================================
-// 🟢【新增】按鈕統一入口
-// ======================================================
-function handleClick() {
+// 🟢按鈕統一入口
+async function handleClick() {
   if (isBound.value) {
-    unbindAccount()
+    await unbindAccount()
   } else {
-    bindAccount()
+    await bindAccount()
   }
 }
 
