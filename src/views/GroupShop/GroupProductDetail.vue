@@ -26,25 +26,6 @@ const authStore = useAuthStore()
 // 一般管理員（Admin）前台只能看不能操作，SuperAdmin 不受限
 const isReadOnly = computed(() => authStore.role === 'Admin')
 
-// 左側選單：一般會員只看得到「專案瀏覽」「團購紀錄」，
-// Admin / SuperAdmin 登入時，「團購紀錄」下面會多出後台管理的兩個項目
-const navItems = computed(() => {
-  const items = [
-    { label: '專案瀏覽', icon: 'user', to: '/GroupShop' },
-    { label: '團購紀錄', icon: 'history', to: '/GroupShop/orders' }
-  ]
-  if (authStore.isAdmin) {
-    items.push(
-      { label: '團購商品管理', icon: 'box', to: '/GroupShop/admin/products' },
-      { label: '團購訂單管理', icon: 'clipboard', to: '/GroupShop/admin/orders' }
-    )
-  }
-  return items
-})
-
-// 判斷某個選單項目是不是「目前所在的頁面」，是的話會加上 active 樣式（醒目提示）
-const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : route.path.startsWith(to))
-
 // 會員名稱：登入狀態統一用 useAuthStore()，尚未登入則顯示預設值
 const memberName = computed(() => authStore.name || '會員')
 
@@ -162,47 +143,6 @@ const handleJoin = async () => {
   <div class="clo-shell">
     <!-- 購物車圖示改為右下角浮動按鈕，見頁面最下方 -->
     <div class="clo-body">
-      <!-- ============ 左側選單 ============ -->
-      <aside class="clo-sidebar">
-        <nav class="sidebar-nav">
-          <!-- v-for 用來把 navItems 陣列裡的每一筆資料，重複產生一個對應的選單項目 -->
-          <!-- :key 是給 Vue 用來辨識每個項目的獨一無二標籤，通常會用不會重複的欄位 -->
-          <template v-for="item in navItems" :key="item.label">
-            <router-link
-              v-if="item.to"
-              :to="item.to"
-              class="nav-item"
-              :class="{ active: isActive(item.to) }"
-            >
-              <span class="nav-icon">
-                <!-- 依 item.icon 的值，顯示對應的嵌入式 SVG 圖示（v-if / v-else-if 只會顯示符合條件的那一個） -->
-                <svg v-if="item.icon === 'user'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-                <svg v-else-if="item.icon === 'history'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="1 4 1 10 7 10"></polyline>
-                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                </svg>
-                <svg v-else-if="item.icon === 'box'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
-                  <polyline points="3.29 7 12 12 20.71 7"></polyline>
-                  <line x1="12" y1="22" x2="12" y2="12"></line>
-                </svg>
-                <svg v-else-if="item.icon === 'clipboard'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                  <line x1="9" y1="12" x2="15" y2="12"></line>
-                  <line x1="9" y1="16" x2="15" y2="16"></line>
-                </svg>
-              </span>
-              <span>{{ item.label }}</span>
-            </router-link>
-          </template>
-        </nav>
-
-      </aside>
-
       <!-- ============ 主要內容區：商品詳情 ============ -->
       <main class="clo-main">
     <router-link to="/GroupShop" class="back-link mb-3">
@@ -533,60 +473,14 @@ const handleJoin = async () => {
   align-items: flex-start;
 }
 
-.clo-sidebar {
-  width: 220px;
-  flex-shrink: 0;
-  min-height: calc(100vh - 65px);
-  background-color: var(--color-bg-page);
-  border-right: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 20px 0;
-}
-
-.sidebar-nav {
-  display: flex;
-  flex-direction: column;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 24px;
-  color: var(--color-text-muted);
-  text-decoration: none;
-  font-size: 0.92rem;
-  border-left: 3px solid transparent;
-  cursor: pointer;
-}
-.nav-item:hover {
-  background-color: var(--color-hover-bg);
-}
-.nav-item.active {
-  color: var(--color-text);
-  font-weight: 700;
-  background-color: var(--color-active-bg);
-  border-left-color: var(--color-accent);
-}
-.nav-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-}
-
 .clo-main {
   flex: 1;
+  width: 100%;
   padding: 28px 32px;
   min-width: 0;
 }
 
-@media (max-width: 900px) {
-  .clo-sidebar { width: 72px; }
-  .nav-item span:last-child { display: none; }
-}
+
 
 /* ============ 本頁用到的特效樣式（進場動畫／懸停／按鈕微動效／載入動畫），class 一律以 go- 開頭 ============ */
 @keyframes goFadeInUp {
