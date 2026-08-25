@@ -13,6 +13,9 @@ import { useRoute } from 'vue-router'
 // api：跟其他頁面共用同一個 axios 實例（src/services/api.js），會自動把登入後的 JWT
 // token 帶進 Authorization header，跟直接 import axios from 'axios' 不一樣。
 import api from '@/services/api'
+// animate：anime.js v4 的動畫函式，這裡用來做編輯貼文彈出視窗的開關動畫，
+// 跟 CommunityView.vue、ChatView.vue 是同一個套件、同一套用法。
+import { animate } from 'animejs'
 
 // 收藏功能共用資料（跟 PostDetailView.vue 共用同一份收藏清單，直接 import 那個檔案）
 // savedPosts：使用者收藏的所有貼文，格式對照 Community_Favorite + Community_Post：
@@ -33,11 +36,14 @@ const route = useRoute()
 // 實際上還沒有的檔案），失敗時把圖片來源換成 dicebear 產生的預設頭像，
 // 跟 CommunityView.vue 的 onAvatarError 是同一套邏輯。
 const onAvatarError = (event, name) => {
-  // 加個保護：如果換成 dicebear 網址後還是失敗（例如完全沒有網路），
-  // 就不要再觸發一次 @error，避免無限迴圈一直重新請求。
-  if (event.target.dataset.fallback) return
-  event.target.dataset.fallback = '1'
-  event.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+  // 用「換過的網址是不是已經是預設圖」來判斷要不要再換一次，而不是用一個存在
+  // DOM 元素上的旗標（dataset.fallback）——原因跟 CommunityView.vue 的
+  // onAvatarError 註解一樣：這種寫法在「單一、被重複使用」的欄位上會有問題
+  // （例如這個檔案自己的大頭貼欄位），舊旗標可能卡住新資料的備援。
+  // 改成比對「現在這個網址是不是已經是預設圖網址」，就不會有這種問題。
+  const fallbackUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+  if (event.target.src === fallbackUrl) return
+  event.target.src = fallbackUrl
 }
 
 // currentUserId：目前登入者真正的 userId，跟 CommunityView.vue 共用同一份（import 進來的）。
@@ -218,6 +224,43 @@ const startEdit = (post) => {
 // cancelEdit：取消編輯，收起表單，不送出任何變更。
 const cancelEdit = () => {
   editingPostId.value = null
+}
+
+// ============================================================
+// 編輯貼文彈出視窗的開關動畫（Vue <Transition> 的 JS hook 搭配 anime.js）
+// ============================================================
+
+// onEditModalEnter：彈出視窗「出現」的時候執行——el 是 Vue 傳進來的
+// .edit-modal-overlay 這個真正的 DOM 元素，done 是「動畫播完了，可以繼續」的通知函式。
+// 背景（overlay）淡入的同時，裡面的視窗本體（.edit-modal）從稍微縮小的狀態
+// 放大回原本尺寸＋淡入，兩層疊在一起有種「從畫面中間浮出來」的感覺，
+// 比單純的淡入更有彈出視窗該有的存在感。
+const onEditModalEnter = (el, done) => {
+  const modalBox = el.querySelector('.edit-modal')
+  animate(el, { opacity: [0, 1], duration: 200, ease: 'outQuad' })
+  animate(modalBox, {
+    opacity: [0, 1],
+    scale: [0.92, 1],
+    duration: 260,
+    ease: 'outQuad',
+    onComplete: done
+  })
+}
+
+// onEditModalLeave：彈出視窗「關閉」的時候執行——跟 enter 相反，背景淡出、
+// 視窗本體縮小＋淡出。:css="false" 模式下，leave 的 done() 一定要呼叫，
+// 不然 Vue 不知道動畫什麼時候播完，會讓這個元素（連同 Teleport 出去的節點）
+// 卡在 DOM 裡拿不掉。
+const onEditModalLeave = (el, done) => {
+  const modalBox = el.querySelector('.edit-modal')
+  animate(el, { opacity: [1, 0], duration: 180, ease: 'inQuad' })
+  animate(modalBox, {
+    opacity: [1, 0],
+    scale: [1, 0.92],
+    duration: 180,
+    ease: 'inQuad',
+    onComplete: done
+  })
 }
 
 // lightboxImage：目前燈箱裡放大顯示的圖片網址，null 代表燈箱沒有打開。
@@ -656,9 +699,21 @@ const toggleFollow = async () => {
                 又窄又長。同一時間只會有一篇貼文在編輯（editingPostId 是單一值），
                 所以就算表單搬到 <body> 下面，也不會跟其他卡片衝突。
               -->
-              <Teleport to="body" v-if="editingPostId === post.communityPostId">
-                <div class="edit-modal-overlay" @click.self="cancelEdit">
-                  <div class="edit-modal">
+              <Teleport to="body">
+                <!--
+                  Transition + :css="false"：v-if 原本是「一改條件，元素馬上出現／消失」，
+                  沒有中間過程。包一層 <Transition>，Vue 才會在元素真正被加進 DOM 之前
+                  呼叫 @enter，元素被拿掉之前呼叫 @leave，讓我們有機會在這兩個時間點插入
+                  anime.js 的動畫。:css="false" 是告訴 Vue「這裡的動畫由 JS（anime.js）
+                  自己控制，不用去偵測 CSS transition/animation 的結束事件」，
+                  不然 Vue 預設會等 CSS transitionend 事件，但這裡根本沒有寫 CSS transition。
+                  v-if 從原本放在 <Teleport> 上，改成放在裡面這個真正的元素上——
+                  Transition 是靠偵測「包住的這個元素」被插入/移除來觸發 enter/leave，
+                  v-if 要跟著移到這裡才抓得到。
+                -->
+                <Transition @enter="onEditModalEnter" @leave="onEditModalLeave" :css="false">
+                  <div v-if="editingPostId === post.communityPostId" class="edit-modal-overlay" @click.self="cancelEdit">
+                    <div class="edit-modal">
                     <!-- 新增一個標題列：跟原本純表單比起來更有「這是一個彈出視窗」的感覺，右上角 ✕ 也能關閉 -->
                     <div class="edit-modal-header">
                       <h3 class="edit-modal-title">編輯貼文</h3>
@@ -747,6 +802,7 @@ const toggleFollow = async () => {
                     </div>
                   </div>
                 </div>
+                </Transition>
               </Teleport>
 
               <div v-if="editingPostId !== post.communityPostId" class="post-manage-actions">
@@ -796,7 +852,18 @@ const toggleFollow = async () => {
 
         <!-- v-else（搭配上面裡層的 v-if）：收藏清單是空的時候，顯示這個提示，而不是一片空白 -->
         <div v-else class="empty-state">
-          <div class="empty-icon">📁</div>
+          <!--
+            原本這裡是用 emoji（📁）當圖示，跟之前 ChatView.vue 的相機按鈕圖示消失
+            是同一類風險：emoji 靠字型渲染，換一台電腦、換個瀏覽器字型設定就可能跑掉或消失；
+            這裡也還沒踩到問題，但既然已經在處理圖示一致性，先換成 SVG 畫的線條圖示——
+            不吃字型，風格上也比較貼近網站其他地方（搜尋圖示、輪播箭頭）用的線條風。
+          -->
+          <svg class="empty-icon" viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 8l2.5-4h11L20 8" />
+            <path d="M4 8v10a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 18V8" />
+            <path d="M4 8h16" />
+            <path d="M9.5 12h5" />
+          </svg>
           <p class="empty-note">「還沒有收藏任何穿搭，去社群逛逛按個收藏吧。」</p>
         </div>
       </div>
@@ -1093,8 +1160,8 @@ const toggleFollow = async () => {
   background:var(--paper);
   border-radius:14px;
   width:100%;
-  max-width:640px;
-  max-height:88vh;
+  max-width:760px;
+  max-height:90vh;
   box-shadow:0 20px 60px rgba(42,36,32,.35);
   display:flex; flex-direction:column;
   overflow:hidden; /* 讓內層 .edit-form 自己捲動，標題列跟底部按鈕才能固定不跟著捲走 */
@@ -1247,7 +1314,7 @@ const toggleFollow = async () => {
   background:var(--paper); border:1px solid var(--hairline); border-radius:22px;
   padding:3.5rem 2rem; text-align:center; margin-top:2rem;
 }
-.empty-icon{ font-size:2.2rem; margin-bottom:.8rem; opacity:.7; }
+.empty-icon{ display:block; margin:0 auto .8rem; color:var(--ink-soft); opacity:.7; }
 .empty-note{
   font-family:'Noto Serif TC', serif; font-style:italic;
   color:var(--ink-soft); font-size:.95rem; margin:0;

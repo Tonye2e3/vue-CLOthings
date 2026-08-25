@@ -199,7 +199,15 @@ export const toggleSavePost = async (post) => {
 // ============================================================
 // 這裡開始是這個頁面「自己專屬」的邏輯，不會被其他檔案拿去用
 // ============================================================
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+// useRoute：讀網址上的查詢字串（例如從 PostDetailView.vue 點某個標記商品的標籤
+// 跳過來時，網址會帶 ?tag=商品名稱），讓這個頁面一打開就自動用那個商品名稱篩選貼文。
+import { useRoute } from 'vue-router'
+// animate：anime.js v4 的動畫函式。這裡用來做貼文卡片的捲動進場動畫——
+// 卡片捲動到看得見的範圍內才淡入＋往上滑一點點，不是一渲染出來就播。
+import { animate } from 'animejs'
+
+const route = useRoute()
 
 // authStore：只用來讀 isAdmin，決定要不要顯示「管理後台」入口按鈕。
 // useAuthStore 已經在上面那個 <script>（非 setup）區塊 import 過了，這裡直接呼叫就好。
@@ -210,11 +218,16 @@ const authStore = useAuthStore()
 // 有些是佔位用的、對應的檔案還沒真的放上去）。
 // 失敗時把圖片來源換成 dicebear 產生的預設頭像，畫面才不會出現「圖片壞掉」的圖示。
 const onAvatarError = (event, name) => {
-  // 加個保護：如果換成 dicebear 網址後還是失敗（例如完全沒有網路），
-  // 就不要再觸發一次 @error，避免無限迴圈一直重新請求。
-  if (event.target.dataset.fallback) return
-  event.target.dataset.fallback = '1'
-  event.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+  // 用「換過的網址是不是已經是預設圖」來判斷要不要再換一次，而不是用一個存在
+  // DOM 元素上的旗標（dataset.fallback）——原本那種寫法在「單一、被重複使用」的
+  // 大頭貼欄位上（不是 v-for 跑出來的，例如封面故事卡只有一個）會有問題：換了一篇
+  // 不同的貼文當封面故事，Vue 只會更新同一個 <img> 的 src，不會整個重新產生新元素，
+  // 舊的旗標還留著，新網址就算真的載入失敗，也會被舊旗標擋下來、不會真的換成預設圖。
+  // 改成比對「現在這個網址是不是已經是預設圖網址」，不會有這種「換了新資料，
+  // 但舊旗標還卡著」的問題。
+  const fallbackUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+  if (event.target.src === fallbackUrl) return
+  event.target.src = fallbackUrl
 }
 
 // posts 已經在上面的 <script> 區塊宣告並 export，這裡同一個檔案內可以直接使用，不用再 import
@@ -395,7 +408,16 @@ const tabPosts = computed(() => {
 
 // 搜尋（可搜尋貼文標題、標籤商品、用戶名），在目前分頁的結果之上再過濾一次
 // searchQuery：使用者在搜尋框打的文字，會透過 v-model 自動雙向同步（下面 template 會看到）。
-const searchQuery = ref('')
+const searchQuery = ref(route.query.tag || '')
+
+// 從 PostDetailView.vue 點某個標記商品的標籤跳過來時，網址是 /community?tag=商品名稱，
+// 上面已經在宣告 searchQuery 的當下讀了一次網址的初始值；但如果使用者本來就已經在
+// 社群首頁，又點了另一篇貼文裡不同商品的標籤，Vue Router 會直接重用同一個元件
+// （不會整個重新整理、重新掛載），上面那個初始值只會套用一次，之後網址查詢字串
+// 再怎麼變都不會自動反映。這裡另外監看 route.query.tag，之後變了就同步更新搜尋框。
+watch(() => route.query.tag, (newTag) => {
+  if (newTag) searchQuery.value = newTag
+})
 
 const filteredPosts = computed(() => {
   // .trim()：把文字前後多餘的空白刪掉。
@@ -472,6 +494,47 @@ const nextCardImage = (post) => {
   cardImageIndex[post.communityPostId] = (cur + 1) % len
 }
 
+// ============================================================
+// 滑鼠移上去才自動輪播（預覽用）：跟 PostDetailView.vue 主圖那種「進頁面就自動一直播」
+// 不一樣，這裡是一個上面同時會出現很多張卡片的動態牆，如果每張卡片自己就自動一直輪播，
+// 畫面會變得很雜亂。改成只有滑鼠正在看的那張卡片才會動，移開就停下來、
+// 回到第一張（封面圖）——跟很多購物網站「滑過商品圖預覽其他角度」的邏輯一樣。
+// ============================================================
+
+// cardAutoplayTimers：目前正在自動播放的網格卡片，用 Map 記錄「哪篇貼文對應哪個計時器」，
+// 因為同時可能有好幾張卡片被滑過，需要各自獨立的計時器（不能只用一個共用的）。
+const cardAutoplayTimers = new Map()
+const CARD_AUTOPLAY_INTERVAL = 1200
+
+const startCardAutoplay = (post) => {
+  if (post.images.length <= 1) return
+  const timer = setInterval(() => nextCardImage(post), CARD_AUTOPLAY_INTERVAL)
+  cardAutoplayTimers.set(post.communityPostId, timer)
+}
+const stopCardAutoplay = (post) => {
+  const timer = cardAutoplayTimers.get(post.communityPostId)
+  if (timer) {
+    clearInterval(timer)
+    cardAutoplayTimers.delete(post.communityPostId)
+  }
+  // 滑鼠移開後歸零，回到封面圖（第一張），不要停在滑到一半的那張。
+  cardImageIndex[post.communityPostId] = 0
+}
+
+// 封面故事卡只有單獨一張，邏輯一樣但不用像網格卡片那樣用 Map 記，單一個計時器變數就夠了。
+let featureAutoplayTimer = null
+const startFeatureAutoplay = () => {
+  if (!featurePost.value || featurePost.value.images.length <= 1) return
+  featureAutoplayTimer = setInterval(nextFeatureImage, CARD_AUTOPLAY_INTERVAL)
+}
+const stopFeatureAutoplay = () => {
+  if (featureAutoplayTimer) {
+    clearInterval(featureAutoplayTimer)
+    featureAutoplayTimer = null
+  }
+  featureImageIndex.value = 0
+}
+
 // gridPosts：如果正在搜尋，網格就顯示全部搜尋結果；
 // 如果沒有搜尋，網格就顯示「除了第一篇以外」的其他貼文
 // （.slice(1) 的意思是「從陣列的第 1 筆開始，取到最後」，等於跳過第 0 筆）。
@@ -503,8 +566,99 @@ watch([currentTab, searchQuery], () => {
 
 // 換了一篇不同的貼文當封面故事時（例如切分頁），輪播位置重設回第一張，
 // 不然可能會卡在「上一篇封面故事」切到的第 3 張，但新的這篇根本沒有第 3 張圖。
+const featureCardEl = ref(null)
 watch(() => featurePost.value?.communityPostId, () => {
   featureImageIndex.value = 0
+})
+
+// ============================================================
+// 捲動觸發進場動畫：卡片不是「一渲染出來就播動畫」，而是真的捲動到
+// 看得見的範圍內，才淡入＋往上滑一點點。用瀏覽器內建的 IntersectionObserver
+// 判斷「這個元素現在有沒有進入可視範圍」，交給 anime.js 的 animate() 做實際的動畫效果。
+// ============================================================
+
+// scrollAnimatedIds：記錄「已經播過捲動進場動畫」的貼文 id，避免同一張卡片捲出畫面
+// 又捲回來時重複播放（每張卡片只在第一次進入視窗時播一次，之後就維持顯示狀態）。
+const scrollAnimatedIds = new Set()
+
+// runRevealAnimation：實際播放淡入＋上滑的動畫，並在動畫播完後把 anime.js 留下的
+// 行內 opacity／transform 樣式清掉——原因跟之前貼文卡片進場動畫一樣：這幾張卡片本身
+// 有 :hover 效果會用到 transform（滑鼠移上去卡片往上浮），行內樣式的優先權比 CSS
+// class 高，動畫播完後如果不清掉，transform 會一直卡在動畫結束的值，蓋掉 hover 效果。
+const runRevealAnimation = (el, translateFrom = 20, duration = 500) => {
+  animate(el, {
+    opacity: [0, 1],
+    translateY: [translateFrom, 0],
+    duration,
+    ease: 'outQuad',
+    onComplete: () => {
+      el.style.opacity = ''
+      el.style.transform = ''
+    }
+  })
+}
+
+// cardObserver：只建立一次的 IntersectionObserver 實例，之後所有卡片都共用同一個，
+// 不用每張卡片各自 new 一個觀察器，比較省資源。
+// threshold: .15：卡片至少露出 15% 才算「進入畫面」，不用等整張卡片完全捲進來才觸發。
+// rootMargin 的 -40px：讓觸發點往上收一點，卡片還沒完全貼到畫面最底部就開始播動畫，
+// 使用者往下捲的時候比較不會覺得「動畫慢半拍」。
+let cardObserver = null
+const getCardObserver = () => {
+  if (cardObserver) return cardObserver
+  cardObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return
+      runRevealAnimation(entry.target)
+      // unobserve：這張卡片已經播過動畫了，不用繼續盯著它的捲動狀態，
+      // 節省效能，也確保「只在第一次進入畫面時播放一次」。
+      cardObserver.unobserve(entry.target)
+    })
+  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' })
+  return cardObserver
+}
+
+// observeGridCards：把「目前畫面上、還沒被觀察過」的卡片元素交給 IntersectionObserver
+// 盯著——呼叫時機是 visibleGridPosts 改變的時候（見下面的 watch）：不管是第一次載入、
+// 切換分頁、搜尋結果改變，還是按「載入更多穿搭」多顯示出幾篇，都會經過這裡。
+// 卡片本身一開始不會播動畫，是先把 opacity 設成 0（用行內樣式暫時藏起來），
+// 真正捲進畫面、被 IntersectionObserver 偵測到的那一刻，才會播放淡入效果。
+const observeGridCards = () => {
+  const observer = getCardObserver()
+  document.querySelectorAll('.post-grid .post-card').forEach((el, idx) => {
+    const post = visibleGridPosts.value[idx]
+    if (!post || scrollAnimatedIds.has(post.communityPostId)) return
+    scrollAnimatedIds.add(post.communityPostId)
+    el.style.opacity = '0'
+    observer.observe(el)
+  })
+}
+
+// flush: 'post'：這個 watch 的 callback 會在 Vue 把畫面（DOM）真正更新完之後才執行，
+// 不用自己再包一層 nextTick(...) 去等畫面更新——observeGridCards 裡面要用
+// document.querySelectorAll 抓真正畫出來的 <div class="post-card">，一定要等
+// DOM 更新完成才抓得到剛渲染出來的新卡片。
+watch(visibleGridPosts, () => {
+  observeGridCards()
+}, { flush: 'post' })
+
+// 封面故事卡片也用同一套邏輯，只是它只有單獨一張，直接用 featureCardEl 這個範本參照，
+// 不用像網格卡片那樣批次抓 DOM，動畫細節（滑動距離、時長）跟網格卡片共用同一顆
+// runRevealAnimation，維持一致的節奏感。
+watch(featureCardEl, (el) => {
+  if (!el) return
+  el.style.opacity = '0'
+  getCardObserver().observe(el)
+})
+
+// onUnmounted：離開這個頁面時，把 IntersectionObserver 跟所有還在跑的卡片自動輪播
+// 計時器都停掉，不然使用者離開頁面後，這些觀察器／計時器還留在記憶體裡繼續運作，
+// 是不必要的資源浪費。
+onUnmounted(() => {
+  if (cardObserver) cardObserver.disconnect()
+  cardAutoplayTimers.forEach(timer => clearInterval(timer))
+  cardAutoplayTimers.clear()
+  if (featureAutoplayTimer) clearInterval(featureAutoplayTimer)
 })
 
 // 點擊追蹤按鈕時呼叫：把該達人的 isFollowing 改成相反的值。
@@ -616,12 +770,21 @@ const toggleFollow = async (creator) => {
 
         <div class="d-flex align-items-center gap-2">
           <!-- 管理後台入口：只有登入者是管理員才會出現。放在這裡（社群首頁）是因為
-               管理員帳號沒有自己的個人頁可以放這顆按鈕，但每個登入的人本來就會經過這頁。 -->
+               管理員帳號沒有自己的個人頁可以放這顆按鈕，但每個登入的人本來就會經過這頁。
+               原本這裡是用 emoji（🛠）當圖示，跟之前 ChatView.vue 相機按鈕、
+               UserProfileView.vue 收藏空狀態圖示消失是同一類風險：emoji 靠字型渲染，
+               換一台電腦、換個瀏覽器字型設定就可能跑掉或消失。這裡也一起換成 SVG
+               扳手圖示，統一整個 Community 的圖示風格。 -->
           <router-link
             v-if="authStore.isAdmin"
             to="/admin/community/posts"
             class="btn-admin-entry text-decoration-none"
-          >🛠 管理後台</router-link>
+          >
+            <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.8 2.8-2-2 2.8-2.8z" />
+            </svg>
+            管理後台
+          </router-link>
           <router-link to="/community/create" class="btn-share text-decoration-none">
             ＋ 分享我的穿搭
           </router-link>
@@ -640,7 +803,7 @@ const toggleFollow = async (creator) => {
             還記得上面 script 裡的邏輯嗎？正在搜尋的時候 featurePost 會是 null，
             這時候這整塊就不會出現，搜尋結果會全部乖乖排在下面的網格裡。
           -->
-          <div class="feature-card" v-if="featurePost">
+          <div class="feature-card" v-if="featurePost" ref="featureCardEl">
             <!--
               feature-media 現在是一個普通的 div，不是 router-link 了——
               因為裡面要放輪播箭頭／圓點按鈕，如果整塊還是 router-link，
@@ -648,7 +811,7 @@ const toggleFollow = async (creator) => {
               改成：router-link 只包住圖片本身（點圖片才會跳轉到貼文詳情），
               箭頭、圓點則是跟 router-link 平級的兄弟元素，點下去不會觸發跳轉。
             -->
-            <div class="feature-media">
+            <div class="feature-media" @mouseenter="startFeatureAutoplay" @mouseleave="stopFeatureAutoplay">
               <router-link :to="`/community/post/${featurePost.communityPostId}`" class="feature-media-link d-block text-decoration-none">
                 <span class="tag-label">{{ currentTabCopy.ribbon }}</span>
                 <img :src="featurePost.images[featureImageIndex]?.url" :alt="featurePost.content" />
@@ -693,8 +856,23 @@ const toggleFollow = async (creator) => {
                 <h3>{{ featurePost.content }}</h3>
               </router-link>
               <div class="stat-row">
-                <span>♥ {{ formatCount(featurePost.likesCount) }}</span>
-                <span>💬 {{ formatCount(featurePost.commentsCount) }}</span>
+                <!--
+                  ♥、💬 原本是文字符號／emoji，這裡跟其他圖示一起換成 SVG 心形、對話框圖示，
+                  不吃字型、風格也跟輪播箭頭這類線條圖示一致。icon-inline 這個共用 class
+                  負責讓圖示跟旁邊的數字文字對齊。
+                -->
+                <span>
+                  <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                  {{ formatCount(featurePost.likesCount) }}
+                </span>
+                <span>
+                  <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" />
+                  </svg>
+                  {{ formatCount(featurePost.commentsCount) }}
+                </span>
               </div>
             </div>
           </div>
@@ -725,7 +903,7 @@ const toggleFollow = async (creator) => {
                 router-link 只包住圖片，箭頭／圓點是平級的兄弟元素，
                 點箭頭切換照片才不會被當成「點到卡片」一起跳轉到貼文詳情。
               -->
-              <div class="post-media">
+              <div class="post-media" @mouseenter="startCardAutoplay(post)" @mouseleave="stopCardAutoplay(post)">
                 <router-link :to="`/community/post/${post.communityPostId}`" class="post-media-link d-block text-decoration-none">
                   <span class="tag-label" v-if="post.taggedProducts && post.taggedProducts[0]">
                     {{ post.taggedProducts[0].name }}
@@ -776,9 +954,20 @@ const toggleFollow = async (creator) => {
                     formatCount(...)：post.likesCount／commentsCount 現在存的是純數字
                     （例如 1200），不是寫死的 '1.2k' 字串，畫面顯示時才呼叫 formatCount
                     轉換成縮寫格式。這樣資料本身仍然是「可以排序、可以比大小」的數字。
+                    ♥、💬 一樣換成跟封面故事卡同樣的 SVG 圖示，兩邊風格才會一致。
                   -->
-                  <span>♥ {{ formatCount(post.likesCount) }}</span>
-                  <span>💬 {{ formatCount(post.commentsCount) }}</span>
+                  <span>
+                    <svg class="icon-inline" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                    </svg>
+                    {{ formatCount(post.likesCount) }}
+                  </span>
+                  <span>
+                    <svg class="icon-inline" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" />
+                    </svg>
+                    {{ formatCount(post.commentsCount) }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -1042,7 +1231,11 @@ const toggleFollow = async (creator) => {
   border-top:1px dashed var(--hairline); padding-top:1rem; margin-top:1rem;
   font-size:.85rem; color:var(--ink-soft);
 }
+.stat-row span{ display:inline-flex; align-items:center; gap:.3rem; }
 .stat-row .link-out{ margin-left:auto; color:var(--plum); font-weight:600; text-decoration:none; border-bottom:1px solid var(--plum); }
+/* icon-inline：跟文字並排的小圖示共用樣式（心形、對話框、扳手），顏色跟著所在文字的
+   顏色走（currentColor），不用每個地方各自寫一次顏色。 */
+.icon-inline{ flex-shrink:0; }
 
 /* ---------- 貼文網格 ---------- */
 .post-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:1.4rem; }
@@ -1074,6 +1267,7 @@ const toggleFollow = async (creator) => {
   padding-top:.8rem; border-top:1px solid var(--hairline);
   font-size:.8rem; color:var(--ink-soft);
 }
+.post-foot span{ display:inline-flex; align-items:center; gap:.3rem; }
 .post-foot a{ margin-left:auto; color:var(--plum); text-decoration:none; font-weight:600; }
 
 .line-clamp-2{
