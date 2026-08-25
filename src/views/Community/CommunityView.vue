@@ -421,7 +421,11 @@ const fetchCreators = async () => {
       name: c.name,
       // c.avatar 一樣是相對路徑，要接上 IMAGE_BASE；沒設大頭貼的人用預設頭像頂著。
       avatar: c.avatar ? `${IMAGE_BASE}${c.avatar}` : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + c.name,
-      meta: `${formatCount(c.followersCount)}追蹤`,
+      // followersCount 改存「純數字」，不是先組好的 "4追蹤" 字串——這樣按下追蹤／取消追蹤
+      // 的時候，才能直接把這個數字 +1 / -1，畫面上的粉絲數即時更新。
+      // 如果先組成字串存起來，之後要更新就要整個字串重新拼一次，不如一開始就存數字，
+      // 顯示的時候（template 裡）才用 formatCount() 轉成「4追蹤」這種格式。
+      followersCount: c.followersCount,
       isFollowing: c.isFollowing,
       userFollowId: c.userFollowId
     }))
@@ -752,6 +756,7 @@ const toggleFollow = async (creator) => {
     }
     creator.isFollowing = false
     creator.userFollowId = null
+    creator.followersCount -= 1 // 取消追蹤，粉絲數立刻減 1，不用重新整理頁面、重打 API 才看得到
   } else {
     try {
       await api.post(`/UserFollow`, {
@@ -763,6 +768,7 @@ const toggleFollow = async (creator) => {
       return
     }
     creator.isFollowing = true
+    creator.followersCount += 1 // 追蹤成功，粉絲數立刻加 1
     // POST 沒有回傳新建紀錄的 id，重新問一次這位使用者的追蹤狀態，拿到真正的 userFollowId。
     try {
       const statusRes = await api.get(`/UserFollow/follower/${currentUserId.value}/following/${creator.id}`)
@@ -1105,7 +1111,7 @@ const toggleFollow = async (creator) => {
                 <img class="stylist-avatar" :src="creator.avatar" alt="avatar" @error="onAvatarError($event, creator.name)" />
                 <div class="min-w-0">
                   <div class="stylist-name text-truncate">{{ creator.name }}</div>
-                  <div class="stylist-meta">{{ creator.meta }}</div>
+                  <div class="stylist-meta">{{ formatCount(creator.followersCount) }}追蹤</div>
                 </div>
               </router-link>
               <button
