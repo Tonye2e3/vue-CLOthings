@@ -300,6 +300,7 @@ onMounted(async () => {
   fetchPosts()
   await loadCurrentUserId()
   loadSavedPosts()
+  loadLikedPosts()
   fetchCreators()
 })
 
@@ -313,6 +314,75 @@ const formatCount = (n) => {
     return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
   }
   return String(n)
+}
+
+// ============================================================
+// 按讚功能：跟 PostDetailView.vue 是同一套 PostLike API，
+// 只是那邊一次只顯示「一篇」貼文的按讚狀態，這裡是一整面卡片牆，
+// 用一個 Map 記錄「這個使用者總共讚過哪些貼文、每篇對應的 postLikesId」，
+// 不用每張卡片各自打一次 API 去問。
+// ============================================================
+
+// likedPostIds：key 是 communityPostId，value 是這筆讚的 postLikesId（取消讚要用到）。
+// 用 reactive 包住一個 Map，畫面才會隨著這份資料改變自動更新。
+const likedPostIds = reactive(new Map())
+
+// loadLikedPosts：打 PostLikeController.cs 的 GET api/PostLike/user/{userid}，
+// 把這個使用者按過的所有讚一次抓回來，填進 likedPostIds。
+const loadLikedPosts = async () => {
+  try {
+    const res = await api.get(`/PostLike/user/${currentUserId.value}`)
+    likedPostIds.clear()
+    res.data.forEach(like => {
+      likedPostIds.set(like.communityPostId, like.postLikesId)
+    })
+  } catch (err) {
+    console.error('讀取按讚清單失敗：', err)
+  }
+}
+
+// isPostLiked：這篇貼文（用 communityPostId 判斷）現在是不是在已讚清單裡。
+const isPostLiked = (communityPostId) => likedPostIds.has(communityPostId)
+
+// toggleLikePost：按下卡片上的愛心時執行。post 參數是 template 裡
+// @click="toggleLikePost(post)" 傳進來的，代表「使用者點的是哪一篇貼文」。
+// 跟 PostDetailView.vue 的 toggleLike 是同一套邏輯（先看有沒有讚過，決定要打 POST 還是
+// DELETE），只是這邊要多一個步驟：改到 likedPostIds 這個共用的 Map，而不是單一個變數。
+const toggleLikePost = async (post) => {
+  const likeId = likedPostIds.get(post.communityPostId)
+  if (likeId) {
+    // 已經讚過 → 這次是要取消讚 → 打 DELETE
+    try {
+      await api.delete(`/PostLike/${likeId}`)
+    } catch (err) {
+      console.error('取消讚失敗：', err)
+      return
+    }
+    likedPostIds.delete(post.communityPostId)
+    post.likesCount -= 1
+  } else {
+    // 還沒讚過 → 這次是要按讚 → 打 POST 新增一筆
+    try {
+      await api.post(`/PostLike`, {
+        communityPostId: post.communityPostId,
+        userId: currentUserId.value
+      })
+    } catch (err) {
+      console.error('按讚失敗：', err)
+      return
+    }
+    // POST 只會回傳成功與否，不會回傳剛剛新增那筆紀錄的 id，
+    // 所以要重新問一次後端才知道這筆讚的 postLikesId 是多少（之後要取消讚會用到），
+    // 跟 PostDetailView.vue toggleLike 的做法一樣，只是這裡只需要問「這一篇」就好，
+    // 不用整份 loadLikedPosts() 重打一次。
+    try {
+      const res = await api.get(`/PostLike/post/${post.communityPostId}/user/${currentUserId.value}`)
+      if (res.data) likedPostIds.set(post.communityPostId, res.data.postLikesId)
+    } catch (err) {
+      console.error('讀取剛剛按讚的紀錄失敗：', err)
+    }
+    post.likesCount += 1
+  }
 }
 
 // 分頁 Tab 狀態
@@ -860,13 +930,16 @@ const toggleFollow = async (creator) => {
                   ♥、💬 原本是文字符號／emoji，這裡跟其他圖示一起換成 SVG 心形、對話框圖示，
                   不吃字型、風格也跟輪播箭頭這類線條圖示一致。icon-inline 這個共用 class
                   負責讓圖示跟旁邊的數字文字對齊。
+                  愛心那顆現在是可以按的：:class="{ liked: ... }" 決定要不要顯示紅色強調，
+                  :fill 決定要不要整顆填滿（已讚＝實心，跟 PostDetailView.vue 是同一套視覺邏輯），
+                  @click="toggleLikePost(featurePost)" 呼叫上面 script 定義的按讚／取消讚函式。
                 -->
-                <span>
-                  <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <button type="button" class="stat-like-btn" :class="{ liked: isPostLiked(featurePost.communityPostId) }" @click="toggleLikePost(featurePost)">
+                  <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" :fill="isPostLiked(featurePost.communityPostId) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                   </svg>
                   {{ formatCount(featurePost.likesCount) }}
-                </span>
+                </button>
                 <span>
                   <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" />
@@ -955,13 +1028,14 @@ const toggleFollow = async (creator) => {
                     （例如 1200），不是寫死的 '1.2k' 字串，畫面顯示時才呼叫 formatCount
                     轉換成縮寫格式。這樣資料本身仍然是「可以排序、可以比大小」的數字。
                     ♥、💬 一樣換成跟封面故事卡同樣的 SVG 圖示，兩邊風格才會一致。
+                    愛心一樣可以直接在卡片上按，跟封面故事卡是同一套 toggleLikePost 邏輯。
                   -->
-                  <span>
-                    <svg class="icon-inline" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <button type="button" class="stat-like-btn" :class="{ liked: isPostLiked(post.communityPostId) }" @click="toggleLikePost(post)">
+                    <svg class="icon-inline" viewBox="0 0 24 24" width="13" height="13" :fill="isPostLiked(post.communityPostId) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                     </svg>
                     {{ formatCount(post.likesCount) }}
-                  </span>
+                  </button>
                   <span>
                     <svg class="icon-inline" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" />
@@ -1232,6 +1306,17 @@ const toggleFollow = async (creator) => {
   font-size:.85rem; color:var(--ink-soft);
 }
 .stat-row span{ display:inline-flex; align-items:center; gap:.3rem; }
+/* stat-like-btn：跟旁邊 <span> 留言數字視覺上要對齊，但這個是可以點的 <button>，
+   要先把瀏覽器預設的按鈕樣式（邊框、底色、內距）都歸零，只留下跟 span 一樣的排版。
+   已讚時整體套用跟 PostDetailView.vue 一樣的紅色（#B4453A），呼應同一個「已按讚」的視覺語言。 */
+.stat-like-btn{
+  display:inline-flex; align-items:center; gap:.3rem;
+  background:none; border:none; padding:0; margin:0;
+  font-size:inherit; font-family:inherit; color:inherit;
+  cursor:pointer; transition:color .18s ease;
+}
+.stat-like-btn:hover{ color:#B4453A; }
+.stat-like-btn.liked{ color:#B4453A; font-weight:600; }
 .stat-row .link-out{ margin-left:auto; color:var(--plum); font-weight:600; text-decoration:none; border-bottom:1px solid var(--plum); }
 /* icon-inline：跟文字並排的小圖示共用樣式（心形、對話框、扳手），顏色跟著所在文字的
    顏色走（currentColor），不用每個地方各自寫一次顏色。 */
