@@ -1,7 +1,6 @@
 <script setup>
 
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
 
 // 團購購物車 store：跟商品詳情頁共用同一份購物車資料
 import { useGroupCartStore } from '@/stores/groupCart'
@@ -20,32 +19,11 @@ const resolveImageUrl = (path) => {
 }
 
 
-const route = useRoute()
 const cartStore = useGroupCartStore()
 const authStore = useAuthStore()
 
 const searchKeyword = ref('')
 
-// 左側選單：一般會員只看得到「專案瀏覽」「團購紀錄」，
-// Admin / SuperAdmin 登入時，「團購紀錄」下面會多出後台管理的兩個項目
-const navItems = computed(() => {
-  const items = [
-    { label: '專案瀏覽', icon: 'user', to: '/GroupShop' },
-    { label: '團購紀錄', icon: 'history', to: '/GroupShop/orders' }
-  ]
-  if (authStore.isAdmin) {
-    items.push(
-      { label: '團購商品管理', icon: 'box', to: '/GroupShop/admin/products' },
-      { label: '團購訂單管理', icon: 'clipboard', to: '/GroupShop/admin/orders' }
-    )
-  }
-  return items
-})
-// 判斷選單項目是否為目前所在頁面（用來加上醒目樣式）
-const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : route.path.startsWith(to))
-
-// 會員名稱：登入狀態統一用 useAuthStore()，尚未登入則顯示預設值
-const memberName = computed(() => authStore.name || '會員')
 // 一般管理員（Admin）前台只能看不能操作，SuperAdmin 不受限
 const isReadOnly = computed(() => authStore.role === 'Admin')
 // 購物車商品數量：直接從 store 拿，跨頁面即時反映實際品項數
@@ -54,6 +32,8 @@ const cartCount = computed(() => cartStore.items.length)
 // 商品目錄：改成向 GroupProductController 拿，欄位跟原本的假資料結構相容
 // （id / name / imageUrl / listPrice / tiers[{qty,discount,unitPrice}] / orderedQty / intro）
 const products = ref([])
+// 商品資料是否還在載入中：true 時畫面顯示骨架屏卡片，避免空白畫面
+const isLoading = ref(true)
 
 onMounted(async () => {
   // 管理員（Admin）沒有購物車權限，fetchCart 會回 403，
@@ -63,7 +43,11 @@ onMounted(async () => {
   } catch (e) {
     // 忽略，購物車數量顯示 0 即可
   }
-  products.value = await getGroupProducts()
+  try {
+    products.value = await getGroupProducts()
+  } finally {
+    isLoading.value = false
+  }
 })
 
 // 讀取購物車裡此商品目前的數量：直接從 store 裡的 items 陣列找
@@ -147,6 +131,8 @@ const banners = ref([
   }
 ])
 const currentSlide = ref(0)
+// 目前顯示的輪播圖：搭配 <Transition> 做淡入淡出轉場
+const currentBanner = computed(() => banners.value[currentSlide.value])
 const prevSlide = () => {
   currentSlide.value = (currentSlide.value - 1 + banners.value.length) % banners.value.length
 }
@@ -159,74 +145,32 @@ const nextSlide = () => {
   <div class="clo-shell">
     <!-- 搜尋欄在輪播圖下方；購物車圖示改為右下角浮動按鈕，見頁面最下方 -->
     <div class="clo-body">
-      <!-- ============ 左側選單 ============ -->
-      <aside class="clo-sidebar">
-        <nav class="sidebar-nav">
-          <template v-for="item in navItems" :key="item.label">
-            <router-link
-              v-if="item.to"
-              :to="item.to"
-              class="nav-item"
-              :class="{ active: isActive(item.to) }"
-            >
-              <span class="nav-icon">
-                <!--顯示對應的嵌入式 SVG 圖示-->
-                <svg v-if="item.icon === 'user'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-                <svg v-else-if="item.icon === 'history'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="1 4 1 10 7 10"></polyline>
-                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                </svg>
-                <svg v-else-if="item.icon === 'box'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
-                  <polyline points="3.29 7 12 12 20.71 7"></polyline>
-                  <line x1="12" y1="22" x2="12" y2="12"></line>
-                </svg>
-                <svg v-else-if="item.icon === 'clipboard'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                  <line x1="9" y1="12" x2="15" y2="12"></line>
-                  <line x1="9" y1="16" x2="15" y2="16"></line>
-                </svg>
-              </span>
-              <span>{{ item.label }}</span>
-            </router-link>
-          </template>
-        </nav>
-
-      </aside>
-
-      <!-- ============ 主要內容區：商品列表 ============ -->
+      <!-- ============ 主要內容區：商品列表（滿版，無側邊選單） ============ -->
       <main class="clo-main">
     <!-- ============ 首頁輪播圖 ============ -->
     <section class="carousel">
-      <button class="carousel-arrow carousel-arrow-left" type="button" @click="prevSlide" aria-label="上一張">
+      <button class="carousel-arrow carousel-arrow-left go-icon-tap" type="button" @click="prevSlide" aria-label="上一張">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="15 18 9 12 15 6"></polyline>
         </svg>
       </button>
 
       <div class="carousel-track">
-        <div
-          v-for="(banner, idx) in banners"
-          v-show="idx === currentSlide"
-          :key="idx"
-          class="carousel-slide"
-        >
-          <img :src="banner.image" class="carousel-img" :alt="banner.title" />
-          <div class="carousel-overlay"></div>
-          <div class="carousel-content">
-            <span class="carousel-badge">{{ banner.badge }}</span>
-            <h3 class="carousel-title">{{ banner.title }}</h3>
-            <p class="carousel-subtitle">{{ banner.subtitle }}</p>
-            <p class="carousel-price">NT$&nbsp;{{ formatCurrency(banner.price) }}</p>
+        <Transition name="go-fade" mode="out-in">
+          <div :key="currentSlide" class="carousel-slide">
+            <img :src="currentBanner.image" class="carousel-img" :alt="currentBanner.title" />
+            <div class="carousel-overlay"></div>
+            <div class="carousel-content">
+              <span class="carousel-badge">{{ currentBanner.badge }}</span>
+              <h3 class="carousel-title">{{ currentBanner.title }}</h3>
+              <p class="carousel-subtitle">{{ currentBanner.subtitle }}</p>
+              <p class="carousel-price">NT$&nbsp;{{ formatCurrency(currentBanner.price) }}</p>
+            </div>
           </div>
-        </div>
+        </Transition>
       </div>
 
-      <button class="carousel-arrow carousel-arrow-right" type="button" @click="nextSlide" aria-label="下一張">
+      <button class="carousel-arrow carousel-arrow-right go-icon-tap" type="button" @click="nextSlide" aria-label="下一張">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="9 18 15 12 9 6"></polyline>
         </svg>
@@ -236,7 +180,7 @@ const nextSlide = () => {
         <span
           v-for="(banner, idx) in banners"
           :key="`dot-${idx}`"
-          class="carousel-dot"
+          class="carousel-dot go-icon-tap"
           :class="{ active: idx === currentSlide }"
           @click="currentSlide = idx"
         ></span>
@@ -246,7 +190,7 @@ const nextSlide = () => {
     <!-- ============ 關鍵字搜尋（放在輪播圖下方） ============ -->
     <div class="clo-search-below mb-4">
       <input v-model="searchKeyword" type="text" placeholder="搜尋項目" />
-      <button class="search-btn" type="button" aria-label="搜尋">
+      <button class="search-btn go-btn-tap" type="button" aria-label="搜尋">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"></circle>
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -269,9 +213,23 @@ const nextSlide = () => {
           </svg>
         </span> 未達團購數量 (進行中)
       </div>
-      <div class="product-grid">
-        <div v-for="p in ongoingProducts" :key="p.id" class="product-card">
-          <router-link :to="`/GroupShop/product/${p.id}`" class="card-img-wrap">
+      <div v-if="isLoading" class="product-grid">
+        <div v-for="n in 4" :key="n" class="product-card">
+          <div class="card-img go-skeleton"></div>
+          <div class="card-info">
+            <div class="go-skeleton" style="width: 70%; height: 16px;"></div>
+            <div class="go-skeleton mt-2" style="width: 90%; height: 12px;"></div>
+            <div class="go-skeleton mt-2" style="width: 100%; height: 6px; border-radius: 999px;"></div>
+            <div class="d-flex justify-content-between align-items-center mt-2">
+              <div class="go-skeleton" style="width: 40%; height: 18px;"></div>
+              <div class="go-skeleton" style="width: 30%; height: 26px; border-radius: 6px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="product-grid go-stagger">
+        <div v-for="p in ongoingProducts" :key="p.id" class="product-card go-card-hover">
+          <router-link :to="`/GroupShop/product/${p.id}`" class="card-img-wrap go-img-zoom">
             <img :src="resolveImageUrl(p.imageUrl)" class="card-img" :alt="p.name" />
           </router-link>
           <div class="card-info">
@@ -289,11 +247,11 @@ const nextSlide = () => {
               <router-link
                 v-if="!isReadOnly"
                 :to="`/GroupShop/product/${p.id}`"
-                class="btn btn-main btn-sm"
+                class="btn btn-main btn-sm go-btn-tap"
               >
                 加入此團購
               </router-link>
-              <button v-else class="btn btn-main btn-sm" disabled title="管理員帳號僅供瀏覽，無法加入團購">
+              <button v-else class="btn btn-main btn-sm go-btn-tap" disabled title="管理員帳號僅供瀏覽，無法加入團購">
                 加入此團購
               </button>
             </div>
@@ -312,10 +270,24 @@ const nextSlide = () => {
           </svg>
         </span> 已達團購數量 (完成)
       </div>
-      <div class="product-grid">
+      <div v-if="isLoading" class="product-grid">
+        <div v-for="n in 4" :key="n" class="product-card">
+          <div class="card-img go-skeleton"></div>
+          <div class="card-info">
+            <div class="go-skeleton" style="width: 70%; height: 16px;"></div>
+            <div class="go-skeleton mt-2" style="width: 90%; height: 12px;"></div>
+            <div class="go-skeleton mt-2" style="width: 100%; height: 6px; border-radius: 999px;"></div>
+            <div class="d-flex justify-content-between align-items-center mt-2">
+              <div class="go-skeleton" style="width: 40%; height: 18px;"></div>
+              <div class="go-skeleton" style="width: 30%; height: 26px; border-radius: 6px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="product-grid go-stagger">
         <!-- v-for 把 completedProducts 陣列裡每一筆商品，重複產生一張卡片 -->
-        <div v-for="p in completedProducts" :key="p.id" class="product-card">
-          <router-link :to="`/GroupShop/product/${p.id}`" class="card-img-wrap">
+        <div v-for="p in completedProducts" :key="p.id" class="product-card go-card-hover">
+          <router-link :to="`/GroupShop/product/${p.id}`" class="card-img-wrap go-img-zoom">
             <img :src="resolveImageUrl(p.imageUrl)" class="card-img" :alt="p.name" />
           </router-link>
           <div class="card-info">
@@ -339,7 +311,7 @@ const nextSlide = () => {
     </div>
 
     <!-- ============ 浮動購物車按鈕（右下角，點擊直接跳到購物車畫面） ============ -->
-    <router-link to="/GroupShop/checkout" class="floating-cart" aria-label="前往購物車">
+    <router-link to="/GroupShop/checkout" class="floating-cart go-btn-tap" aria-label="前往購物車">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="9" cy="21" r="1"></circle>
         <circle cx="20" cy="21" r="1"></circle>
@@ -668,61 +640,91 @@ const nextSlide = () => {
   align-items: flex-start;
 }
 
-.clo-sidebar {
-  width: 220px;
-  flex-shrink: 0;
-  min-height: calc(100vh - 65px);
-  background-color: var(--color-bg-page);
-  border-right: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 20px 0;
-}
-
-.sidebar-nav {
-  display: flex;
-  flex-direction: column;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 24px;
-  color: var(--color-text-muted);
-  text-decoration: none;
-  font-size: 0.92rem;
-  border-left: 3px solid transparent;
-  cursor: pointer;
-}
-.nav-item:hover {
-  background-color: var(--color-hover-bg);
-}
-.nav-item.active {
-  color: var(--color-text);
-  font-weight: 700;
-  background-color: var(--color-active-bg);
-  border-left-color: var(--color-accent);
-}
-.nav-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-}
-
 .clo-main {
   flex: 1;
+  width: 100%;
   padding: 28px 32px;
   min-width: 0;
 }
 
 @media (max-width: 900px) {
-  .clo-sidebar { width: 72px; }
-  .nav-item span:last-child { display: none; }
   .carousel { height: 260px; }
   .carousel-content { max-width: 80%; left: 20px; bottom: 24px; }
   .carousel-title { font-size: 1.25rem; }
+}
+
+/* ============ 本頁用到的特效樣式（進場動畫／懸停／按鈕微動效／載入動畫），class 一律以 go- 開頭 ============ */
+@keyframes goFadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 一批卡片依序淡入滑入（最多算到第 12 個，之後統一延遲） */
+.go-stagger > * { animation: goFadeInUp 0.5s ease both; }
+.go-stagger > *:nth-child(1)  { animation-delay: 0.02s; }
+.go-stagger > *:nth-child(2)  { animation-delay: 0.06s; }
+.go-stagger > *:nth-child(3)  { animation-delay: 0.10s; }
+.go-stagger > *:nth-child(4)  { animation-delay: 0.14s; }
+.go-stagger > *:nth-child(5)  { animation-delay: 0.18s; }
+.go-stagger > *:nth-child(6)  { animation-delay: 0.22s; }
+.go-stagger > *:nth-child(7)  { animation-delay: 0.26s; }
+.go-stagger > *:nth-child(8)  { animation-delay: 0.30s; }
+.go-stagger > *:nth-child(9)  { animation-delay: 0.34s; }
+.go-stagger > *:nth-child(10) { animation-delay: 0.38s; }
+.go-stagger > *:nth-child(n+11) { animation-delay: 0.42s; }
+
+/* <Transition name="go-fade"> 用：淡入淡出 */
+.go-fade-enter-active, .go-fade-leave-active { transition: opacity 0.25s ease; }
+.go-fade-enter-from, .go-fade-leave-to { opacity: 0; }
+
+.go-card-hover { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+.go-card-hover:hover {
+  transform: translateY(-6px) scale(1.015);
+  box-shadow: 0 14px 26px rgba(74, 62, 61, 0.16);
+}
+
+/* 卡片圖片懸停放大（需包在 overflow:hidden 容器裡） */
+.go-img-zoom { overflow: hidden; }
+.go-img-zoom img { transition: transform 0.45s ease; }
+.go-img-zoom:hover img { transform: scale(1.08); }
+
+.go-btn-tap { transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease; }
+.go-btn-tap:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: 0 6px 14px rgba(74, 62, 61, 0.18);
+}
+.go-btn-tap:active:not(:disabled) {
+  transform: scale(0.94);
+  filter: brightness(0.97);
+}
+
+.go-icon-tap { transition: transform 0.15s ease, background-color 0.15s ease; }
+.go-icon-tap:hover { transform: scale(1.08); }
+.go-icon-tap:active { transform: scale(0.9); }
+
+@keyframes goShimmer {
+  0%   { background-position: -300px 0; }
+  100% { background-position: 300px 0; }
+}
+
+.go-skeleton {
+  position: relative;
+  background: linear-gradient(90deg, #ece3d8 25%, #f6f0e8 37%, #ece3d8 63%);
+  background-size: 600px 100%;
+  animation: goShimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+  color: transparent !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .go-stagger > *,
+  .go-card-hover,
+  .go-img-zoom img,
+  .go-btn-tap,
+  .go-icon-tap,
+  .go-skeleton {
+    animation-duration: 0.001s !important;
+    transition-duration: 0.001s !important;
+  }
 }
 </style>
