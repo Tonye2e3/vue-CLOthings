@@ -1,15 +1,9 @@
-import {
-  createRouter,
-  createWebHistory
-} from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
-import {
-  useAuthStore
-} from '@/stores/auth'
+import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
-  history: createWebHistory(
-    import.meta.env.BASE_URL),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     //內建主頁暫不使用
     {
@@ -36,6 +30,11 @@ const router = createRouter({
       path: '/shop/favorite',
       name: 'favorite',
       component: () => import('../views/Shop/ShopFavoriteView.vue'),
+    },
+    {
+      path: '/shop/search',
+      name: 'search',
+      component: () => import('../views/Shop/ShopSearchView.vue'),
     },
     {
       path: '/shop/product/:id',
@@ -95,7 +94,7 @@ const router = createRouter({
       name: 'GroupCart',
       component: () => import('../views/GroupShop/GroupCartView.vue'),
       meta: {
-        requiresAuth: true
+        requiresAuth: true,
       },
     },
     {
@@ -103,7 +102,7 @@ const router = createRouter({
       name: 'GroupOrders',
       component: () => import('../views/GroupShop/GroupOrdersView.vue'),
       meta: {
-        requiresAuth: true
+        requiresAuth: true,
       },
     },
     {
@@ -111,7 +110,7 @@ const router = createRouter({
       name: 'GroupCheckout',
       component: () => import('../views/GroupShop/GroupCheckoutView.vue'),
       meta: {
-        requiresAuth: true
+        requiresAuth: true,
       },
     },
     // 模擬付款頁：結帳送出後會先跳到這裡，付款結果確認後才會真的建立訂單
@@ -120,7 +119,7 @@ const router = createRouter({
       name: 'GroupFakePayment',
       component: () => import('../views/GroupShop/GroupFakePaymentView.vue'),
       meta: {
-        requiresAuth: true
+        requiresAuth: true,
       },
     },
     // 管理端：商品管理、訂單管理（僅 Admin / SuperAdmin 可進入）
@@ -130,7 +129,7 @@ const router = createRouter({
       component: () => import('../views/GroupShop/GroupProductAdminView.vue'),
       meta: {
         requiresAuth: true,
-        requiresAdmin: true
+        requiresAdmin: true,
       },
     },
     {
@@ -139,7 +138,7 @@ const router = createRouter({
       component: () => import('../views/GroupShop/GroupOrderAdminView.vue'),
       meta: {
         requiresAuth: true,
-        requiresAdmin: true
+        requiresAdmin: true,
       },
     },
 
@@ -157,7 +156,7 @@ const router = createRouter({
       name: 'CommunityFollowers',
       component: () => import('@/views/Community/FollowListView.vue'),
       props: {
-        mode: 'followers'
+        mode: 'followers',
       },
     },
     {
@@ -165,7 +164,7 @@ const router = createRouter({
       name: 'CommunityFollowing',
       component: () => import('@/views/Community/FollowListView.vue'),
       props: {
-        mode: 'following'
+        mode: 'following',
       },
     },
     {
@@ -193,7 +192,7 @@ const router = createRouter({
       name: 'CommunityMessages',
       component: () => import('@/views/Community/ChatView.vue'),
       meta: {
-        requiresAuth: true
+        requiresAuth: true,
       },
     },
     {
@@ -201,7 +200,7 @@ const router = createRouter({
       name: 'CommunityMessagesWith',
       component: () => import('@/views/Community/ChatView.vue'),
       meta: {
-        requiresAuth: true
+        requiresAuth: true,
       },
     },
     // 社群後台管理（管理者用，不是給一般使用者看的）
@@ -235,10 +234,11 @@ const router = createRouter({
       component: () => import('@/views/Users/User.vue'),
 
       meta: {
-        requiresAuth: true
+        requiresAuth: true,
       },
 
-      children: [{
+      children: [
+        {
           // /user
           path: '',
           name: 'user',
@@ -304,7 +304,7 @@ router.beforeEach((to) => {
   // 要進入的頁面需要管理員權限，而目前登入的角色不是 Admin / SuperAdmin
   if (to.meta.requiresAdmin && !authStore.isAdmin) {
     return {
-      name: 'home'
+      name: 'home',
     }
   }
 })
