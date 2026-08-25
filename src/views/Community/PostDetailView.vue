@@ -417,6 +417,53 @@ const closeShareMenu = () => {
   showShareMenu.value = false
 }
 
+// ============================================================
+// 檢舉功能
+// ============================================================
+
+const showReportMenu = ref(false)
+const reportReason = ref('')
+const reportSubmitting = ref(false)
+
+const toggleReportMenu = () => {
+  showReportMenu.value = !showReportMenu.value
+}
+const closeReportMenu = () => {
+  showReportMenu.value = false
+  reportReason.value = ''
+}
+
+// submitReport：送出檢舉。後端 PostReportController.cs 不是用真正的 HTTP 409 狀態碼
+// 表示「已經檢舉過了」，是回傳 200 但內容是 { ok: false, code: 409 } 這種格式
+// （跟專案裡其他 Controller 是同一套 ResultDTO 慣例），所以這裡要檢查 res.data.ok，
+// 不能只靠 try/catch 抓錯誤——用 try/catch 抓不到「已經檢舉過」這種情況，
+// 因為對 axios 來說這仍然是一個成功的 200 回應。
+const submitReport = async () => {
+  const reason = reportReason.value.trim()
+  if (!reason) return
+  reportSubmitting.value = true
+  try {
+    const res = await api.post('/PostReport', {
+      communityPostId: post.value.communityPostId,
+      reporterId: currentUserId.value,
+      reason
+    })
+    if (res.data.ok) {
+      alert('已送出檢舉，謝謝你的回報！')
+    } else if (res.data.code === 409) {
+      alert('你已經檢舉過這篇貼文了')
+    } else {
+      alert('檢舉失敗，請稍後再試一次！')
+    }
+  } catch (err) {
+    console.error('檢舉失敗：', err)
+    alert('檢舉失敗，請稍後再試一次！')
+  } finally {
+    reportSubmitting.value = false
+    closeReportMenu()
+  }
+}
+
 // linkCopied：複製連結成功後，短暫把按鈕文字換成「已複製！」給使用者一個回饋，
 // 用 setTimeout 在 1.5 秒後自動切回「複製連結」。
 const linkCopied = ref(false)
@@ -821,6 +868,37 @@ const addComment = async () => {
                     </button>
                   </div>
                 </div>
+
+                <!--
+                  檢舉：跟分享選單同一種「小面板」做法（position:relative 的外層包住
+                  position:absolute 的面板 + 透明背景擋點外面），不用像編輯貼文那種
+                  Teleport 彈出視窗那麼重，畢竟只是一個文字欄位加送出按鈕。
+                -->
+                <div class="report-wrapper">
+                  <button class="action-btn" @click="toggleReportMenu">
+                    <svg class="icon-inline" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M5 3v18" />
+                      <path d="M5 4h13l-3 4 3 4H5" />
+                    </svg>
+                    檢舉
+                  </button>
+                  <div v-if="showReportMenu" class="share-menu-backdrop" @click="closeReportMenu"></div>
+                  <div v-if="showReportMenu" class="report-panel">
+                    <p class="report-panel-title">檢舉這篇貼文</p>
+                    <textarea
+                      v-model="reportReason"
+                      class="report-textarea"
+                      rows="3"
+                      placeholder="請簡短說明檢舉原因（例如：不實廣告、冒犯言論...）"
+                    ></textarea>
+                    <div class="report-panel-actions">
+                      <button type="button" class="report-btn-cancel" @click="closeReportMenu">取消</button>
+                      <button type="button" class="report-btn-submit" :disabled="!reportReason.trim() || reportSubmitting" @click="submitReport">
+                        {{ reportSubmitting ? '送出中...' : '送出檢舉' }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
               <!--
                 收藏按鈕：
@@ -1173,6 +1251,43 @@ const addComment = async () => {
 /* 系統分享、複製連結、LINE、Facebook 現在全部都是 SVG（沒有任何 <i> 圖示了），
    統一用同一條規則控制尺寸／顏色，currentColor 會直接跟著這裡設定的 color 走。 */
 .share-menu-item svg{ width:16px; height:16px; flex-shrink:0; color:var(--ink-soft); }
+
+/* 檢舉面板：跟分享選單同一種定位邏輯（.report-wrapper 是參考點），
+   共用同一顆 .share-menu-backdrop 處理「點外面關閉」。 */
+.report-wrapper{ position:relative; }
+.report-panel{
+  position:absolute; top:calc(100% + 8px); right:0; z-index:10;
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  border-radius:8px;
+  box-shadow:0 10px 30px rgba(42,36,32,.18);
+  padding:1rem;
+  width:260px;
+}
+.report-panel-title{
+  margin:0 0 .6rem; font-size:.86rem; font-weight:700; color:var(--ink);
+}
+.report-textarea{
+  width:100%; border:1px solid var(--hairline); background:var(--cream);
+  border-radius:6px; padding:.6rem .7rem; font-size:.82rem; color:var(--ink);
+  font-family:inherit; resize:vertical;
+}
+.report-textarea:focus{ outline:none; border-color:var(--plum); }
+.report-panel-actions{ display:flex; gap:.5rem; margin-top:.7rem; }
+.report-btn-cancel{
+  flex:1; padding:.45rem; font-size:.78rem;
+  background:transparent; color:var(--ink-soft);
+  border:1px solid var(--hairline); border-radius:4px; cursor:pointer;
+}
+.report-btn-cancel:hover{ border-color:var(--ink); color:var(--ink); }
+.report-btn-submit{
+  flex:1; padding:.45rem; font-size:.78rem; font-weight:600;
+  background:var(--ink); color:var(--paper);
+  border:none; border-radius:4px; cursor:pointer;
+  transition:background .18s ease;
+}
+.report-btn-submit:hover:not(:disabled){ background:var(--plum-deep); }
+.report-btn-submit:disabled{ opacity:.5; cursor:not-allowed; }
 
 /* ---------- 內文 ---------- */
 .post-content{
