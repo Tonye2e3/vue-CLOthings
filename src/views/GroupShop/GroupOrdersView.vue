@@ -16,6 +16,23 @@ const authStore = useAuthStore()
 // 一般管理員（Admin）前台只能看不能操作，SuperAdmin 不受限
 const isReadOnly = computed(() => authStore.role === 'Admin')
 
+// 左側選單：一般會員只看得到「專案瀏覽」「團購紀錄」，
+// Admin / SuperAdmin 登入時，「團購紀錄」下面會多出後台管理的兩個項目
+const navItems = computed(() => {
+  const items = [
+    { label: '專案瀏覽', icon: 'user', to: '/GroupShop' },
+    { label: '團購紀錄', icon: 'history', to: '/GroupShop/orders' }
+  ]
+  if (authStore.isAdmin) {
+    items.push(
+      { label: '團購商品管理', icon: 'box', to: '/GroupShop/admin/products' },
+      { label: '團購訂單管理', icon: 'clipboard', to: '/GroupShop/admin/orders' }
+    )
+  }
+  return items
+})
+const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : route.path.startsWith(to))
+
 // 會員名稱：登入狀態統一用 useAuthStore()，尚未登入則顯示預設值
 const memberName = computed(() => authStore.name || '會員')
 // 購物車商品數量
@@ -25,25 +42,18 @@ const cartCount = computed(() => cartStore.items.length)
 // 欄位對應後端 GroupOrderListDTO，這裡把 groupOrderId 轉成 id，template 才不用改
 const myOrders = reactive([])
 
-// 訂單列表是否還在載入中：true 時表格顯示骨架屏列
-const isLoading = ref(true)
-
 const loadOrders = async () => {
-  try {
-    // UserId 不用帶了，後端一律從 JWT 判斷是誰的訂單
-    const rows = await getGroupOrders()
-    const mapped = rows.map(r => ({
-      id: r.groupOrderId,
-      productName: r.productName,
-      status: r.status,
-      totalPrice: r.totalPrice,
-      orderDate: r.orderDate,
-      shipName: r.shipName
-    }))
-    myOrders.splice(0, myOrders.length, ...mapped)
-  } finally {
-    isLoading.value = false
-  }
+  // UserId 不用帶了，後端一律從 JWT 判斷是誰的訂單
+  const rows = await getGroupOrders()
+  const mapped = rows.map(r => ({
+    id: r.groupOrderId,
+    productName: r.productName,
+    status: r.status,
+    totalPrice: r.totalPrice,
+    orderDate: r.orderDate,
+    shipName: r.shipName
+  }))
+  myOrders.splice(0, myOrders.length, ...mapped)
 }
 
 onMounted(() => {
@@ -114,9 +124,6 @@ const closeEditModal = () => {
 
 // 按下 Modal 裡的「儲存」時執行的動作：改成呼叫後端編輯 API，
 // 團購價、運費怎麼重算都交給後端處理，前端不用再自己算一次
-// 儲存編輯是否處理中：true 時「儲存」按鈕顯示 spinner
-const isSaving = ref(false)
-
 const saveEdit = async () => {
   const order = myOrders.find(o => o.id === editingOrderId.value)
   if (!order) return
@@ -130,22 +137,17 @@ const saveEdit = async () => {
     return
   }
 
-  isSaving.value = true
-  try {
-    const updated = await editGroupOrder(editingOrderId.value, {
-      shipName: editForm.shipName.trim(),
-      items: editForm.items.map(i => ({ groupProductId: i.id, quantity: i.qty }))
-    })
+  const updated = await editGroupOrder(editingOrderId.value, {
+    shipName: editForm.shipName.trim(),
+    items: editForm.items.map(i => ({ groupProductId: i.id, quantity: i.qty }))
+  })
 
-    // 把後端算好的結果寫回這筆訂單
-    order.shipName = updated.shipName
-    order.productName = updated.productName
-    order.totalPrice = updated.totalPrice
+  // 把後端算好的結果寫回這筆訂單
+  order.shipName = updated.shipName
+  order.productName = updated.productName
+  order.totalPrice = updated.totalPrice
 
-    showEditModal.value = false
-  } finally {
-    isSaving.value = false
-  }
+  showEditModal.value = false
 }
 
 // 把數字格式化成千分位顯示（例如 1234 -> 1,234）
@@ -179,31 +181,23 @@ const closeServiceModal = () => {
 }
 
 // 按下「送出」時執行的動作：呼叫後端新增一筆客服紀錄，成功後加進畫面上的清單
-// 送出客服單是否處理中：true 時「送出」按鈕顯示 spinner
-const isSubmittingService = ref(false)
-
 const submitService = async () => {
   if (!serviceForm.title.trim() || !serviceForm.content.trim()) {
     alert('請填寫標題與內容')
     return
   }
 
-  isSubmittingService.value = true
-  try {
-    const saved = await createCustomerService(activeServiceOrderId.value, {
-      name: serviceForm.name,
-      email: serviceForm.email,
-      phone: serviceForm.phone,
-      title: serviceForm.title.trim(),
-      content: serviceForm.content.trim()
-    })
+  const saved = await createCustomerService(activeServiceOrderId.value, {
+    name: serviceForm.name,
+    email: serviceForm.email,
+    phone: serviceForm.phone,
+    title: serviceForm.title.trim(),
+    content: serviceForm.content.trim()
+  })
 
-    serviceRecords.value.push(saved)
-    serviceForm.title = ''
-    serviceForm.content = ''
-  } finally {
-    isSubmittingService.value = false
-  }
+  serviceRecords.value.push(saved)
+  serviceForm.title = ''
+  serviceForm.content = ''
 }
 </script>
 
@@ -562,7 +556,6 @@ table tbody td {
 
 .clo-main {
   flex: 1;
-  width: 100%;
   padding: 28px 32px;
   min-width: 0;
 }
