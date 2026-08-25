@@ -252,6 +252,7 @@ watch(() => route.params.id, () => {
   replyingTo.value = null // 取消原本在回覆的狀態，避免對新貼文的留言用到舊貼文的 parentCommentId
   currentImageIndex.value = 0 // 換到新貼文時輪播歸零，從第一張開始顯示
   stopAutoplay() // 換貼文了，先把舊貼文的自動輪播計時器停掉，fetchPost 拿到新資料後會重新啟動
+  visibleCommentCount.value = COMMENTS_PAGE_SIZE // 換貼文了，留言分頁也重設回第一頁
   fetchPost()
   fetchComments()
   fetchSimilarPosts()
@@ -505,6 +506,29 @@ const groupedComments = computed(() => {
       .sort((a, b) => new Date(a.commentDate) - new Date(b.commentDate))
   }))
 })
+
+// ============================================================
+// 留言分頁：留言一多（幾十則），一次全部攤開會把頁面撐得很長。
+// 改成一開始只顯示前幾則「主留言」（連同它們的回覆），按「查看更多留言」才多顯示幾則，
+// 跟 CommunityView.vue 網格區「載入更多穿搭」是同一套做法。
+// ============================================================
+
+const COMMENTS_PAGE_SIZE = 5
+// visibleCommentCount：目前願意顯示到第幾則「主留言」（不含回覆，回覆是跟著主留言一起出現的）。
+const visibleCommentCount = ref(COMMENTS_PAGE_SIZE)
+
+// visibleGroupedComments：真正給 template 用 v-for 畫出來的清單，是 groupedComments
+// 裡「前 visibleCommentCount 則」。.slice(0, n)：從陣列開頭取到第 n 筆（不含第 n 筆）。
+const visibleGroupedComments = computed(() => groupedComments.value.slice(0, visibleCommentCount.value))
+
+// hasMoreComments：判斷還有沒有更多沒顯示出來的主留言，用來決定「查看更多留言」
+// 按鈕要不要出現，全部顯示完就不用再讓使用者看到一顆按下去沒有反應的按鈕。
+const hasMoreComments = computed(() => visibleCommentCount.value < groupedComments.value.length)
+
+// loadMoreComments：按下「查看更多留言」時執行，一次多開放顯示 5 則主留言。
+const loadMoreComments = () => {
+  visibleCommentCount.value += COMMENTS_PAGE_SIZE
+}
 
 // replyingTo：目前正在回覆哪一則留言。null 代表現在是要發「新的主留言」，
 // 有值的話代表輸入框上面會出現「回覆 @xxx」的提示，送出時會帶上 parentCommentId。
@@ -870,8 +894,11 @@ const addComment = async () => {
               </div>
 
               <div class="comments-list">
-                <!-- v-for="c in groupedComments"：只跑主留言，每則主留言底下再跑一次 c.replies 畫出它的回覆 -->
-                <div v-for="c in groupedComments" :key="c.postCommentId" class="comment-thread">
+                <!-- v-for="c in visibleGroupedComments"：只跑「目前願意顯示的那幾則」主留言，
+                     不是把 groupedComments 全部畫出來——跟 CommunityView.vue 網格區的
+                     「載入更多穿搭」是同一種做法，一開始只看得到前 5 則，按「查看更多留言」
+                     才會再多顯示幾則。每則主留言底下再跑一次 c.replies 畫出它的回覆。 -->
+                <div v-for="c in visibleGroupedComments" :key="c.postCommentId" class="comment-thread">
                   <div class="comment-row">
                     <img :src="c.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, c.user)" />
                     <div class="comment-bubble">
@@ -900,6 +927,11 @@ const addComment = async () => {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <!-- 查看更多留言：只有還有更多沒顯示出來的主留言時才出現，全部顯示完就自動收起來 -->
+              <div class="load-more-comments-wrap" v-if="hasMoreComments">
+                <button class="btn-load-comments" @click="loadMoreComments">查看更多留言 ▾</button>
               </div>
             </div>
 
@@ -1181,6 +1213,15 @@ const addComment = async () => {
 }
 
 .comments-list{ display:flex; flex-direction:column; gap:1rem; margin-bottom:1.1rem; }
+/* 查看更多留言：跟 CommunityView.vue「載入更多穿搭」是同一顆按鈕樣式，維持整個網站
+   一致的「還有更多內容」互動語言。 */
+.load-more-comments-wrap{ text-align:center; margin-bottom:1.3rem; }
+.btn-load-comments{
+  background:transparent; border:1px solid var(--ink); color:var(--ink);
+  border-radius:999px; padding:.5rem 1.6rem; font-size:.82rem; letter-spacing:.03em;
+  transition:all .2s ease;
+}
+.btn-load-comments:hover{ background:var(--ink); color:var(--cream); }
 .comment-thread{ display:flex; flex-direction:column; gap:.5rem; }
 .comment-row{ display:flex; align-items:flex-start; gap:.6rem; }
 .comment-row.comment-reply{ margin-left:2.4rem; } /* 往內縮排，跟 IG 的回覆呈現方式一樣 */
