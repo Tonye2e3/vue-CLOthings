@@ -205,9 +205,6 @@ const submitService = async () => {
   <div class="clo-shell">
     <!-- 購物車圖示改為右下角浮動按鈕，見頁面最下方 -->
     <div class="clo-body">
-      <!-- ============ 左側選單 ============ -->
-
-
       <!-- ============ 主要內容區：訂單列表 ============ -->
       <main class="clo-main">
         <div class="page-header mb-4">
@@ -215,7 +212,7 @@ const submitService = async () => {
           <p class="text-muted small mb-0">追蹤您參與的所有團購專案與運送進度</p>
         </div>
 
-        <div class="card shadow-sm border-0 rounded-3 overflow-hidden">
+        <div class="card shadow-sm border-0 rounded-3 overflow-hidden go-fade-in-up">
           <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
               <thead>
@@ -229,9 +226,17 @@ const submitService = async () => {
                   <th>操作</th>
                 </tr>
               </thead>
-              <tbody>
-                <!-- v-for 把 myOrders 陣列裡每一筆訂單，重複產生一列表格資料 -->
-                <tr v-for="order in myOrders" :key="order.id">
+              <!-- 載入中：顯示 3 列骨架屏 -->
+              <tbody v-if="isLoading">
+                <tr v-for="n in 3" :key="n">
+                  <td colspan="7">
+                    <div class="go-skeleton" style="height: 18px; width: 100%;"></div>
+                  </td>
+                </tr>
+              </tbody>
+              <!-- v-for 把 myOrders 陣列裡每一筆訂單，重複產生一列表格資料；TransitionGroup 讓列表淡入更自然 -->
+              <TransitionGroup v-else tag="tbody" name="go-fade">
+                <tr v-for="order in myOrders" :key="order.id" class="go-row-hover">
                   <td class="fw-bold text-main">#{{ order.id }}</td>
                   <td class="fw-bold">{{ order.productName }}</td>
                   <td>
@@ -245,111 +250,131 @@ const submitService = async () => {
                   <td>{{ order.shipName }}</td>
                   <td>
                     <div class="action-buttons">
-                      <button class="edit-btn" :disabled="order.status.includes('已取消') || isReadOnly"
+                      <button class="edit-btn go-btn-tap" :disabled="order.status.includes('已取消') || isReadOnly"
                         @click="openEditModal(order.id)">編輯</button>
-                      <button class="cancel-btn" :disabled="order.status.includes('已取消') || isReadOnly"
+                      <button class="cancel-btn go-btn-tap" :disabled="order.status.includes('已取消') || isReadOnly"
                         @click="cancelOrder(order.id)">取消</button>
-                      <button class="service-btn" :disabled="isReadOnly"
+                      <button class="service-btn go-btn-tap" :disabled="isReadOnly"
                         @click="openServiceModal(order.id)">聯絡客服</button>
                     </div>
                   </td>
                 </tr>
-              </tbody>
+              </TransitionGroup>
             </table>
           </div>
         </div>
 
         <!-- ============ 編輯訂單 Modal ============ -->
         <!-- 背景遮罩：showEditModal 為 true 時顯示，讓後面的內容變暗、不能點擊 -->
-        <div v-if="showEditModal" class="modal-backdrop fade show"></div>
-        <div v-if="showEditModal" class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
-          <div class="modal-dialog">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h5 class="modal-title fw-bold mb-0">編輯訂單</h5>
-                <button type="button" class="btn-close" aria-label="Close" @click="closeEditModal"></button>
-              </div>
-              <div class="modal-body">
-                <div class="mb-3">
-                  <label class="form-label">收件人姓名</label>
-                  <!-- v-model 把輸入框內容同步到 editForm.shipName -->
-                  <input type="text" class="form-control" v-model="editForm.shipName" />
+        <Transition name="go-fade">
+          <div v-if="showEditModal" class="modal-backdrop fade show"></div>
+        </Transition>
+        <Transition name="go-pop">
+          <div v-if="showEditModal" class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title fw-bold mb-0">編輯訂單</h5>
+                  <button type="button" class="btn-close go-icon-tap" aria-label="Close"
+                    @click="closeEditModal"></button>
                 </div>
+                <div class="modal-body">
+                  <div class="mb-3">
+                    <label class="form-label">收件人姓名</label>
+                    <!-- v-model 把輸入框內容同步到 editForm.shipName -->
+                    <input type="text" class="form-control" v-model="editForm.shipName" />
+                  </div>
 
-                <label class="form-label">商品數量</label>
-                <!-- 逐一列出這筆訂單裡的每個商品，各自可以調整數量 -->
-                <div v-for="item in editForm.items" :key="item.id"
-                  class="d-flex align-items-center justify-content-between edit-item-row">
-                  <span class="small">{{ item.name }}</span>
-                  <input type="number" min="1" class="form-control edit-qty-input" v-model.number="item.qty" />
+                  <label class="form-label">商品數量</label>
+                  <!-- 逐一列出這筆訂單裡的每個商品，各自可以調整數量 -->
+                  <div v-for="item in editForm.items" :key="item.id"
+                    class="d-flex align-items-center justify-content-between edit-item-row">
+                    <span class="small">{{ item.name }}</span>
+                    <input type="number" min="1" class="form-control edit-qty-input" v-model.number="item.qty" />
+                  </div>
                 </div>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" @click="closeEditModal">取消</button>
-                <button type="button" class="btn btn-primary" @click="saveEdit">儲存</button>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-secondary go-btn-tap" @click="closeEditModal">取消</button>
+                  <button type="button" class="btn btn-primary go-btn-tap" :disabled="isSaving" @click="saveEdit">
+                    <span v-if="isSaving" class="go-spinner me-2"></span>
+                    儲存
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </Transition>
 
         <!-- ============ 聯絡客服 Modal ============ -->
-        <div v-if="showServiceModal" class="modal-backdrop fade show"></div>
-        <div v-if="showServiceModal" class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
-          <div class="modal-dialog">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h5 class="modal-title fw-bold mb-0">聯絡客服 #{{ activeServiceOrderId }}</h5>
-                <button type="button" class="btn-close" aria-label="Close" @click="closeServiceModal"></button>
-              </div>
-              <div class="modal-body">
-                <div class="row g-2 mb-2">
-                  <div class="col">
-                    <label class="form-label small">姓名</label>
-                    <input type="text" class="form-control form-control-sm" v-model="serviceForm.name" />
-                  </div>
-                  <div class="col">
-                    <label class="form-label small">Email</label>
-                    <input type="email" class="form-control form-control-sm" v-model="serviceForm.email" />
-                  </div>
-                  <div class="col">
-                    <label class="form-label small">電話</label>
-                    <input type="tel" class="form-control form-control-sm" v-model="serviceForm.phone" />
-                  </div>
+        <Transition name="go-fade">
+          <div v-if="showServiceModal" class="modal-backdrop fade show"></div>
+        </Transition>
+        <Transition name="go-pop">
+          <div v-if="showServiceModal" class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title fw-bold mb-0">聯絡客服 #{{ activeServiceOrderId }}</h5>
+                  <button type="button" class="btn-close go-icon-tap" aria-label="Close"
+                    @click="closeServiceModal"></button>
                 </div>
-                <div class="mb-2">
-                  <label class="form-label small">標題</label>
-                  <input type="text" class="form-control" v-model="serviceForm.title" placeholder="請簡短描述問題" />
-                </div>
-                <div class="mb-3">
-                  <label class="form-label small">內容</label>
-                  <textarea class="form-control" rows="3" v-model="serviceForm.content"
-                    placeholder="請詳細描述您的問題"></textarea>
-                </div>
-                <button type="button" class="btn btn-primary btn-sm mb-3" @click="submitService">送出</button>
+                <div class="modal-body">
+                  <div class="row g-2 mb-2">
+                    <div class="col">
+                      <label class="form-label small">姓名</label>
+                      <input type="text" class="form-control form-control-sm" v-model="serviceForm.name" />
+                    </div>
+                    <div class="col">
+                      <label class="form-label small">Email</label>
+                      <input type="email" class="form-control form-control-sm" v-model="serviceForm.email" />
+                    </div>
+                    <div class="col">
+                      <label class="form-label small">電話</label>
+                      <input type="tel" class="form-control form-control-sm" v-model="serviceForm.phone" />
+                    </div>
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label small">標題</label>
+                    <input type="text" class="form-control" v-model="serviceForm.title" placeholder="請簡短描述問題" />
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label small">內容</label>
+                    <textarea class="form-control" rows="3" v-model="serviceForm.content"
+                      placeholder="請詳細描述您的問題"></textarea>
+                  </div>
+                  <button type="button" class="btn btn-primary btn-sm mb-3 go-btn-tap" :disabled="isSubmittingService"
+                    @click="submitService">
+                    <span v-if="isSubmittingService" class="go-spinner me-2"></span>
+                    送出
+                  </button>
 
-                <hr />
-                <p class="small fw-bold mb-2">過去的客服紀錄</p>
-                <p v-if="serviceRecords.length === 0" class="small text-muted">目前沒有客服紀錄</p>
-                <div v-for="r in serviceRecords" :key="r.groupCustomerServiceId" class="service-record-row">
-                  <p class="small fw-bold mb-1">{{ r.title }}</p>
-                  <p class="small text-muted mb-1">{{ r.content }}</p>
-                  <p v-if="r.replyContent" class="small text-success mb-0">
-                    客服回覆：{{ r.replyContent }}（{{ r.repliedAt }}）
-                  </p>
-                  <p v-else class="small text-muted mb-0">尚未回覆</p>
+                  <hr />
+                  <p class="small fw-bold mb-2">過去的客服紀錄</p>
+                  <p v-if="serviceRecords.length === 0" class="small text-muted">目前沒有客服紀錄</p>
+                  <div v-for="r in serviceRecords" :key="r.groupCustomerServiceId" class="service-record-row">
+                    <p class="small fw-bold mb-1">{{ r.title }}</p>
+                    <p class="small text-muted mb-1">{{ r.content }}</p>
+                    <p v-if="r.replyContent" class="small text-success mb-0">
+                      客服回覆：{{ r.replyContent }}（{{ r.repliedAt }}）
+                    </p>
+                    <p v-else class="small text-muted mb-0">尚未回覆</p>
+                  </div>
                 </div>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" @click="closeServiceModal">關閉</button>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-secondary" @click="closeServiceModal">關閉</button>
+                </div>
               </div>
             </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary go-btn-tap" @click="closeServiceModal">關閉</button>
+            </div>
           </div>
-        </div>
+        </Transition>
       </main>
     </div>
 
     <!-- ============ 浮動購物車按鈕（右下角，點擊直接跳到購物車畫面） ============ -->
-    <router-link to="/GroupShop/checkout" class="floating-cart" aria-label="前往購物車">
+    <router-link to="/GroupShop/checkout" class="floating-cart go-btn-tap" aria-label="前往購物車">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"
         stroke-linecap="round" stroke-linejoin="round">
         <circle cx="9" cy="21" r="1"></circle>
@@ -529,66 +554,136 @@ table tbody td {
   align-items: flex-start;
 }
 
-.clo-sidebar {
-  width: 220px;
-  flex-shrink: 0;
-  min-height: calc(100vh - 65px);
-  background-color: var(--color-bg-page);
-  border-right: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 20px 0;
-}
-
-.sidebar-nav {
-  display: flex;
-  flex-direction: column;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 24px;
-  color: var(--color-text-muted);
-  text-decoration: none;
-  font-size: 0.92rem;
-  border-left: 3px solid transparent;
-  cursor: pointer;
-}
-
-.nav-item:hover {
-  background-color: var(--color-hover-bg);
-}
-
-.nav-item.active {
-  color: var(--color-text);
-  font-weight: 700;
-  background-color: var(--color-active-bg);
-  border-left-color: var(--color-accent);
-}
-
-.nav-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-}
-
 .clo-main {
   flex: 1;
   padding: 28px 32px;
   min-width: 0;
 }
 
-@media (max-width: 900px) {
-  .clo-sidebar {
-    width: 72px;
+
+
+/* ============ 本頁用到的特效樣式（進場動畫／懸停／按鈕微動效／載入動畫），class 一律以 go- 開頭 ============ */
+@keyframes goFadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
   }
 
-  .nav-item span:last-child {
-    display: none;
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.go-fade-in-up {
+  animation: goFadeInUp 0.5s ease both;
+}
+
+/* <Transition name="go-fade"> 用：淡入淡出 */
+.go-fade-enter-active,
+.go-fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+
+.go-fade-enter-from,
+.go-fade-leave-to {
+  opacity: 0;
+}
+
+/* <Transition name="go-pop"> 用：彈出效果（Modal） */
+.go-pop-enter-active {
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.go-pop-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.go-pop-enter-from,
+.go-pop-leave-to {
+  opacity: 0;
+  transform: scale(0.92);
+}
+
+.go-row-hover {
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.go-row-hover:hover {
+  background-color: var(--color-hover-bg, #f1e7de);
+}
+
+.go-btn-tap {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.go-btn-tap:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: 0 6px 14px rgba(74, 62, 61, 0.18);
+}
+
+.go-btn-tap:active:not(:disabled) {
+  transform: scale(0.94);
+  filter: brightness(0.97);
+}
+
+.go-icon-tap {
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.go-icon-tap:hover {
+  transform: scale(1.08);
+}
+
+.go-icon-tap:active {
+  transform: scale(0.9);
+}
+
+@keyframes goShimmer {
+  0% {
+    background-position: -300px 0;
+  }
+
+  100% {
+    background-position: 300px 0;
+  }
+}
+
+.go-skeleton {
+  position: relative;
+  background: linear-gradient(90deg, #ece3d8 25%, #f6f0e8 37%, #ece3d8 63%);
+  background-size: 600px 100%;
+  animation: goShimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+  color: transparent !important;
+}
+
+@keyframes goSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.go-spinner {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  vertical-align: -2px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: goSpin 0.7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .go-fade-in-up,
+  .go-btn-tap,
+  .go-icon-tap,
+  .go-skeleton,
+  .go-spinner {
+    animation-duration: 0.001s !important;
+    transition-duration: 0.001s !important;
   }
 }
 </style>

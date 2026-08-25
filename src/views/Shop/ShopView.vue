@@ -7,6 +7,7 @@ import CategoryShowcase from '@/components/home/CategoryShowcase.vue'
 <template>
   <div class="uniqlo-home">
     <main>
+      <h1>2026/08/21 16:44</h1>
       <HeroCarousel />
       <ProductGrid />
     </main>

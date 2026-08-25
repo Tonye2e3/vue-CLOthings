@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 // useRoute：Vue Router 提供的功能，讓我們可以在 <script> 裡面讀到「目前網址」的資訊，
 // 例如網址上帶的動態參數。router/index.js 裡這個頁面對應的路由是
 // path: '/community/post/:id'，所以網址上 :id 那一段的值，
@@ -8,6 +8,16 @@ import { useRoute } from 'vue-router'
 // api：跟其他頁面共用同一個 axios 實例（src/services/api.js），會自動把登入後的 JWT
 // token 帶進 Authorization header，跟直接 import axios from 'axios' 不一樣。
 import api from '@/services/api'
+
+// IconFacebook、IconLine：分享選單裡「分享到 Facebook／LINE」原本是用 Font Awesome
+// 的品牌圖示（<i class="fa-brands fa-facebook">），改成專案裡自己準備的 SVG 圖示元件
+// （src/components/icons/），畫面上其他地方（例如頁尾社群連結）也是用同一套元件，
+// 統一起來風格才會一致，也不用再依賴外部 CDN 載入 Font Awesome 的品牌圖示子集。
+import IconFacebook from '@/components/icons/IconFacebook.vue'
+import IconLine from '@/components/icons/IconLine.vue'
+// animate：anime.js v4 的動畫函式，這裡用來讓按讚愛心在點下去的瞬間做一個「彈跳」效果，
+// 跟 CommunityView.vue 貼文卡片的進場動畫是同一個套件、同一套用法。
+import { animate } from 'animejs'
 
 // 收藏功能共用資料（跟 UserProfileView.vue 共用同一份收藏清單，直接 import 那個檔案）
 // savedPosts：目前所有收藏的貼文清單（雖然這裡沒有直接用到它本身，
@@ -38,11 +48,15 @@ const route = useRoute()
 // 實際上還沒有的檔案），失敗時把圖片來源換成 dicebear 產生的預設頭像，
 // 跟 CommunityView.vue 的 onAvatarError 是同一套邏輯。
 const onAvatarError = (event, name) => {
-  // 加個保護：如果換成 dicebear 網址後還是失敗（例如完全沒有網路），
-  // 就不要再觸發一次 @error，避免無限迴圈一直重新請求。
-  if (event.target.dataset.fallback) return
-  event.target.dataset.fallback = '1'
-  event.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+  // 用「換過的網址是不是已經是預設圖」來判斷要不要再換一次，而不是用一個存在
+  // DOM 元素上的旗標（dataset.fallback）——原因跟 CommunityView.vue 的
+  // onAvatarError 註解一樣：這種寫法在「單一、被重複使用」的欄位上會有問題
+  // （例如這個檔案的發文者大頭貼，換到另一篇貼文時 Vue 只會更新同一個 <img> 的 src），
+  // 舊旗標可能卡住新資料的備援。改成比對「現在這個網址是不是已經是預設圖網址」，
+  // 就不會有這種問題。
+  const fallbackUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+  if (event.target.src === fallbackUrl) return
+  event.target.src = fallbackUrl
 }
 
 // 貼文詳細資料
@@ -83,10 +97,47 @@ const currentImageIndex = ref(0)
 const prevImage = () => {
   const len = post.value.images.length
   currentImageIndex.value = (currentImageIndex.value - 1 + len) % len
+  restartAutoplay() // 使用者自己手動切過圖了，計時器重新算，不然可能手動切完馬上又被自動播放跳走
 }
 const nextImage = () => {
   const len = post.value.images.length
   currentImageIndex.value = (currentImageIndex.value + 1) % len
+  restartAutoplay()
+}
+
+// ============================================================
+// 主圖自動輪播：不用一直手動點箭頭，超過 1 張照片時會每隔幾秒自動切下一張。
+// ============================================================
+
+const AUTOPLAY_INTERVAL = 4000 // 每 4 秒切一張
+let autoplayTimer = null
+
+// stopAutoplay：把目前的計時器停掉並清乾淨。每次要重新啟動之前都要先呼叫這個，
+// 不然舊的計時器沒清掉、又設了一個新的，會變成同時有兩個計時器同時在跑，
+// 圖片會跳得比預期快兩倍。
+const stopAutoplay = () => {
+  if (autoplayTimer) {
+    clearInterval(autoplayTimer)
+    autoplayTimer = null
+  }
+}
+
+// startAutoplay：只有超過 1 張照片時才需要自動播放（只有 1 張的話，
+// 切來切去都是同一張，設計時器只是白白浪費資源）。
+const startAutoplay = () => {
+  stopAutoplay()
+  if (post.value.images.length <= 1) return
+  autoplayTimer = setInterval(() => {
+    const len = post.value.images.length
+    currentImageIndex.value = (currentImageIndex.value + 1) % len
+  }, AUTOPLAY_INTERVAL)
+}
+
+// restartAutoplay：使用者自己按了箭頭或點了圓點手動切圖時呼叫，
+// 把計時器重新算一次——不然使用者才剛手動切到某一張，計時器可能下一秒就到了，
+// 畫面又自動跳走，體感上會覺得「我明明剛剛才選了這張」。
+const restartAutoplay = () => {
+  startAutoplay()
 }
 
 const fetchPost = async () => {
@@ -135,6 +186,10 @@ const fetchPost = async () => {
     // ?? 0：如果 p.likesCount 是 undefined 或 null，就用 0 代替，
     // 避免後端這個欄位漏帶或叫別的名字時，讓 likesNumber 變成 undefined 把整頁弄壞。
     likesNumber.value = p.likesCount ?? 0
+
+    // 圖片資料确定載入完成、真的知道這篇貼文有幾張圖之後，才能開始自動輪播——
+    // 不能提早在 fetchPost 呼叫之前就開始，那時候 post.value.images 還是預設的假資料。
+    startAutoplay()
 
     // fetchFollowStatus 要用到 post.value.userId，一定要等上面 post.value 設定完才能呼叫，
     // 不能跟 fetchPost() 平行呼叫（那樣 userId 還是初始值 null，會查到錯的人）。
@@ -190,10 +245,17 @@ watch(() => route.params.id, () => {
   newComment.value = '' // 清空還沒送出的留言草稿，避免帶到別篇貼文底下去
   replyingTo.value = null // 取消原本在回覆的狀態，避免對新貼文的留言用到舊貼文的 parentCommentId
   currentImageIndex.value = 0 // 換到新貼文時輪播歸零，從第一張開始顯示
+  stopAutoplay() // 換貼文了，先把舊貼文的自動輪播計時器停掉，fetchPost 拿到新資料後會重新啟動
   fetchPost()
   fetchComments()
   fetchLikeStatus()
   fetchSimilarPosts()
+})
+
+// onUnmounted：離開這個頁面時，把自動輪播的計時器停掉，
+// 不然使用者已經離開頁面了，計時器還留在背景繼續跑，是不必要的資源浪費。
+onUnmounted(() => {
+  stopAutoplay()
 })
 
 // formatTimeAgo：把一個 ISO 時間字串，轉換成「N 小時前」這種給人看的相對時間文字。
@@ -232,8 +294,26 @@ const likesNumber = ref(1248) // 對應原本的 '1,248'
 // 自動幫數字加上千分位逗號。
 const likesDisplay = computed(() => likesNumber.value.toLocaleString())
 
+// likeIconEl：按讚按鈕裡那顆心形 SVG 圖示的 DOM 參照，animateLikeIcon 需要直接抓到
+// 這個元素才能對它播放動畫。
+const likeIconEl = ref(null)
+
+// animateLikeIcon：心形圖示的「彈跳」效果——不管這次是要按讚還是取消讚，
+// 點下去都先給一個小小的放大再彈回去的回饋，操作起來比較有「按到了」的實感。
+// 這個動畫純粹是視覺回饋，跟後面 API 呼叫成功與否無關，所以放在 toggleLike 最開頭、
+// 立刻執行，不用等 API 回應。
+const animateLikeIcon = () => {
+  if (!likeIconEl.value) return
+  animate(likeIconEl.value, {
+    scale: [1, 1.4, 1],
+    duration: 380,
+    ease: 'outBack'
+  })
+}
+
 // toggleLike：按下愛心按鈕時執行。改成 async，因為裡面要 await 打 API。
 const toggleLike = async () => {
+  animateLikeIcon()
   if (post.value.isLiked) {
     // 目前是「已按讚」狀態 → 這次是要取消讚 → 打 DELETE，刪掉 myLikeId 那筆紀錄
     try {
@@ -590,7 +670,10 @@ const addComment = async () => {
 
             <!-- 主圖：改成可以左右切換的輪播，顯示 CreatePostView.vue 上傳時選的每一張照片，
                  不再固定只顯示第一張。currentImageIndex 記錄現在顯示第幾張（從 0 開始）。 -->
-            <div class="post-media">
+            <!-- @mouseenter/@mouseleave：滑鼠移到主圖上面時暫停自動輪播，方便使用者
+                 好好看清楚正在顯示的這張圖，不會看到一半突然自動跳到下一張；
+                 滑鼠移開再恢復自動播放。 -->
+            <div class="post-media" @mouseenter="stopAutoplay" @mouseleave="startAutoplay">
               <span class="tag-label" v-if="post.taggedProducts[0]">封面故事</span>
               <img :src="post.images[currentImageIndex]?.url" class="post-image" alt="post image" />
 
@@ -620,7 +703,7 @@ const addComment = async () => {
                     :key="idx"
                     class="media-dot"
                     :class="{ active: idx === currentImageIndex }"
-                    @click="currentImageIndex = idx"
+                    @click="currentImageIndex = idx; restartAutoplay()"
                   ></button>
                 </div>
               </template>
@@ -633,7 +716,7 @@ const addComment = async () => {
                 :key="idx"
                 class="post-thumb-item"
                 :class="{ active: idx === currentImageIndex }"
-                @click="currentImageIndex = idx"
+                @click="currentImageIndex = idx; restartAutoplay()"
               >
                 <img :src="img.url" alt="縮圖" />
               </button>
@@ -648,10 +731,18 @@ const addComment = async () => {
                   @click="toggleLike"：點下去執行上面 script 定義的 toggleLike 函式。
                 -->
                 <button class="action-btn" :class="{ liked: post.isLiked }" @click="toggleLike">
-                  ♥ {{ likesDisplay }}
+                  <!-- fill="currentColor" 只有 isLiked 是 true 時才套用：已按讚時整顆心是實心的紅色，
+                       跟大部分社群 App「按讚＝實心愛心」的視覺習慣一致；還沒按讚時維持空心線條。 -->
+                  <svg ref="likeIconEl" class="icon-inline" viewBox="0 0 24 24" width="16" height="16" :fill="post.isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                  {{ likesDisplay }}
                 </button>
                 <button class="action-btn">
-                  💬 {{ post.commentsCount }}
+                  <svg class="icon-inline" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" />
+                  </svg>
+                  {{ post.commentsCount }}
                 </button>
                 <!--
                   share-wrapper：包住分享按鈕跟下拉選單的容器，加 position:relative，
@@ -670,17 +761,34 @@ const addComment = async () => {
                   -->
                   <div v-if="showShareMenu" class="share-menu-backdrop" @click="closeShareMenu"></div>
                   <div v-if="showShareMenu" class="share-menu">
+                    <!--
+                      這兩顆原本用 Font Awesome 的 fa-share-nodes、fa-link，這次也一起換成
+                      SVG——跟其他檔案陸續脫離 Font Awesome 是同一個理由（不吃字型／CDN，
+                      不用擔心某些網路環境擋掉外部字型 CDN 導致圖示變成空白方框），
+                      現在整個 Community 已經沒有任何地方在用 Font Awesome 了。
+                    -->
                     <button v-if="canNativeShare" type="button" class="share-menu-item" @click="nativeShare">
-                      <i class="fa-solid fa-share-nodes"></i> 系統分享
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="18" cy="5" r="3" />
+                        <circle cx="6" cy="12" r="3" />
+                        <circle cx="18" cy="19" r="3" />
+                        <path d="M8.6 13.5l6.8 4" />
+                        <path d="M15.4 6.5l-6.8 4" />
+                      </svg>
+                      系統分享
                     </button>
                     <button type="button" class="share-menu-item" @click="copyLink">
-                      <i class="fa-solid fa-link"></i> {{ linkCopied ? '已複製！' : '複製連結' }}
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                      </svg>
+                      {{ linkCopied ? '已複製！' : '複製連結' }}
                     </button>
                     <button type="button" class="share-menu-item" @click="shareToLine">
-                      <i class="fa-brands fa-line"></i> 分享到 LINE
+                      <IconLine /> 分享到 LINE
                     </button>
                     <button type="button" class="share-menu-item" @click="shareToFacebook">
-                      <i class="fa-brands fa-facebook"></i> 分享到 Facebook
+                      <IconFacebook /> 分享到 Facebook
                     </button>
                   </div>
                 </div>
@@ -690,16 +798,14 @@ const addComment = async () => {
                 @click="toggleSave"：呼叫上面 script 定義的 toggleSave 函式，
                 這個函式會去更新「共用的收藏清單」，而不是只改這個頁面自己的一個變數，
                 這樣 UserProfileView.vue 的收藏頁籤才看得到剛剛收藏的貼文。
-                :class="{ saved: isSaved }" 跟 <i> 裡的 isSaved，
-                都是讀上面那個 computed，會自動反映「這篇貼文現在是不是在收藏清單裡」。
-                <i :class="['fa-bookmark', isSaved ? 'fa-solid' : 'fa-regular']">：
-                這裡的 :class 綁定的是一個「陣列」，陣列裡每一項都會變成一個 class。
-                'fa-bookmark' 固定會加上；第二項用三元運算子決定，
-                如果已收藏，用實心的 fa-solid 樣式圖示；還沒收藏，用空心的 fa-regular 樣式圖示，
-                點一下就能明顯看到書籤圖示「被收起來」的視覺變化。
+                書籤圖示原本是 Font Awesome 的 fa-bookmark（依 isSaved 切換 fa-solid／
+                fa-regular），一起換成 SVG，用 :fill 動態切換實心／空心，
+                跟按讚愛心「已讚=實心」是同一套做法。
               -->
               <button class="action-btn" :class="{ saved: isSaved }" @click="toggleSave">
-                <i :class="['fa-bookmark', isSaved ? 'fa-solid' : 'fa-regular']"></i>
+                <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" :fill="isSaved ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                </svg>
                 {{ isSaved ? '已收藏' : '收藏' }}
               </button>
             </div>
@@ -708,22 +814,23 @@ const addComment = async () => {
             <p class="post-content">{{ post.content }}</p>
 
             <!--
-              標記商品：原本是浮在照片上的定位標籤，現在改成貼文下方的一排標籤。
-              v-if="post.taggedProducts.length"：陣列裡有東西才顯示這一整塊。
-              這裡先用 <span> 不用 <a>：因為現在是要給老師看前台畫面，
-              productRoute 目前只是假的路徑（例如 /shop/product/101），
-              真的點下去會導到不存在的頁面，demo 階段先不要讓它跳轉，
-              只保留視覺樣式（看起來像標籤）。之後商城的商品頁做好、
-              productRoute 是真的網址時，把 <span> 換回 <a :href="tag.productRoute">就可以了。
+              標記商品：點下去會跳到社群首頁，並帶上 ?tag=商品名稱 這個查詢字串，
+              CommunityView.vue 那邊已經改成會讀這個查詢字串、自動塞進搜尋框，
+              等於「幫使用者按下這個商品名稱去搜尋」，畫面上就會看到其他標記過同一件
+              商品的貼文——跟右側欄「熱門商品標籤」點下去的效果是同一套邏輯。
+              之前先用 <span>（不能點）是因為那時候想接的是「商品頁」，但 productRoute
+              還是假資料；現在改成連到「相關貼文」，不需要真的商品頁網址，
+              所以可以先做。
             -->
             <div class="tagged-products" v-if="post.taggedProducts.length">
               <span class="tagged-label">標記商品</span>
               <div class="tag-cloud">
-                <span
+                <router-link
                   v-for="tag in post.taggedProducts"
                   :key="tag.postTaggedProductId"
+                  :to="`/community?tag=${encodeURIComponent(tag.name)}`"
                   class="tag-chip"
-                >#{{ tag.name }}</span>
+                >#{{ tag.name }}</router-link>
               </div>
             </div>
 
@@ -849,7 +956,6 @@ const addComment = async () => {
 </template>
 
 <style scoped>
-@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
 .community-page {
   width: 100%;
   min-height: 100vh;
@@ -995,6 +1101,10 @@ const addComment = async () => {
 .action-btn:hover{ color:var(--ink); }
 .action-btn.liked{ color:#B4453A; font-weight:600; }
 .action-btn.saved{ color:var(--ochre); font-weight:600; }
+/* icon-inline：跟文字並排的小圖示共用樣式，顏色跟著所在文字走（currentColor），
+   跟 CommunityView.vue 的 .icon-inline 是同一個概念，各自獨立的 <style scoped> 沒辦法共用，
+   所以這裡也宣告一次。 */
+.icon-inline{ flex-shrink:0; }
 
 /*
   分享選單：
@@ -1023,7 +1133,9 @@ const addComment = async () => {
   transition:background .15s ease;
 }
 .share-menu-item:hover{ background:var(--cream); }
-.share-menu-item i{ width:16px; text-align:center; color:var(--ink-soft); }
+/* 系統分享、複製連結、LINE、Facebook 現在全部都是 SVG（沒有任何 <i> 圖示了），
+   統一用同一條規則控制尺寸／顏色，currentColor 會直接跟著這裡設定的 color 走。 */
+.share-menu-item svg{ width:16px; height:16px; flex-shrink:0; color:var(--ink-soft); }
 
 /* ---------- 內文 ---------- */
 .post-content{
