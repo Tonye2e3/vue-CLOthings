@@ -1,16 +1,20 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute,useRouter } from 'vue-router'
 import api from '@/services/api'
 import Review from '@/components/Shop/ProductReview.vue'
 import Post from '@/components/Shop/ProductPost.vue'
 import { useCartStore } from '@/stores/ShopCart'
 import { useFavoriteStore } from '@/stores/ShopFavorite'
+import { useBuyNowStore } from '@/stores/ShopBuyNow'
 
 const cartStore = useCartStore()
 const favoriteStore = useFavoriteStore()
 const route = useRoute()
+const router = useRouter()
 const API_BASE = 'https://localhost:7255'
+const buyNowStore = useBuyNowStore()
+
 
 function getImageUrl(fileName) {
   if (!fileName) {
@@ -37,7 +41,7 @@ const isCurrentFavorite = computed(() => {
 onMounted(async () => {
   try {
     const id = route.params.id // 從網址拿 id（例如 /shop/product/5 → "5"）
-    const response = await api.get(`${API_BASE}/api/product/${id}`)
+    const response = await api.get(`/product/${id}`)
     product.value = response.data
     // 資料來了之後，才設定主圖（用 images 的第一張）
     if (product.value.images && product.value.images.length > 0) {
@@ -85,6 +89,18 @@ function buyNow() {
     alert('請選擇顏色和尺寸')
     return
   }
+  // 把這一個商品存進 buyNow store
+  buyNowStore.setItem({
+    productSpecificationId: selectedSpec.value.productSpecificationId,
+    productName: product.value.productName,
+    price: product.value.price,
+    color: selectedColor.value,
+    size: selectedSize.value,
+    image: getImageUrl(product.value.images[0]),
+    quantity: 1,
+  })
+  // 跳結帳頁，用參數標記是立即購買
+  router.push({ name: 'checkout', query: { buyNow: '1' } })
 }
 
 // 從規格組合中，取出所有「不重複的顏色」
@@ -112,6 +128,8 @@ const selectedSpec = computed(() => {
     (spec) => spec.color === selectedColor.value && spec.size === selectedSize.value,
   )
 })
+
+
 </script>
 
 <!-- =========================================================== -->

@@ -2,9 +2,14 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/ShopCart'
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+import { useBuyNowStore } from '@/stores/ShopBuyNow'
 import api from '@/services/api'
 const cartStore = useCartStore()
 const router = useRouter()
+const route = useRoute()
+const buyNowStore = useBuyNowStore()
 
 // 收件資訊表單資料
 const form = ref({
@@ -42,7 +47,7 @@ async function submitOrder() {
     shipAddress: form.value.address,
     shipPhone: form.value.phone,
     // 把購物車勾選的商品，轉成後端要的格式（只要規格 id + 數量）
-    items: cartStore.selectedItems.map((item) => ({
+    items: checkoutItems.value.map((item) => ({
       productSpecificationId: item.productSpecificationId,
       quantity: item.quantity,
     })),
@@ -51,7 +56,11 @@ async function submitOrder() {
   // ③ 打 API 建立訂單
   try {
     const response = await api.post('/order', orderData)
-    await cartStore.loadCart()   // 重新載入購物車（後端已清，前端同步）
+    if (isBuyNow.value) {
+      buyNowStore.clear()   // 清立即購買暫存
+    } else {
+      await cartStore.loadCart()   // 重新載入購物車（後端已清，前端同步）
+    }
     alert('訂單建立成功！訂單編號：' + response.data.orderId)
     // ④ 成功後：跳到訂單頁（或首頁）
     router.push({ name: 'orders' })
@@ -60,17 +69,30 @@ async function submitOrder() {
     alert('建立訂單失敗，請稍後再試')
   }
 }
-// ═══════════════════════════════════════════════
-// 結帳頁 Checkout
-// 路由：/shop/checkout   name: 'checkout'
-// 用途：顯示待結帳商品明細、填收件/付款資訊、送出訂單
-// ═══════════════════════════════════════════════
-//
-// 【之後要串的 API】
-//   GET  /api/cart     取得購物車內容（要結帳的商品）
-//   POST /api/orders   建立訂單（送出成功後導向訂單詳情或完成頁）
-//
-// 目前為骨架階段，尚無邏輯，script 先留空。
+// 是不是立即購買？
+const isBuyNow = computed(() => route.query.buyNow === '1')
+
+// 要結帳的商品（依來源）
+const checkoutItems = computed(() => {
+  if (isBuyNow.value) {
+    return buyNowStore.item ? [buyNowStore.item] : []
+  }
+  return cartStore.selectedItems
+})
+
+// 總金額
+const checkoutTotal = computed(() => {
+  return checkoutItems.value.reduce((sum, item) => sum + item.price * item.quantity, 0)
+})
+// 運費（依商品小計判斷免運，門檻自己定，這裡用 1000）
+const shippingFee = computed(() => {
+  return checkoutTotal.value >= 1000 ? 0 : 60
+})
+
+// 最終總計 = 商品小計 + 運費
+const finalTotal = computed(() => {
+  return checkoutTotal.value + shippingFee.value
+})
 </script>
 
 <template>
@@ -82,23 +104,17 @@ async function submitOrder() {
       <h2 class="h5 fw-bold mb-3">訂單明細</h2>
 
       <!-- 空狀態：沒有勾選任何商品 -->
-      <div v-if="cartStore.selectedItems.length == 0" class="text-muted py-3">
+      <div v-if="checkoutItems.length == 0" class="text-muted py-3">
         沒有要結帳的商品，請回購物車勾選商品。
       </div>
 
       <!-- 有商品：列出勾選的商品 -->
       <div v-else>
-        <div
-          v-for="product in cartStore.selectedItems"
-          :key="product.productSpecificationId"
-          class="d-flex align-items-center gap-3 border-bottom py-3"
-        >
+        <div v-for="product in checkoutItems" :key="product.productSpecificationId"
+          class="d-flex align-items-center gap-3 border-bottom py-3">
           <!-- 商品圖片 -->
-          <img
-            :src="product.image"
-            :alt="product.productName"
-            style="width: 56px; height: 56px; object-fit: cover; border-radius: 6px"
-          />
+          <img :src="product.image" :alt="product.productName"
+            style="width: 56px; height: 56px; object-fit: cover; border-radius: 6px" />
           <!-- 名稱 + 規格 -->
           <div class="flex-fill">
             <div class="fw-semibold">{{ product.productName }}</div>
@@ -146,18 +162,17 @@ async function submitOrder() {
       <h2 class="h5 fw-bold mb-3">金額摘要</h2>
       <div class="d-flex justify-content-between mb-2">
         <span>商品小計</span>
-        <span>NT$ {{ cartStore.total }}</span>
+        <span>NT$ {{ checkoutTotal }}</span>
       </div>
       <div class="d-flex justify-content-between mb-2">
         <span>運費</span>
-        <!-- 免運時顯示「免運費」，否則顯示金額 -->
-        <span v-if="cartStore.shippingFee == 0" class="text-success">免運費</span>
-        <span v-else>NT$ {{ cartStore.shippingFee }}</span>
+        <span v-if="shippingFee == 0" class="text-success">免運費</span>
+        <span v-else>NT$ {{ shippingFee }}</span>
       </div>
       <hr />
       <div class="d-flex justify-content-between fw-bold fs-5">
         <span>總計</span>
-        <span class="text-primary">NT$ {{ cartStore.finalTotal }}</span>
+        <span class="text-primary">NT$ {{ finalTotal }}</span>
       </div>
     </section>
     <section class="mt-4">
@@ -174,10 +189,12 @@ async function submitOrder() {
   margin: 0 auto;
   padding: 24px;
 }
+
 .page-title {
   font-size: 1.75rem;
   margin-bottom: 24px;
 }
+
 .placeholder-block {
   border: 1px dashed #ccc;
   border-radius: 8px;

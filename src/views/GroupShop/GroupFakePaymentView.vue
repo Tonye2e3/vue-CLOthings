@@ -61,19 +61,17 @@ const handleConfirmFailure = async () => {
 
 <template>
   <div class="pay-shell">
-    <div class="pay-card go-scale-in">
+    <div class="pay-card">
       <div class="pay-badge">模擬付款頁（僅供測試展示，非真實金流）</div>
 
-      <div v-if="loading" class="text-center py-5 text-muted">
-        <span class="go-spinner go-spinner-dark"></span> 載入中...
-      </div>
+      <div v-if="loading" class="text-center py-5 text-muted">載入中...</div>
 
-      <div v-else-if="errorMessage" class="text-center py-5 go-fade-in">
+      <div v-else-if="errorMessage" class="text-center py-5">
         <p class="text-danger mb-3">{{ errorMessage }}</p>
-        <button class="btn btn-outline-secondary go-btn-tap" @click="router.push('/GroupShop/checkout')">返回購物車</button>
+        <button class="btn btn-outline-secondary" @click="router.push('/GroupShop/checkout')">返回購物車</button>
       </div>
 
-      <div v-else class="go-fade-in">
+      <div v-else>
         <h4 class="fw-bold mb-3">確認訂單</h4>
 
         <div class="pay-items mb-3">
@@ -95,15 +93,14 @@ const handleConfirmFailure = async () => {
         </div>
 
         <button
-          class="btn btn-success w-100 mb-2 go-btn-tap"
+          class="btn btn-success w-100 mb-2"
           :disabled="processing"
           @click="handleConfirmSuccess"
         >
-          <span v-if="processing" class="go-spinner me-2"></span>
           確認訂單成立
         </button>
         <button
-          class="btn btn-outline-danger w-100 go-btn-tap"
+          class="btn btn-outline-danger w-100"
           :disabled="processing"
           @click="handleConfirmFailure"
         >
@@ -151,61 +148,5 @@ const handleConfirmFailure = async () => {
 .pay-items {
   max-height: 200px;
   overflow-y: auto;
-}
-
-/* ============ 本頁用到的特效樣式（進場動畫／懸停／按鈕微動效／載入動畫），class 一律以 go- 開頭 ============ */
-@keyframes goFadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-.go-fade-in { animation: goFadeIn 0.4s ease both; }
-
-@keyframes goScaleIn {
-  from { opacity: 0; transform: scale(0.94); }
-  to   { opacity: 1; transform: scale(1); }
-}
-
-.go-scale-in { animation: goScaleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
-
-.go-btn-tap { transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease; }
-.go-btn-tap:hover:not(:disabled) {
-  filter: brightness(1.06);
-  box-shadow: 0 6px 14px rgba(74, 62, 61, 0.18);
-}
-.go-btn-tap:active:not(:disabled) {
-  transform: scale(0.94);
-  filter: brightness(0.97);
-}
-
-@keyframes goSpin {
-  to { transform: rotate(360deg); }
-}
-
-.go-spinner {
-  display: inline-block;
-  width: 15px;
-  height: 15px;
-  vertical-align: -2px;
-  border: 2px solid rgba(255, 255, 255, 0.45);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: goSpin 0.7s linear infinite;
-}
-
-/* 淺底色（白底卡片）用的深色 spinner */
-.go-spinner-dark {
-  border: 2px solid rgba(74, 62, 61, 0.25);
-  border-top-color: var(--color-text, #4a3e3d);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .go-fade-in,
-  .go-scale-in,
-  .go-btn-tap,
-  .go-spinner {
-    animation-duration: 0.001s !important;
-    transition-duration: 0.001s !important;
-  }
 }
 </style>

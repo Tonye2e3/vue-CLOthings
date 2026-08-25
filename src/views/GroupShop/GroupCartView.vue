@@ -1,7 +1,7 @@
 <script setup>
 
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useGroupCartStore } from '@/stores/groupCart'
 import { useAuthStore } from '@/stores/auth'
 // 圖片網址工具：後端上傳圖片回傳的是相對路徑（例如 /images/group-products/xxx.jpg），
@@ -16,11 +16,29 @@ const resolveImageUrl = (path) => {
 }
 
 
+const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
 // 一般管理員（Admin）前台只能看不能操作，SuperAdmin 不受限
 const isReadOnly = computed(() => authStore.role === 'Admin')
+
+// 左側選單：一般會員只看得到「專案瀏覽」「團購紀錄」，
+// Admin / SuperAdmin 登入時，「團購紀錄」下面會多出後台管理的兩個項目
+const navItems = computed(() => {
+  const items = [
+    { label: '專案瀏覽', icon: 'user', to: '/GroupShop' },
+    { label: '團購紀錄', icon: 'history', to: '/GroupShop/orders' }
+  ]
+  if (authStore.isAdmin) {
+    items.push(
+      { label: '團購商品管理', icon: 'box', to: '/GroupShop/admin/products' },
+      { label: '團購訂單管理', icon: 'clipboard', to: '/GroupShop/admin/orders' }
+    )
+  }
+  return items
+})
+const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : route.path.startsWith(to))
 
 // 會員名稱：登入狀態統一用 useAuthStore()，尚未登入則顯示預設值
 const memberName = computed(() => authStore.name || '會員')
@@ -28,17 +46,10 @@ const memberName = computed(() => authStore.name || '會員')
 // 呼叫 useGroupCartStore()
 const cartStore = useGroupCartStore()
 
-// 購物車是否還在跟後端同步中：true 時列表顯示骨架屏
-const isLoading = ref(true)
-
 // 進到購物車頁時，跟後端同步一次目前的購物車內容
-onMounted(async () => {
-  try {
-    // 管理員（Admin）沒有購物車權限，fetchCart 會回 403，補上 catch 避免出現未處理的 Promise 錯誤
-    await cartStore.fetchCart().catch(() => {})
-  } finally {
-    isLoading.value = false
-  }
+onMounted(() => {
+  // 管理員（Admin）沒有購物車權限，fetchCart 會回 403，補上 catch 避免出現未處理的 Promise 錯誤
+  cartStore.fetchCart().catch(() => {})
 })
 
 // 團購加購專區
@@ -89,6 +100,45 @@ const handleCheckout = () => {
 <template>
   <div class="clo-shell">
     <div class="clo-body">
+      <!-- ============ 左側選單 ============ -->
+      <aside class="clo-sidebar">
+        <nav class="sidebar-nav">
+          <template v-for="item in navItems" :key="item.label">
+            <router-link
+              v-if="item.to"
+              :to="item.to"
+              class="nav-item"
+              :class="{ active: isActive(item.to) }"
+            >
+              <span class="nav-icon">
+                <!-- 依 item.icon 的值，顯示對應的嵌入式 SVG 圖示（v-if / v-else-if 只會顯示符合條件的那一個） -->
+                <svg v-if="item.icon === 'user'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <svg v-else-if="item.icon === 'history'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="1 4 1 10 7 10"></polyline>
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                </svg>
+                <svg v-else-if="item.icon === 'box'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
+                  <polyline points="3.29 7 12 12 20.71 7"></polyline>
+                  <line x1="12" y1="22" x2="12" y2="12"></line>
+                </svg>
+                <svg v-else-if="item.icon === 'clipboard'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                  <line x1="9" y1="12" x2="15" y2="12"></line>
+                  <line x1="9" y1="16" x2="15" y2="16"></line>
+                </svg>
+              </span>
+              <span>{{ item.label }}</span>
+            </router-link>
+          </template>
+        </nav>
+
+      </aside>
+
       <!-- ============ 主要內容區：購物車 ============ -->
       <main class="clo-main">
     <div class="row g-4">
@@ -97,55 +147,43 @@ const handleCheckout = () => {
         <h4 class="fw-bold mb-3">購物車 ({{ cartStore.items.length }})</h4>
 
         <div class="cart-list-card mb-4">
-          <!-- 載入中：顯示 3 列骨架屏，避免畫面空白閃一下 -->
-          <div v-if="isLoading">
-            <div v-for="n in 3" :key="n" class="cart-row">
-              <div class="cart-img go-skeleton"></div>
-              <div class="cart-item-info">
-                <div class="go-skeleton" style="width: 50%; height: 16px;"></div>
-                <div class="go-skeleton mt-2" style="width: 70%; height: 12px;"></div>
-              </div>
-            </div>
-          </div>
           <!-- 購物車是空的時候顯示提示文字 -->
-          <div v-else-if="cartStore.items.length === 0" class="empty-cart go-fade-in">
+          <div v-if="cartStore.items.length === 0" class="empty-cart">
             購物車目前是空的，快去挑選喜歡的商品加入團購吧！
           </div>
-          <!-- v-for 把購物車裡每一項商品都顯示成一列；TransitionGroup 讓新增/移除項目有滑入滑出效果 -->
-          <TransitionGroup v-else name="go-slide" tag="div">
-            <div v-for="item in cartStore.items" :key="item.id" class="cart-row go-row-hover">
-              <img :src="resolveImageUrl(item.imageUrl)" class="cart-img" :alt="item.name" />
-              <div class="cart-item-info">
-                <h6 class="fw-bold mb-1">{{ item.name }}</h6>
-                <div class="d-flex align-items-center gap-2 mb-1">
-                  <label class="small text-muted mb-0">數量</label>
-                  <input
-                    type="number"
-                    min="1"
-                    :value="item.qty"
-                    :disabled="isReadOnly"
-                    @change="updateQty(item.id, Number($event.target.value))"
-                    class="qty-input"
-                  />
-                </div>
-                <p class="small text-muted mb-0">
-                  團購價 ${{ formatCurrency(unitPriceOf(item)) }}
-                </p>
+          <!-- v-for 把購物車裡每一項商品都顯示成一列 -->
+          <div v-for="item in cartStore.items" :key="item.id" class="cart-row">
+            <img :src="resolveImageUrl(item.imageUrl)" class="cart-img" :alt="item.name" />
+            <div class="cart-item-info">
+              <h6 class="fw-bold mb-1">{{ item.name }}</h6>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <label class="small text-muted mb-0">數量</label>
+                <input
+                  type="number"
+                  min="1"
+                  :value="item.qty"
+                  :disabled="isReadOnly"
+                  @change="updateQty(item.id, Number($event.target.value))"
+                  class="qty-input"
+                />
               </div>
-              <div class="cart-item-price">
-                <span class="fw-bold">$ {{ formatCurrency(unitPriceOf(item) * item.qty) }}</span>
-                <button class="remove-btn go-icon-tap" :disabled="isReadOnly" @click="removeItem(item.id)">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                  <line x1="10" y1="11" x2="10" y2="17"></line>
-                  <line x1="14" y1="11" x2="14" y2="17"></line>
-                </svg>
-                移除
-              </button>
-              </div>
+              <p class="small text-muted mb-0">
+                團購價 ${{ formatCurrency(unitPriceOf(item)) }}
+              </p>
             </div>
-          </TransitionGroup>
+            <div class="cart-item-price">
+              <span class="fw-bold">$ {{ formatCurrency(unitPriceOf(item) * item.qty) }}</span>
+              <button class="remove-btn" :disabled="isReadOnly" @click="removeItem(item.id)">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+              移除
+            </button>
+            </div>
+          </div>
         </div>
 
         <!-- 當加購商品陣列不是空的時候才顯示這個區塊 -->
@@ -172,7 +210,7 @@ const handleCheckout = () => {
 
       <!-- 右側：購物車摘要 -->
       <div class="col-lg-4">
-        <div class="summary-panel go-fade-in-up" style="animation-delay: 0.08s;">
+        <div class="summary-panel">
           <h6 class="fw-bold summary-title">購物車摘要</h6>
           <div class="summary-body">
             <div class="d-flex justify-content-between mb-2">
@@ -198,10 +236,10 @@ const handleCheckout = () => {
               <span class="fw-bold fs-4 text-accent">${{ formatCurrency(grandTotal) }}</span>
             </div>
 
-            <button class="btn btn-outline w-100 mb-2 go-btn-tap" @click="continueShopping">繼續購物</button>
+            <button class="btn btn-outline w-100 mb-2" @click="continueShopping">繼續購物</button>
             <!-- 購物車完全空的時候，或目前是唯讀身分（Admin），按鈕會被禁用 -->
             <button
-              class="btn btn-main w-100 go-btn-tap"
+              class="btn btn-main w-100"
               :disabled="allItems.length === 0 || isReadOnly"
               :title="isReadOnly ? '管理員帳號僅供瀏覽，無法結帳' : ''"
               @click="handleCheckout"
@@ -384,75 +422,58 @@ const handleCheckout = () => {
   align-items: flex-start;
 }
 
+.clo-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  min-height: calc(100vh - 65px);
+  background-color: var(--color-bg-page);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 20px 0;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: 0.92rem;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+.nav-item:hover {
+  background-color: var(--color-hover-bg);
+}
+.nav-item.active {
+  color: var(--color-text);
+  font-weight: 700;
+  background-color: var(--color-active-bg);
+  border-left-color: var(--color-accent);
+}
+.nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+}
+
 .clo-main {
   flex: 1;
-  width: 100%;
   padding: 28px 32px;
   min-width: 0;
 }
 
-
-
-/* ============ 本頁用到的特效樣式（進場動畫／懸停／按鈕微動效／載入動畫），class 一律以 go- 開頭 ============ */
-@keyframes goFadeInUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.go-fade-in-up { animation: goFadeInUp 0.5s ease both; }
-
-@keyframes goFadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-.go-fade-in { animation: goFadeIn 0.4s ease both; }
-
-/* <Transition>/<TransitionGroup name="go-slide"> 用：滑入滑出 */
-.go-slide-enter-active, .go-slide-leave-active { transition: opacity 0.3s ease, transform 0.3s ease; }
-.go-slide-enter-from, .go-slide-leave-to { opacity: 0; transform: translateY(10px); }
-.go-slide-move { transition: transform 0.3s ease; }
-.go-slide-leave-active { position: absolute; }
-
-.go-row-hover { transition: background-color 0.15s ease, transform 0.15s ease; }
-.go-row-hover:hover { background-color: var(--color-hover-bg, #f1e7de); }
-
-.go-btn-tap { transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease; }
-.go-btn-tap:hover:not(:disabled) {
-  filter: brightness(1.06);
-  box-shadow: 0 6px 14px rgba(74, 62, 61, 0.18);
-}
-.go-btn-tap:active:not(:disabled) {
-  transform: scale(0.94);
-  filter: brightness(0.97);
-}
-
-.go-icon-tap { transition: transform 0.15s ease, background-color 0.15s ease; }
-.go-icon-tap:hover { transform: scale(1.08); }
-.go-icon-tap:active { transform: scale(0.9); }
-
-@keyframes goShimmer {
-  0%   { background-position: -300px 0; }
-  100% { background-position: 300px 0; }
-}
-
-.go-skeleton {
-  position: relative;
-  background: linear-gradient(90deg, #ece3d8 25%, #f6f0e8 37%, #ece3d8 63%);
-  background-size: 600px 100%;
-  animation: goShimmer 1.4s ease-in-out infinite;
-  border-radius: 6px;
-  color: transparent !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .go-fade-in-up,
-  .go-fade-in,
-  .go-btn-tap,
-  .go-icon-tap,
-  .go-skeleton {
-    animation-duration: 0.001s !important;
-    transition-duration: 0.001s !important;
-  }
+@media (max-width: 900px) {
+  .clo-sidebar { width: 72px; }
+  .nav-item span:last-child { display: none; }
 }
 </style>

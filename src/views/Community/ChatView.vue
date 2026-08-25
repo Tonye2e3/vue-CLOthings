@@ -9,6 +9,9 @@ import api from '@/services/api'
 // 從 CommunityView.vue 匯出，全站共用同一份「目前登入者是誰」的狀態，不用重複打 API。
 import { currentUserId, loadCurrentUserId } from '@/views/Community/CommunityView.vue'
 import { connectChat, disconnectChat, onReceiveMessage, offReceiveMessage, sendChatMessage } from '@/services/chatHub'
+// animate：anime.js v4 的動畫函式，這裡用來讓「即時收到的新訊息」滑入畫面，
+// 跟 CommunityView.vue 貼文卡片的捲動進場動畫是同一個套件、同一套用法。
+import { animate } from 'animejs'
 
 const route = useRoute()
 const router = useRouter()
@@ -42,9 +45,17 @@ const avatarUrl = (avatarPath, username) => {
     : `https://api.dicebear.com/7.x/avataaars/svg?seed=${username || 'guest'}`
 }
 const onAvatarError = (event, name) => {
-  if (event.target.dataset.fallback) return
-  event.target.dataset.fallback = '1'
-  event.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+  // 用「換過的網址是不是已經是預設圖」來判斷要不要再換一次，而不是用一個存在
+  // DOM 元素上的旗標（例如 dataset.fallback）——這裡的大頭貼是「單一、被重複使用」
+  // 的欄位（不是 v-for 跑出來的），例如切換到不同的聊天對象時，Vue 只會更新同一個
+  // <img> 的 src，不會整個重新產生一個新的 <img> 元素。如果用旗標記錄「這個元素已經
+  // 失敗過、觸發過備援了」，切到下一個對話對象、換了新的大頭貼網址，舊的旗標還留著，
+  // 新網址就算真的載入失敗，也會被那個舊旗標擋下來、不會真的換成預設圖，
+  // 使用者會看到大頭貼一直是破圖。改成比對「現在這個網址是不是已經是預設圖網址」，
+  // 不會有這種「換了新資料，但舊旗標還卡著」的問題。
+  const fallbackUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+  if (event.target.src === fallbackUrl) return
+  event.target.src = fallbackUrl
 }
 
 // formatChatTime：跟 PostDetailView.vue 的 formatDateTime 是同一套「2026-06-06 12:00」固定格式。
@@ -142,6 +153,10 @@ const handleReceiveMessage = (dto) => {
     (dto.senderId === activeOtherUserId.value || dto.receiverId === activeOtherUserId.value)
 
   if (isForActiveConversation) {
+    // pendingSlideInIds：記下這則訊息是「即時收到的」，等一下畫出來的時候要播放滑入動畫。
+    // 一開始用 fetchMessages 載入的歷史訊息不會經過這裡，只有透過 ChatHub 即時推送進來的
+    // 新訊息才會被標記，這樣歷史訊息就不會跟著一起播動畫，只有真的「剛收到」的才會滑入。
+    pendingSlideInIds.add(dto.chatMessageId)
     messages.value.push(dto)
     scrollToBottom()
   }
@@ -150,6 +165,45 @@ const handleReceiveMessage = (dto) => {
   // 「未讀數字」保持最新——重新打一次 API 最單純，不用手動在前端拼湊排序、去重的邏輯。
   fetchConversations()
 }
+
+// ============================================================
+// 新訊息滑入動畫：只有「即時收到的新訊息」（handleReceiveMessage 標記過的）才會播放，
+// 一開始載入的歷史訊息維持直接顯示，不會整批一起滑動，那樣反而不像「剛收到」的感覺。
+// ============================================================
+
+// pendingSlideInIds：等著播放滑入動畫的訊息 id 清單。
+const pendingSlideInIds = new Set()
+
+// animatePendingBubbles：把「畫面上剛渲染出來、還在等著播動畫」的訊息氣泡抓出來播放。
+// 自己傳的訊息（.mine）從右邊滑入，對方傳來的訊息從左邊滑入，方向跟氣泡本身靠左靠右一致，
+// 感覺像是「這則訊息真的從那個方向冒出來」。
+const animatePendingBubbles = () => {
+  if (pendingSlideInIds.size === 0) return
+  document.querySelectorAll('.chat-bubble-row').forEach(el => {
+    const id = Number(el.dataset.messageId)
+    if (!pendingSlideInIds.has(id)) return
+    pendingSlideInIds.delete(id)
+    const isMine = el.classList.contains('mine')
+    animate(el, {
+      opacity: [0, 1],
+      translateX: [isMine ? 24 : -24, 0],
+      duration: 380,
+      ease: 'outQuad',
+      // onComplete：清掉 anime.js 留下的行內 opacity／transform 樣式，避免卡住
+      // 之後任何跟 transform 有關的效果（目前氣泡本身沒有用到，純粹是保險習慣）。
+      onComplete: () => {
+        el.style.opacity = ''
+        el.style.transform = ''
+      }
+    })
+  })
+}
+
+// flush: 'post'：等 Vue 把新訊息真正畫到畫面上（DOM 更新完）之後才執行，
+// 這樣 document.querySelectorAll 才抓得到剛渲染出來的新氣泡。
+watch(messages, () => {
+  animatePendingBubbles()
+}, { flush: 'post' })
 
 // handlePickImage：使用者從檔案選擇視窗選好圖片之後執行（可以一次選很多張，也可以分次
 //加選）——這裡只做「本地預覽」，還沒真的上傳到伺服器，上傳的動作留到按下「送出」的那一刻
@@ -305,6 +359,7 @@ watch(() => route.params.userId, (newVal) => {
               <div
                 v-for="m in messages"
                 :key="m.chatMessageId"
+                :data-message-id="m.chatMessageId"
                 class="chat-bubble-row"
                 :class="{ mine: m.senderId === currentUserId }"
               >
@@ -351,9 +406,15 @@ watch(() => route.params.userId, (newVal) => {
           <div class="chat-input-row">
             <!-- 圖片按鈕本身是一個包住隱藏 file input 的 label，點按鈕視覺上是點圖示，
                  實際觸發的是底下那個看不見的 <input type="file">，開出系統的檔案選擇視窗。
-                 multiple：可以一次選很多張圖片，也可以分好幾次加選。 -->
+                 multiple：可以一次選很多張圖片，也可以分好幾次加選。
+                 這裡跟 CreatePostView.vue、CommunityView.vue 一起把 Font Awesome 圖示換成
+                 專案自己的 SVG 線條圖示，理由一樣：不吃字型／CDN，風格也統一。 -->
             <label class="chat-image-btn" title="傳送圖片">
-              <i class="fa-solid fa-image" style="color: rgb(122, 75, 84);"></i>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <circle cx="8.5" cy="9.5" r="1.5" />
+                <path d="M21 15l-5-5-4 4-3-3-6 6" />
+              </svg>
               <input
                 type="file"
                 accept="image/*"
@@ -450,10 +511,23 @@ watch(() => route.params.userId, (newVal) => {
   font-size:.78rem; color:var(--ink-soft);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
+/*
+  chat-unread-badge 的脈動效果：這裡改用純 CSS 的 @keyframes，不是 anime.js。
+  這個角標會隨著左側清單重新整理（每次收發訊息都會重打一次 fetchConversations）
+  不斷被 Vue 重新渲染／可能被整批換掉，如果用 anime.js 的 loop:true 持續動畫，
+  要另外處理「元素換掉了、動畫實例要不要重建」這種生命週期管理，反而變複雜；
+  純 CSS 的無限循環動畫，瀏覽器原生處理好這一切，不用寫任何 JS 去維護，
+  也更省效能——這種「持續存在、不需要精準控制播放時機」的效果，CSS 天生就是更適合的工具。
+*/
+@keyframes chat-badge-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(122,75,84,.45); }
+  50% { transform: scale(1.14); box-shadow: 0 0 0 4px rgba(122,75,84,0); }
+}
 .chat-unread-badge{
   background:var(--plum); color:#fff; font-size:.68rem; font-weight:700;
   min-width:18px; height:18px; border-radius:9px; padding:0 .4rem;
   display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  animation: chat-badge-pulse 1.6s ease-in-out infinite;
 }
 
 /* ---------- 右側訊息串 ---------- */
@@ -568,9 +642,9 @@ watch(() => route.params.userId, (newVal) => {
 .chat-image-btn{
   position:relative;
   width:38px; height:38px; border-radius:50%;
-  background:var(--cream); flex-shrink:0;
+  background:var(--cream); flex-shrink:0; color:var(--plum);
   display:flex; align-items:center; justify-content:center;
-  font-size:1.1rem; cursor:pointer;
+  cursor:pointer;
   transition:background .18s ease;
 }
 .chat-image-btn:hover{ background:var(--hairline); }

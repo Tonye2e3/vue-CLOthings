@@ -8,7 +8,7 @@ import '@/assets/styles/user-common.css'
 
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
-
+import { useRoute } from 'vue-router'
 import api from '@/services/api'
 
 import {
@@ -17,10 +17,17 @@ import {
   faHouse,
   faLink,
   faRightFromBracket,
+
+  faBagShopping,
+  faUsers,
+  faAddressCard,
+  faMessage,
+
 } from '@fortawesome/free-solid-svg-icons'
 
 const authStore = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 // ⭐ 修改：改成 async，因為現在要呼叫後端
 async function logout() {
@@ -40,6 +47,22 @@ async function logout() {
     router.push({ name: 'login' })
   }
 }
+
+// 🟢 新增：回到會員設定頁，並捲動到指定 Card
+async function goToSection(sectionId) {
+  // 先回到會員中心首頁
+  if (router.currentRoute.value.name !== 'user') {
+    await router.push({ name: 'user' })
+  }
+
+  // 等 Vue 把 AccountCard / ProfileCard... 渲染出來
+  requestAnimationFrame(() => {
+    document.getElementById(sectionId)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  })
+}
 </script>
 
 <template>
@@ -56,7 +79,7 @@ async function logout() {
 
         <nav class="sidebar-nav">
           <!-- 帳戶資料 -->
-          <a href="#account" class="nav-item">
+          <button type="button" class="nav-item nav-button" @click="goToSection('account')">
             <span class="nav-icon">
               <FontAwesomeIcon :icon="faUser" />
             </span>
@@ -65,10 +88,9 @@ async function logout() {
               <span class="nav-title">帳戶資料</span>
               <small>Account</small>
             </div>
-          </a>
+          </button>
 
-          <!-- 個人資料 -->
-          <a href="#profile" class="nav-item">
+          <!-- 個人資料 --><button type="button" class="nav-item nav-button" @click="goToSection('profile')">
             <span class="nav-icon">
               <FontAwesomeIcon :icon="faIdCard" />
             </span>
@@ -77,10 +99,8 @@ async function logout() {
               <span class="nav-title">個人資料</span>
               <small>Profile</small>
             </div>
-          </a>
-
-          <!-- 收件資料 -->
-          <a href="#address" class="nav-item">
+          </button>
+          <!-- 收件資料 --><button type="button" class="nav-item nav-button" @click="goToSection('address')">
             <span class="nav-icon">
               <FontAwesomeIcon :icon="faHouse" />
             </span>
@@ -89,10 +109,9 @@ async function logout() {
               <span class="nav-title">收件資料</span>
               <small>Address</small>
             </div>
-          </a>
+          </button>
 
-          <!-- 第三方登入 -->
-          <a href="#oauth" class="nav-item">
+          <!-- 第三方登入 --><button type="button" class="nav-item nav-button" @click="goToSection('oauth')">
             <span class="nav-icon">
               <FontAwesomeIcon :icon="faLink" />
             </span>
@@ -101,7 +120,69 @@ async function logout() {
               <span class="nav-title">第三方登入</span>
               <small>Connections</small>
             </div>
-          </a>
+          </button>
+
+          <div class="sidebar-header">
+            <p class="sidebar-subtitle">Orders</p>
+            <h2 class="sidebar-title">訂單</h2>
+          </div>
+
+          <!--  商城訂單 -->
+          <RouterLink :to="{ name: 'UserShopOrders' }" class="nav-item">
+            <span class="nav-icon">
+              <font-awesome-icon :icon="faBagShopping" />
+            </span>
+
+            <div>
+              <span class="nav-title">商城訂單</span>
+              <small>Orders</small>
+            </div>
+          </RouterLink>
+
+          <!--  團購訂單 -->
+          <RouterLink :to="{ name: 'UserGroupOrders' }" class="nav-item">
+            <span class="nav-icon">
+              <font-awesome-icon :icon="faUsers" />
+            </span>
+
+            <div>
+              <span class="nav-title">團購訂單</span>
+              <small>Group Orders</small>
+            </div>
+          </RouterLink>
+
+          <div class="sidebar-header">
+            <p class="sidebar-subtitle">Community</p>
+            <h2 class="sidebar-title">社群</h2>
+          </div>
+
+          <!--  個人頁 -->
+          <RouterLink v-if="authStore.userId" :to="{
+            name: 'UserCommunityProfile', params: { userId: authStore.userId }
+          }" class="nav-item">
+
+            <span class="nav-icon">
+              <font-awesome-icon :icon="faAddressCard" />
+            </span>
+
+            <div>
+              <span class="nav-title">社群個人頁</span>
+              <small>My Page</small>
+            </div>
+          </RouterLink>
+
+          <!--  訊息 -->
+          <RouterLink :to="{ name: 'UserMessages' }" class="nav-item">
+            <span class="nav-icon">
+              <font-awesome-icon :icon="faMessage" />
+            </span>
+
+            <div>
+              <span class="nav-title">訊息</span>
+              <small>Messages</small>
+            </div>
+          </RouterLink>
+
         </nav>
 
         <div class="sidebar-footer">
@@ -116,29 +197,48 @@ async function logout() {
       <!-- 右側會員內容 -->
       <!-- ============================= -->
       <main class="content-area">
-        <div class="page-header">
-          <p class="page-subtitle">MY ACCOUNT</p>
 
-          <h1>帳戶設定</h1>
+        <!-- ========================================== -->
+        <!-- 🟡 修改：會員中心首頁才顯示原本四張 Card -->
+        <!-- ========================================== -->
 
-          <p class="page-description">管理你的會員資料、個人資訊與收件地址。</p>
-        </div>
+        <template v-if="route.name === 'user'">
 
-        <section id="account" class="content-section">
-          <AccountCard />
-        </section>
+          <div class="page-header">
+            <p class="page-subtitle">MY ACCOUNT</p>
 
-        <section id="profile" class="content-section">
-          <ProfileCard />
-        </section>
+            <h1>帳戶設定</h1>
 
-        <section id="address" class="content-section">
-          <AddressCard />
-        </section>
+            <p class="page-description">
+              管理你的會員資料、個人資訊與收件地址。
+            </p>
+          </div>
 
-        <section id="oauth" class="content-section">
-          <oAuthCard />
-        </section>
+          <section id="account" class="content-section">
+            <AccountCard />
+          </section>
+
+          <section id="profile" class="content-section">
+            <ProfileCard />
+          </section>
+
+          <section id="address" class="content-section">
+            <AddressCard />
+          </section>
+
+          <section id="oauth" class="content-section">
+            <oAuthCard />
+          </section>
+
+        </template>
+
+
+        <!-- ========================================== -->
+        <!-- 🟢 新增：其他會員功能顯示在右側 -->
+        <!-- ========================================== -->
+
+        <RouterView v-else />
+
       </main>
     </div>
   </div>
@@ -167,9 +267,9 @@ async function logout() {
 
   display: grid;
 
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 200px minmax(0, 1fr);
 
-  gap: 40px;
+  gap: 10px;
 
   align-items: start;
 }
@@ -195,7 +295,7 @@ async function logout() {
 }
 
 .sidebar-header {
-  padding: 26px 24px 20px;
+  padding: 10px 18px 15px;
 
   border-bottom: 1px solid #eeeeee;
 }
@@ -227,7 +327,7 @@ async function logout() {
 ========================= */
 
 .sidebar-nav {
-  padding: 12px;
+  padding: 8px;
 }
 
 .nav-item {
@@ -237,7 +337,7 @@ async function logout() {
 
   gap: 13px;
 
-  padding: 13px 14px;
+  padding: 5px 10px;
 
   margin-bottom: 4px;
 
@@ -420,5 +520,32 @@ async function logout() {
   .page-header h1 {
     font-size: 26px;
   }
+}
+
+/* 🟢 新增：Sidebar 功能分類標題 */
+.nav-group-title {
+  margin: 18px 14px 8px;
+
+  padding-top: 16px;
+
+  border-top: 1px solid #eeeeee;
+
+  color: #999999;
+
+  font-size: 11px;
+
+  font-weight: 700;
+
+  letter-spacing: 1.2px;
+}
+
+/* 🟢 新增：讓 button 看起來跟原本導覽列一樣 */
+.nav-button {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 </style>
