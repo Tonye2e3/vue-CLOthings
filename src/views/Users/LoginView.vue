@@ -40,22 +40,10 @@ async function login() {
       alert('伺服器錯誤，請稍後再試')
     }
   }
+}
 
-  // // 模擬後端回傳的假資料
-  // const fakeResp = {
-  //   data: {
-  //        token: 'fake-jwt-token-123',
-  //        name: '測試用戶',
-  //        account: 'test001',
-  //        role: 'admin'
-  //   },
-  //   status: 200,
-  // }
-  // 模擬成功登入流程
-  // authStore.setAuth(fakeResp.data)
-  // alert('登入成功 (假資料)')
-  // router.push({ name: 'home' })
-  // console.log('登入結果', fakeResp)
+function googleLogin() {
+  window.location.href = 'https://localhost:7255/api/User/google/login'
 }
 </script>
 
@@ -84,7 +72,7 @@ async function login() {
     </button>
     <div class="text-center mt-3">其他登入方式</div>
     <div class="d-flex gap-2">
-      <button class="btn btn-outline-secondary w-50 py-2 mt-2" type="button">
+      <button class="btn btn-outline-secondary w-50 py-2 mt-2" type="button" @click="googleLogin">
         <IconGoogle /> Google 登入
       </button>
       <button class="btn btn-outline-secondary w-50 py-2 mt-2" type="button">

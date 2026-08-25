@@ -1,9 +1,15 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import {
+  createRouter,
+  createWebHistory
+} from 'vue-router'
 import HomeView from '../views/HomeView.vue'
-import { useAuthStore } from '@/stores/auth'
+import {
+  useAuthStore
+} from '@/stores/auth'
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(
+    import.meta.env.BASE_URL),
   routes: [
     //內建主頁暫不使用
     {
@@ -88,39 +94,53 @@ const router = createRouter({
       path: '/GroupShop/checkout',
       name: 'GroupCart',
       component: () => import('../views/GroupShop/GroupCartView.vue'),
-      meta: { requiresAuth: true },
+      meta: {
+        requiresAuth: true
+      },
     },
     {
       path: '/GroupShop/orders',
       name: 'GroupOrders',
       component: () => import('../views/GroupShop/GroupOrdersView.vue'),
-      meta: { requiresAuth: true },
+      meta: {
+        requiresAuth: true
+      },
     },
     {
       path: '/GroupShop/checkout/confirm',
       name: 'GroupCheckout',
       component: () => import('../views/GroupShop/GroupCheckoutView.vue'),
-      meta: { requiresAuth: true },
+      meta: {
+        requiresAuth: true
+      },
     },
     // 模擬付款頁：結帳送出後會先跳到這裡，付款結果確認後才會真的建立訂單
     {
       path: '/GroupShop/pay/:paymentId',
       name: 'GroupFakePayment',
       component: () => import('../views/GroupShop/GroupFakePaymentView.vue'),
-      meta: { requiresAuth: true },
+      meta: {
+        requiresAuth: true
+      },
     },
     // 管理端：商品管理、訂單管理（僅 Admin / SuperAdmin 可進入）
     {
       path: '/GroupShop/admin/products',
       name: 'GroupProductAdmin',
       component: () => import('../views/GroupShop/GroupProductAdminView.vue'),
-      meta: { requiresAuth: true, requiresAdmin: true },
+      meta: {
+        requiresAuth: true,
+        requiresAdmin: true
+      },
     },
     {
       path: '/GroupShop/admin/orders',
       name: 'GroupOrderAdmin',
       component: () => import('../views/GroupShop/GroupOrderAdminView.vue'),
-      meta: { requiresAuth: true, requiresAdmin: true },
+      meta: {
+        requiresAuth: true,
+        requiresAdmin: true
+      },
     },
 
     //Community 在註解之間新增個人使用的路由 名字自行修改
@@ -136,13 +156,17 @@ const router = createRouter({
       path: '/community/profile/:userId/followers',
       name: 'CommunityFollowers',
       component: () => import('@/views/Community/FollowListView.vue'),
-      props: { mode: 'followers' },
+      props: {
+        mode: 'followers'
+      },
     },
     {
       path: '/community/profile/:userId/following',
       name: 'CommunityFollowing',
       component: () => import('@/views/Community/FollowListView.vue'),
-      props: { mode: 'following' },
+      props: {
+        mode: 'following'
+      },
     },
     {
       path: '/community/create',
@@ -168,13 +192,17 @@ const router = createRouter({
       path: '/community/messages',
       name: 'CommunityMessages',
       component: () => import('@/views/Community/ChatView.vue'),
-      meta: { requiresAuth: true },
+      meta: {
+        requiresAuth: true
+      },
     },
     {
       path: '/community/messages/:userId',
       name: 'CommunityMessagesWith',
       component: () => import('@/views/Community/ChatView.vue'),
-      meta: { requiresAuth: true },
+      meta: {
+        requiresAuth: true
+      },
     },
     // 社群後台管理（管理者用，不是給一般使用者看的）
     {
@@ -200,13 +228,59 @@ const router = createRouter({
       component: () => import('../views/Users/RegisterView.vue'),
     },
     {
+      // 🟡 修改
       path: '/user',
-      meta: { requiresAuth: true },
-      children: [
-        {
-          path: 'user',
+
+      // 🟢 新增：User.vue 本身成為會員中心 Layout
+      component: () => import('@/views/Users/User.vue'),
+
+      meta: {
+        requiresAuth: true
+      },
+
+      children: [{
+          // /user
+          path: '',
           name: 'user',
-          component: () => import('@/views/Users/User.vue'),
+
+          // 🟢 新增
+          component: () => import('@/views/Users/UserCard/AccountCard.vue'),
+        },
+
+        // ==============================
+        // 🟢 新增：商城訂單
+        // ==============================
+        {
+          path: 'orders',
+          name: 'UserShopOrders',
+          component: () => import('@/views/Shop/ShopOrdersView.vue'),
+        },
+
+        // ==============================
+        // 🟢 新增：團購訂單
+        // ==============================
+        {
+          path: 'group-orders',
+          name: 'UserGroupOrders',
+          component: () => import('@/views/GroupShop/GroupOrdersView.vue'),
+        },
+
+        // ==============================
+        // 🟢 新增：社群個人頁
+        // ==============================
+        {
+          path: 'community/:userId',
+          name: 'UserCommunityProfile',
+          component: () => import('@/views/Community/UserProfileView.vue'),
+        },
+
+        // ==============================
+        // 🟢 新增：訊息
+        // ==============================
+        {
+          path: 'messages',
+          name: 'UserMessages',
+          component: () => import('@/views/Community/ChatView.vue'),
         },
       ],
     },
@@ -229,7 +303,9 @@ router.beforeEach((to) => {
 
   // 要進入的頁面需要管理員權限，而目前登入的角色不是 Admin / SuperAdmin
   if (to.meta.requiresAdmin && !authStore.isAdmin) {
-    return { name: 'home' }
+    return {
+      name: 'home'
+    }
   }
 })
 

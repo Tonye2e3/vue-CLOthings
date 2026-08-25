@@ -58,7 +58,7 @@ const loadOrders = async () => {
 
 onMounted(() => {
   // 管理員（Admin）沒有購物車權限，fetchCart 會回 403，補上 catch 避免出現未處理的 Promise 錯誤
-  cartStore.fetchCart().catch(() => {})
+  cartStore.fetchCart().catch(() => { })
   loadOrders()
 
   // 從 LINE Pay 付款完成導回來的話，網址上會帶 linepay=success，顯示一下提示
@@ -206,215 +206,152 @@ const submitService = async () => {
     <!-- 購物車圖示改為右下角浮動按鈕，見頁面最下方 -->
     <div class="clo-body">
       <!-- ============ 左側選單 ============ -->
-      <aside class="clo-sidebar">
-        <nav class="sidebar-nav">
-          <template v-for="item in navItems" :key="item.label">
-            <router-link
-              v-if="item.to"
-              :to="item.to"
-              class="nav-item"
-              :class="{ active: isActive(item.to) }"
-            >
-              <span class="nav-icon">
-                <!-- 依 item.icon 的值，顯示對應的嵌入式 SVG 圖示（v-if / v-else-if 只會顯示符合條件的那一個） -->
-                <svg v-if="item.icon === 'user'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-                <svg v-else-if="item.icon === 'history'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="1 4 1 10 7 10"></polyline>
-                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                </svg>
-                <svg v-else-if="item.icon === 'box'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
-                  <polyline points="3.29 7 12 12 20.71 7"></polyline>
-                  <line x1="12" y1="22" x2="12" y2="12"></line>
-                </svg>
-                <svg v-else-if="item.icon === 'clipboard'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                  <line x1="9" y1="12" x2="15" y2="12"></line>
-                  <line x1="9" y1="16" x2="15" y2="16"></line>
-                </svg>
-              </span>
-              <span>{{ item.label }}</span>
-            </router-link>
-          </template>
-        </nav>
 
-      </aside>
 
       <!-- ============ 主要內容區：訂單列表 ============ -->
       <main class="clo-main">
-    <div class="page-header mb-4">
-      <h2 class="fw-bold mb-1">我的團購訂單</h2>
-      <p class="text-muted small mb-0">追蹤您參與的所有團購專案與運送進度</p>
-    </div>
+        <div class="page-header mb-4">
+          <h2 class="fw-bold mb-1">我的團購訂單</h2>
+          <p class="text-muted small mb-0">追蹤您參與的所有團購專案與運送進度</p>
+        </div>
 
-    <div class="card shadow-sm border-0 rounded-3 overflow-hidden">
-      <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-          <thead>
-            <tr>
-              <th>訂單編號</th>
-              <th>團購商品</th>
-              <th>進度</th>
-              <th>總金額</th>
-              <th>訂購日期</th>
-              <th>收件人</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <!-- v-for 把 myOrders 陣列裡每一筆訂單，重複產生一列表格資料 -->
-            <tr v-for="order in myOrders" :key="order.id">
-              <td class="fw-bold text-main">#{{ order.id }}</td>
-              <td class="fw-bold">{{ order.productName }}</td>
-              <td>
-                <!-- :class 用陣列動態組合出多個 class，其中 getBadgeClass 會依狀態回傳不同顏色 -->
-                <span :class="['badge', getBadgeClass(order.status), 'px-3', 'py-2']">
-                  {{ order.status }}
-                </span>
-              </td>
-              <td class="fw-bold text-accent">$ {{ formatCurrency(order.totalPrice) }}</td>
-              <td>{{ order.orderDate }}</td>
-              <td>{{ order.shipName }}</td>
-              <td>
-                <div class="action-buttons">
-                  <button
-                    class="edit-btn"
-                    :disabled="order.status.includes('已取消') || isReadOnly"
-                    @click="openEditModal(order.id)"
-                  >編輯</button>
-                  <button
-                    class="cancel-btn"
-                    :disabled="order.status.includes('已取消') || isReadOnly"
-                    @click="cancelOrder(order.id)"
-                  >取消</button>
-                  <button
-                    class="service-btn"
-                    :disabled="isReadOnly"
-                    @click="openServiceModal(order.id)"
-                  >聯絡客服</button>
+        <div class="card shadow-sm border-0 rounded-3 overflow-hidden">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>訂單編號</th>
+                  <th>團購商品</th>
+                  <th>進度</th>
+                  <th>總金額</th>
+                  <th>訂購日期</th>
+                  <th>收件人</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- v-for 把 myOrders 陣列裡每一筆訂單，重複產生一列表格資料 -->
+                <tr v-for="order in myOrders" :key="order.id">
+                  <td class="fw-bold text-main">#{{ order.id }}</td>
+                  <td class="fw-bold">{{ order.productName }}</td>
+                  <td>
+                    <!-- :class 用陣列動態組合出多個 class，其中 getBadgeClass 會依狀態回傳不同顏色 -->
+                    <span :class="['badge', getBadgeClass(order.status), 'px-3', 'py-2']">
+                      {{ order.status }}
+                    </span>
+                  </td>
+                  <td class="fw-bold text-accent">$ {{ formatCurrency(order.totalPrice) }}</td>
+                  <td>{{ order.orderDate }}</td>
+                  <td>{{ order.shipName }}</td>
+                  <td>
+                    <div class="action-buttons">
+                      <button class="edit-btn" :disabled="order.status.includes('已取消') || isReadOnly"
+                        @click="openEditModal(order.id)">編輯</button>
+                      <button class="cancel-btn" :disabled="order.status.includes('已取消') || isReadOnly"
+                        @click="cancelOrder(order.id)">取消</button>
+                      <button class="service-btn" :disabled="isReadOnly"
+                        @click="openServiceModal(order.id)">聯絡客服</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ============ 編輯訂單 Modal ============ -->
+        <!-- 背景遮罩：showEditModal 為 true 時顯示，讓後面的內容變暗、不能點擊 -->
+        <div v-if="showEditModal" class="modal-backdrop fade show"></div>
+        <div v-if="showEditModal" class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title fw-bold mb-0">編輯訂單</h5>
+                <button type="button" class="btn-close" aria-label="Close" @click="closeEditModal"></button>
+              </div>
+              <div class="modal-body">
+                <div class="mb-3">
+                  <label class="form-label">收件人姓名</label>
+                  <!-- v-model 把輸入框內容同步到 editForm.shipName -->
+                  <input type="text" class="form-control" v-model="editForm.shipName" />
                 </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
 
-    <!-- ============ 編輯訂單 Modal ============ -->
-    <!-- 背景遮罩：showEditModal 為 true 時顯示，讓後面的內容變暗、不能點擊 -->
-    <div v-if="showEditModal" class="modal-backdrop fade show"></div>
-    <div
-      v-if="showEditModal"
-      class="modal fade show d-block"
-      tabindex="-1"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title fw-bold mb-0">編輯訂單</h5>
-            <button type="button" class="btn-close" aria-label="Close" @click="closeEditModal"></button>
-          </div>
-          <div class="modal-body">
-            <div class="mb-3">
-              <label class="form-label">收件人姓名</label>
-              <!-- v-model 把輸入框內容同步到 editForm.shipName -->
-              <input type="text" class="form-control" v-model="editForm.shipName" />
+                <label class="form-label">商品數量</label>
+                <!-- 逐一列出這筆訂單裡的每個商品，各自可以調整數量 -->
+                <div v-for="item in editForm.items" :key="item.id"
+                  class="d-flex align-items-center justify-content-between edit-item-row">
+                  <span class="small">{{ item.name }}</span>
+                  <input type="number" min="1" class="form-control edit-qty-input" v-model.number="item.qty" />
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" @click="closeEditModal">取消</button>
+                <button type="button" class="btn btn-primary" @click="saveEdit">儲存</button>
+              </div>
             </div>
-
-            <label class="form-label">商品數量</label>
-            <!-- 逐一列出這筆訂單裡的每個商品，各自可以調整數量 -->
-            <div
-              v-for="item in editForm.items"
-              :key="item.id"
-              class="d-flex align-items-center justify-content-between edit-item-row"
-            >
-              <span class="small">{{ item.name }}</span>
-              <input
-                type="number"
-                min="1"
-                class="form-control edit-qty-input"
-                v-model.number="item.qty"
-              />
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" @click="closeEditModal">取消</button>
-            <button type="button" class="btn btn-primary" @click="saveEdit">儲存</button>
           </div>
         </div>
-      </div>
-    </div>
 
-    <!-- ============ 聯絡客服 Modal ============ -->
-    <div v-if="showServiceModal" class="modal-backdrop fade show"></div>
-    <div
-      v-if="showServiceModal"
-      class="modal fade show d-block"
-      tabindex="-1"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title fw-bold mb-0">聯絡客服 #{{ activeServiceOrderId }}</h5>
-            <button type="button" class="btn-close" aria-label="Close" @click="closeServiceModal"></button>
-          </div>
-          <div class="modal-body">
-            <div class="row g-2 mb-2">
-              <div class="col">
-                <label class="form-label small">姓名</label>
-                <input type="text" class="form-control form-control-sm" v-model="serviceForm.name" />
+        <!-- ============ 聯絡客服 Modal ============ -->
+        <div v-if="showServiceModal" class="modal-backdrop fade show"></div>
+        <div v-if="showServiceModal" class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title fw-bold mb-0">聯絡客服 #{{ activeServiceOrderId }}</h5>
+                <button type="button" class="btn-close" aria-label="Close" @click="closeServiceModal"></button>
               </div>
-              <div class="col">
-                <label class="form-label small">Email</label>
-                <input type="email" class="form-control form-control-sm" v-model="serviceForm.email" />
-              </div>
-              <div class="col">
-                <label class="form-label small">電話</label>
-                <input type="tel" class="form-control form-control-sm" v-model="serviceForm.phone" />
-              </div>
-            </div>
-            <div class="mb-2">
-              <label class="form-label small">標題</label>
-              <input type="text" class="form-control" v-model="serviceForm.title" placeholder="請簡短描述問題" />
-            </div>
-            <div class="mb-3">
-              <label class="form-label small">內容</label>
-              <textarea class="form-control" rows="3" v-model="serviceForm.content" placeholder="請詳細描述您的問題"></textarea>
-            </div>
-            <button type="button" class="btn btn-primary btn-sm mb-3" @click="submitService">送出</button>
+              <div class="modal-body">
+                <div class="row g-2 mb-2">
+                  <div class="col">
+                    <label class="form-label small">姓名</label>
+                    <input type="text" class="form-control form-control-sm" v-model="serviceForm.name" />
+                  </div>
+                  <div class="col">
+                    <label class="form-label small">Email</label>
+                    <input type="email" class="form-control form-control-sm" v-model="serviceForm.email" />
+                  </div>
+                  <div class="col">
+                    <label class="form-label small">電話</label>
+                    <input type="tel" class="form-control form-control-sm" v-model="serviceForm.phone" />
+                  </div>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small">標題</label>
+                  <input type="text" class="form-control" v-model="serviceForm.title" placeholder="請簡短描述問題" />
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small">內容</label>
+                  <textarea class="form-control" rows="3" v-model="serviceForm.content"
+                    placeholder="請詳細描述您的問題"></textarea>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm mb-3" @click="submitService">送出</button>
 
-            <hr />
-            <p class="small fw-bold mb-2">過去的客服紀錄</p>
-            <p v-if="serviceRecords.length === 0" class="small text-muted">目前沒有客服紀錄</p>
-            <div v-for="r in serviceRecords" :key="r.groupCustomerServiceId" class="service-record-row">
-              <p class="small fw-bold mb-1">{{ r.title }}</p>
-              <p class="small text-muted mb-1">{{ r.content }}</p>
-              <p v-if="r.replyContent" class="small text-success mb-0">
-                客服回覆：{{ r.replyContent }}（{{ r.repliedAt }}）
-              </p>
-              <p v-else class="small text-muted mb-0">尚未回覆</p>
+                <hr />
+                <p class="small fw-bold mb-2">過去的客服紀錄</p>
+                <p v-if="serviceRecords.length === 0" class="small text-muted">目前沒有客服紀錄</p>
+                <div v-for="r in serviceRecords" :key="r.groupCustomerServiceId" class="service-record-row">
+                  <p class="small fw-bold mb-1">{{ r.title }}</p>
+                  <p class="small text-muted mb-1">{{ r.content }}</p>
+                  <p v-if="r.replyContent" class="small text-success mb-0">
+                    客服回覆：{{ r.replyContent }}（{{ r.repliedAt }}）
+                  </p>
+                  <p v-else class="small text-muted mb-0">尚未回覆</p>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" @click="closeServiceModal">關閉</button>
+              </div>
             </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" @click="closeServiceModal">關閉</button>
           </div>
         </div>
-      </div>
-    </div>
       </main>
     </div>
 
     <!-- ============ 浮動購物車按鈕（右下角，點擊直接跳到購物車畫面） ============ -->
     <router-link to="/GroupShop/checkout" class="floating-cart" aria-label="前往購物車">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"
+        stroke-linecap="round" stroke-linejoin="round">
         <circle cx="9" cy="21" r="1"></circle>
         <circle cx="20" cy="21" r="1"></circle>
         <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
@@ -439,7 +376,8 @@ const submitService = async () => {
   --color-border-input: #d8c3b5;
   --color-hover-bg: #f1e7de;
   --color-active-bg: #ebdcd0;
-  --color-dark-hover: #362d2c; /* 補回：.floating-cart:hover 有用到，原本沒定義會失效 */
+  --color-dark-hover: #362d2c;
+  /* 補回：.floating-cart:hover 有用到，原本沒定義會失效 */
 
   --shadow-float: 0 4px 12px rgba(74, 62, 61, 0.3);
   --radius-full: 999px;
@@ -449,18 +387,25 @@ const submitService = async () => {
   color: var(--color-text);
 }
 
-.text-main { color: var(--color-text); }
-.text-accent { color: var(--color-accent); }
+.text-main {
+  color: var(--color-text);
+}
+
+.text-accent {
+  color: var(--color-accent);
+}
 
 table thead {
   background-color: var(--color-active-bg);
   color: var(--color-text);
 }
+
 table thead th {
   padding: 14px 16px;
   font-weight: 600;
   border: none;
 }
+
 table tbody td {
   padding: 14px 16px;
 }
@@ -486,6 +431,7 @@ table tbody td {
   border: 1px solid var(--color-danger-border);
   color: var(--color-danger);
 }
+
 .cancel-btn:hover {
   background-color: var(--color-danger-bg);
 }
@@ -495,12 +441,19 @@ table tbody td {
 .service-btn {
   border: 1px solid var(--color-border-input);
 }
+
 .edit-btn:hover,
 .service-btn:hover {
   background-color: var(--color-hover-bg);
 }
-.edit-btn { color: var(--color-text); }
-.service-btn { color: var(--color-text-muted); }
+
+.edit-btn {
+  color: var(--color-text);
+}
+
+.service-btn {
+  color: var(--color-text-muted);
+}
 
 /* disabled 狀態 edit-btn / cancel-btn / service-btn 完全一樣，合併成一組 */
 .edit-btn:disabled,
@@ -509,6 +462,7 @@ table tbody td {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
 .edit-btn:disabled:hover,
 .cancel-btn:disabled:hover,
 .service-btn:disabled:hover {
@@ -521,10 +475,12 @@ table tbody td {
   padding: 8px 0;
   border-bottom: 1px solid var(--color-hover-bg);
 }
+
 .service-record-row:last-child,
 .edit-item-row:last-child {
   border-bottom: none;
 }
+
 .edit-qty-input {
   width: 80px;
   text-align: center;
@@ -546,9 +502,11 @@ table tbody td {
   text-decoration: none;
   z-index: 100;
 }
+
 .floating-cart:hover {
   background-color: var(--color-dark-hover);
 }
+
 .cart-badge {
   position: absolute;
   top: -4px;
@@ -599,15 +557,18 @@ table tbody td {
   border-left: 3px solid transparent;
   cursor: pointer;
 }
+
 .nav-item:hover {
   background-color: var(--color-hover-bg);
 }
+
 .nav-item.active {
   color: var(--color-text);
   font-weight: 700;
   background-color: var(--color-active-bg);
   border-left-color: var(--color-accent);
 }
+
 .nav-icon {
   display: inline-flex;
   align-items: center;
@@ -622,7 +583,12 @@ table tbody td {
 }
 
 @media (max-width: 900px) {
-  .clo-sidebar { width: 72px; }
-  .nav-item span:last-child { display: none; }
+  .clo-sidebar {
+    width: 72px;
+  }
+
+  .nav-item span:last-child {
+    display: none;
+  }
 }
 </style>
