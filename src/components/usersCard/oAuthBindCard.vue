@@ -1,19 +1,115 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import api from '@/services/api'
 
 const props = defineProps({
   icon: Object,
   name: String,
-  initialBound: Boolean,
+
+  // 可以當畫面第一次 render 的預設值
+  initialBound: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const isBound = ref(props.initialBound)
 
-// 目前暫時只有前端切換
-// 後續接 OAuth API 時再修改這裡
-const toggleBind = () => {
-  isBound.value = !isBound.value
+// 綁定的第三方 Email
+const boundEmail = ref('')
+
+// 按鈕處理中狀態
+const isLoading = ref(false)
+
+// 取得第三方帳號綁定狀態
+async function loadBindStatus() {
+  // 目前先只串 Google
+  if (props.name !== 'Google') {
+    return
+  }
+
+  try {
+    const response = await api.get('/User/google/status')
+
+    console.log('Google 綁定狀態：', response.data) // 🟢【測試用】
+
+    isBound.value = response.data.isBound
+    boundEmail.value = response.data.email ?? ''
+  } catch (error) {
+    console.error('取得 Google 綁定狀態失敗：', error)
+  }
 }
+
+// 綁定
+async function bindAccount() {
+  if (props.name !== 'Google') {
+    return
+  }
+
+  try {
+    isLoading.value = true
+
+    // ① Axios 呼叫
+    // Axios interceptor 會自動帶 JWT
+    const response = await api.post('/User/google/bind/start')
+
+    // ② 後端回傳真正的 OAuth 啟動網址
+    const bindUrl = response.data.url
+
+    console.log('Google Bind URL：', bindUrl)
+
+    // ③ 現在才離開 Vue
+    window.location.href = bindUrl
+  } catch (error) {
+    console.error('啟動 Google 綁定失敗：', error)
+
+    alert(error.response?.data ?? '啟動 Google 綁定失敗')
+
+    isLoading.value = false
+  }
+}
+
+// 解除綁定
+async function unbindAccount() {
+  if (props.name !== 'Google') {
+    return
+  }
+
+  if (!confirm('確定要解除 Google 帳號綁定嗎？')) {
+    return
+  }
+
+  try {
+    isLoading.value = true
+
+    // 🟡【下一步後端要新增】
+    await api.delete('/User/google/unbind')
+
+    await loadBindStatus()
+
+    alert('Google 帳號已解除綁定')
+  } catch (error) {
+    console.error('解除 Google 綁定失敗：', error)
+
+    alert(error.response?.data || '解除 Google 綁定失敗')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// 🟢按鈕統一入口
+async function handleClick() {
+  if (isBound.value) {
+    await unbindAccount()
+  } else {
+    await bindAccount()
+  }
+}
+
+// 🟢【新增】元件載入時取得真正綁定狀態
+onMounted(() => {
+  loadBindStatus()
+})
 </script>
 
 <template>
@@ -33,6 +129,11 @@ const toggleBind = () => {
           <span class="status-dot"></span>
 
           {{ isBound ? '已綁定' : '尚未綁定' }}
+
+          <!-- 🟢【新增】已綁定時顯示 Email -->
+          <small v-if="isBound && boundEmail" class="provider-email">
+            {{ boundEmail }}
+          </small>
         </div>
       </div>
     </div>
@@ -42,9 +143,11 @@ const toggleBind = () => {
       type="button"
       class="user-btn"
       :class="isBound ? 'user-btn-secondary' : 'user-btn-primary'"
-      @click="toggleBind"
+      @click="handleClick"
+      :disabled="isLoading"
     >
-      {{ isBound ? '解除綁定' : '立即綁定' }}
+      <!-- 🟡【修改】 -->
+      {{ isLoading ? '處理中...' : isBound ? '解除綁定' : '立即綁定' }}
     </button>
   </div>
 </template>
@@ -157,5 +260,15 @@ const toggleBind = () => {
   .oauth-provider .user-btn {
     width: 100%;
   }
+}
+
+/* 🟢【新增】已綁定帳號 Email */
+.provider-email {
+  display: block;
+  margin-top: 4px;
+
+  color: #777777;
+
+  font-size: 11px;
 }
 </style>

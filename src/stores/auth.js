@@ -1,5 +1,10 @@
-import { ref, computed } from 'vue'
-import { defineStore } from 'pinia'
+import {
+  ref,
+  computed
+} from 'vue'
+import {
+  defineStore
+} from 'pinia'
 
 // 設定 pinia 的持久化儲存
 export const useAuthStore = defineStore(
@@ -9,6 +14,7 @@ export const useAuthStore = defineStore(
     // 登入狀態
     // =========================
     const token = ref('')
+    const userId = ref(null)
     const name = ref('')
     const account = ref('')
     const role = ref('')
@@ -18,6 +24,7 @@ export const useAuthStore = defineStore(
     // =========================
     function setAuth(data) {
       token.value = data.token
+      userId.value = data.userId
       name.value = data.name
       account.value = data.account
       role.value = data.role
@@ -36,6 +43,7 @@ export const useAuthStore = defineStore(
     // =========================
     function clearAuth() {
       token.value = ''
+      userId.value = null
       name.value = ''
       account.value = ''
       role.value = ''
@@ -50,6 +58,7 @@ export const useAuthStore = defineStore(
 
     return {
       token,
+      userId,
       name,
       account,
       role,
@@ -58,7 +67,7 @@ export const useAuthStore = defineStore(
       isAdmin,
 
       setAuth,
-      setToken, // ⭐ 新增
+      setToken,
       clearAuth,
     }
   },
