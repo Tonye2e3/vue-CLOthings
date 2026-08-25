@@ -86,6 +86,10 @@ const post = ref({
 // notFound：如果這個 id 在資料庫裡根本找不到對應的貼文，用這個來控制畫面顯示「找不到這篇貼文」。
 const notFound = ref(false)
 
+// postLoading：貼文完整資料還沒抓回來之前是 true，畫面用這個顯示骨架佔位畫面，
+// 跟 CommunityView.vue 動態牆的骨架畫面是同一套做法。
+const postLoading = ref(true)
+
 // currentImageIndex：主圖輪播現在顯示 post.images 裡的第幾張（從 0 開始算）。
 // 每次換到新的一篇貼文時要記得歸零，不然會出現「這篇貼文明明只有 1 張圖，
 // 卻想顯示上一篇貼文停在的第 3 張」這種指到不存在的索引的情況。
@@ -144,6 +148,7 @@ const fetchPost = async () => {
   // route.params.id：讀出網址上 :id 這段動態參數的值，是字串型別
   // （例如網址是 /community/post/3，這裡拿到的就是 "3"）。
   const id = route.params.id
+  postLoading.value = true
   try {
     const res = await api.get(`/CommunityPost/${id}`)
 
@@ -204,6 +209,8 @@ const fetchPost = async () => {
   } catch (err) {
     console.error('讀取貼文詳細資料失敗：', err)
     notFound.value = true
+  } finally {
+    postLoading.value = false
   }
 }
 
@@ -705,10 +712,34 @@ const addComment = async () => {
       <router-link to="/community" class="back-pill">← 返回社群</router-link>
 
       <!--
+        postLoading：貼文完整資料還沒抓回來之前顯示骨架佔位畫面，
+        取代原本「直接空白，資料到了才整個跳出來」的體驗。
+      -->
+      <div v-if="postLoading" class="row g-4">
+        <div class="col-12 col-lg-8">
+          <div class="post-main-card">
+            <div class="skeleton-author-bar">
+              <div class="skeleton-block skeleton-avatar-lg"></div>
+              <div class="skeleton-author-lines">
+                <div class="skeleton-block skeleton-line skeleton-line-40"></div>
+                <div class="skeleton-block skeleton-line skeleton-line-30"></div>
+              </div>
+            </div>
+            <div class="skeleton-block skeleton-main-media"></div>
+            <div class="skeleton-block skeleton-line skeleton-line-90" style="margin-top:1.2rem;"></div>
+            <div class="skeleton-block skeleton-line skeleton-line-60" style="margin-top:.6rem;"></div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-4">
+          <div class="skeleton-block skeleton-side-card"></div>
+        </div>
+      </div>
+
+      <!--
         notFound：如果網址上的 id 在資料庫裡找不到對應的貼文（例如網址被亂改、
         或貼文已經被刪除），就顯示這個提示，不要繼續顯示「載入中...」那份假資料。
       -->
-      <div v-if="notFound" class="not-found-state">
+      <div v-else-if="notFound" class="not-found-state">
         <p>找不到這篇貼文，可能已經被刪除，或網址不正確。</p>
         <router-link to="/community" class="back-pill">← 返回社群</router-link>
       </div>
@@ -1097,6 +1128,35 @@ const addComment = async () => {
   transition:all .18s ease;
 }
 .back-pill:hover{ background:var(--ink); color:var(--cream); }
+
+/* ---------- 骨架載入畫面 ---------- */
+/* 跟 CommunityView.vue 的骨架畫面是同一套「光斑掃過」效果，各自獨立的 <style scoped>
+   沒辦法共用，這裡複製一份對應這個頁面的版面形狀（發文者列＋大圖＋內文＋側欄）。 */
+@keyframes skeleton-shimmer {
+  0% { background-position: -300px 0; }
+  100% { background-position: 300px 0; }
+}
+.skeleton-block{
+  background-color: var(--hairline);
+  background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,.55) 50%, rgba(255,255,255,0) 100%);
+  background-size: 300px 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+.skeleton-author-bar{ display:flex; align-items:center; gap:.7rem; margin-bottom:1.1rem; }
+.skeleton-avatar-lg{ width:44px; height:44px; border-radius:50%; flex-shrink:0; }
+.skeleton-author-lines{ display:flex; flex-direction:column; gap:.5rem; flex:1; }
+.skeleton-line{ height:14px; }
+.skeleton-line-40{ width:40%; }
+.skeleton-line-30{ width:30%; }
+.skeleton-line-90{ width:90%; }
+.skeleton-line-60{ width:60%; }
+.skeleton-main-media{ width:100%; height:550px; border-radius:8px; }
+.skeleton-side-card{ width:100%; height:320px; border-radius:16px; }
+@media (max-width: 767px){
+  .skeleton-main-media{ height:340px; }
+}
 
 /* ---------- 找不到貼文 ---------- */
 .not-found-state{

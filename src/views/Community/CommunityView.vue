@@ -237,7 +237,12 @@ const onAvatarError = (event, name) => {
 // fetchPosts：向後端要「全部貼文」的資料，成功拿到之後取代掉原本寫死的假資料。
 // async function：宣告成「非同步函式」，代表裡面可以用 await「等」一個需要花時間的動作
 // （像是打 API 這種要等網路回應的操作）完成，再繼續往下執行，而不會卡住整個網頁。
+// postsLoading：貼文資料還沒抓回來之前是 true，畫面上用這個判斷要不要顯示骨架佔位畫面
+// （灰色區塊），而不是讓使用者在資料回來之前，一路看著空白的頁面。
+const postsLoading = ref(true)
+
 const fetchPosts = async () => {
+  postsLoading.value = true
   try {
     // api.get(網址)：對這個網址發送 GET 請求。
     // await：先暫停在這一行，等 API 真的回應了，才把結果存進 res，再往下執行。
@@ -287,6 +292,8 @@ const fetchPosts = async () => {
     // 先在瀏覽器主控台印出錯誤內容方便除錯。posts 維持空陣列，畫面會顯示空清單，
     // 不會混進假資料——這是刻意的決定，寧可看到空白也不要顯示不是真的資料。
     console.error('讀取貼文列表失敗：', err)
+  } finally {
+    postsLoading.value = false
   }
 }
 
@@ -868,6 +875,36 @@ const toggleFollow = async (creator) => {
         <div class="col-12 col-lg-9">
 
           <!--
+            骨架載入畫面：postsLoading 是 true（fetchPosts() 還在跑）的時候顯示，
+            用幾個灰色佔位區塊模擬「封面故事卡＋網格卡片」大概的版面形狀，
+            讓使用者知道「這裡等一下會有內容」，而不是盯著一片空白，
+            也避免資料還沒回來的那零點幾秒，先閃過一下「找不到符合的貼文」的空狀態文字
+            （filteredPosts 在資料回來之前本來就是空陣列，沒有這層 loading 判斷的話，
+            會先顯示錯誤的「沒有貼文」訊息，資料回來後才又換成真正的內容，畫面會閃一下）。
+          -->
+          <template v-if="postsLoading">
+            <div class="skeleton-feature">
+              <div class="skeleton-block skeleton-feature-media"></div>
+              <div class="skeleton-feature-body">
+                <div class="skeleton-block skeleton-avatar"></div>
+                <div class="skeleton-block skeleton-line skeleton-line-80"></div>
+                <div class="skeleton-block skeleton-line skeleton-line-60"></div>
+              </div>
+            </div>
+            <div class="skeleton-grid">
+              <div class="skeleton-card" v-for="n in 6" :key="n">
+                <div class="skeleton-block skeleton-card-media"></div>
+                <div class="skeleton-card-body">
+                  <div class="skeleton-block skeleton-line skeleton-line-50"></div>
+                  <div class="skeleton-block skeleton-line skeleton-line-90"></div>
+                  <div class="skeleton-block skeleton-line skeleton-line-70"></div>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <template v-else>
+          <!--
             封面故事卡（依目前分頁取第一筆）
             v-if="featurePost"：只有 featurePost 有值的時候（不是 null）才顯示這張大卡片。
             還記得上面 script 裡的邏輯嗎？正在搜尋的時候 featurePost 會是 null，
@@ -1051,6 +1088,7 @@ const toggleFollow = async (creator) => {
           <div class="load-more-wrap" v-if="hasMoreGridPosts">
             <button class="btn-load" @click="loadMoreGridPosts">載入更多穿搭 ▾</button>
           </div>
+          </template>
         </div>
 
 
@@ -1357,6 +1395,59 @@ const toggleFollow = async (creator) => {
 
 .line-clamp-2{
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+
+/* ---------- 骨架載入畫面 ---------- */
+/*
+  skeleton-shimmer：灰色區塊上有一道淺色光斑，從左往右不斷掃過，是最常見的骨架畫面效果
+  （很多 App 讀取資料時都看得到）。做法是背景疊兩層：底色 var(--hairline) 加一個
+  用 linear-gradient 畫出來的「光斑」，用 background-position 的動畫讓光斑左右移動，
+  製造出「正在讀取」的感覺，比整塊灰色靜止不動更有生氣、更明確傳達「這裡還在忙」。
+*/
+@keyframes skeleton-shimmer {
+  0% { background-position: -300px 0; }
+  100% { background-position: 300px 0; }
+}
+.skeleton-block{
+  background-color: var(--hairline);
+  background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,.55) 50%, rgba(255,255,255,0) 100%);
+  background-size: 300px 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+/* 骨架版的封面故事卡：跟 .feature-card 用同一組尺寸（22px 圓角、320px 最小高度），
+   佔位期間版面高度盡量跟真正內容一致，資料回來後畫面不會突然跳動。 */
+.skeleton-feature{
+  background:var(--paper); border:1px solid var(--hairline); border-radius:22px;
+  overflow:hidden; margin-bottom:1.6rem;
+  display:grid; grid-template-columns:1.15fr 1fr;
+}
+.skeleton-feature-media{ min-height:320px; border-radius:0; }
+.skeleton-feature-body{ padding:1.9rem 1.8rem; display:flex; flex-direction:column; gap:.9rem; }
+.skeleton-avatar{ width:40px; height:40px; border-radius:50%; }
+.skeleton-line{ height:14px; }
+.skeleton-line-80{ width:80%; }
+.skeleton-line-60{ width:60%; }
+.skeleton-line-50{ width:50%; }
+.skeleton-line-90{ width:90%; }
+.skeleton-line-70{ width:70%; }
+
+/* 骨架版的網格卡片：跟 .post-grid／.post-card 同一組欄數、圓角、間距。 */
+.skeleton-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:1.4rem; }
+.skeleton-card{
+  background:var(--paper); border:1px solid var(--hairline); border-radius:16px; overflow:hidden;
+}
+.skeleton-card-media{ aspect-ratio:4/3; border-radius:0; }
+.skeleton-card-body{ padding:1rem 1.1rem 1.2rem; display:flex; flex-direction:column; gap:.6rem; }
+
+@media (max-width: 991px){
+  .skeleton-feature{ grid-template-columns:1fr; }
+  .skeleton-feature-media{ min-height:240px; }
+}
+@media (max-width: 767px){
+  .skeleton-grid{ grid-template-columns:1fr; }
 }
 
 .empty-state{
