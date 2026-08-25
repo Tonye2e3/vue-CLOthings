@@ -129,7 +129,7 @@ async function submitReview() {
     <button class="btn-back me-3" @click="$router.push({ name: 'orders' })">← 回訂單列表</button>
     <!-- 訂單詳情頁加這個按鈕 -->
     <button v-if="order.status === '待付款'" @click="goPay" class="btn-pay me-3">前往付款</button>
-    <button v-if="order.status === '待出貨'" @click="confirmReceipt" class="btn-complete">
+    <button v-if="order.status === '待出貨'" @click="confirmReceipt" class="btn-complete me-3">
       確認收貨
     </button>
 

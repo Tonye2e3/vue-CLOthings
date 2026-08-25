@@ -34,6 +34,16 @@ function validateForm() {
   }
   return true // 全部填了 → 回傳 true，可以送出
 }
+
+const API_BASE = 'https://localhost:7255'
+function getImageUrl(image) {
+  if (!image) return 'https://placehold.co/80x80?text=No+Image'
+  // 已經是完整網址（立即購買）→ 直接用
+  if (image.startsWith('http')) return image
+  // 只是檔名（購物車）→ 組網址
+  return `${API_BASE}/images/product/${image}`
+}
+
 // 送出訂單
 async function submitOrder() {
   // ① 先驗證表單
@@ -93,6 +103,8 @@ const shippingFee = computed(() => {
 const finalTotal = computed(() => {
   return checkoutTotal.value + shippingFee.value
 })
+
+
 </script>
 
 <template>
@@ -113,8 +125,8 @@ const finalTotal = computed(() => {
         <div v-for="product in checkoutItems" :key="product.productSpecificationId"
           class="d-flex align-items-center gap-3 border-bottom py-3">
           <!-- 商品圖片 -->
-          <img :src="product.image" :alt="product.productName"
-            style="width: 56px; height: 56px; object-fit: cover; border-radius: 6px" />
+          <img :src="getImageUrl(product.image)" :alt="product.productName"
+     style="width: 56px; height: 56px; object-fit: cover; border-radius: 6px" />
           <!-- 名稱 + 規格 -->
           <div class="flex-fill">
             <div class="fw-semibold">{{ product.productName }}</div>
