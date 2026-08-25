@@ -191,9 +191,16 @@ const fetchPost = async () => {
     // 不能提早在 fetchPost 呼叫之前就開始，那時候 post.value.images 還是預設的假資料。
     startAutoplay()
 
-    // fetchFollowStatus 要用到 post.value.userId，一定要等上面 post.value 設定完才能呼叫，
-    // 不能跟 fetchPost() 平行呼叫（那樣 userId 還是初始值 null，會查到錯的人）。
+    // fetchFollowStatus、fetchLikeStatus 都要等上面 post.value 設定完才能呼叫——
+    // 這兩支原本是在 onMounted 裡跟 fetchPost() 平行呼叫的，看起來各自獨立、
+    // 互不相干，但其實有問題：post.value = { ... } 那段是「整包蓋掉」，
+    // 裡面 isLiked、isFollowing 都寫死是預設值 false。如果 fetchLikeStatus 先回來、
+    // 正確把 isLiked 設成 true，緊接著上面這段 post.value = { ... } 才執行完，
+    // 就會把剛剛設對的 isLiked 又蓋回 false——使用者明明已經按過讚，
+    // 畫面卻顯示成還沒按，一按下去又想新增一筆，才會撞到資料庫的唯一鍵限制。
+    // 改成在這裡（post.value 已經設定完之後）才呼叫，就不會有這個「後到的蓋掉先到的」問題。
     fetchFollowStatus()
+    fetchLikeStatus()
   } catch (err) {
     console.error('讀取貼文詳細資料失敗：', err)
     notFound.value = true
@@ -230,7 +237,6 @@ onMounted(async () => {
   await loadCurrentUserId()
   fetchPost()
   fetchComments()
-  fetchLikeStatus()
   fetchSimilarPosts()
 })
 
@@ -248,7 +254,6 @@ watch(() => route.params.id, () => {
   stopAutoplay() // 換貼文了，先把舊貼文的自動輪播計時器停掉，fetchPost 拿到新資料後會重新啟動
   fetchPost()
   fetchComments()
-  fetchLikeStatus()
   fetchSimilarPosts()
 })
 
