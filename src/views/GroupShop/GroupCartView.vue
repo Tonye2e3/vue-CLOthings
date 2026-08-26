@@ -7,8 +7,8 @@ import { useAuthStore } from '@/stores/auth'
 // 圖片網址工具：後端上傳圖片回傳的是相對路徑（例如 /images/group-products/xxx.jpg），
 // 舊示範資料則是完整網址（例如 https://picsum.photos/...），這裡統一組成完整網址
 // 圖片是靜態檔案，走的不是 /api 這條路徑，不能直接用 baseURL（那個多了 /api），
-// 這裡把 VITE_API_URL 尾巴的 /api 拿掉，變成純網域，圖片網址才會跟著 .env 換環境，不會在正式環境還打 localhost
-const API_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+// VITE_API_URL 本身就是純後端主機網址，圖片網址會跟著 .env 切換環境。
+const API_BASE = import.meta.env.VITE_API_URL
 const resolveImageUrl = (path) => {
   if (!path) return ''
   if (path.startsWith('http://') || path.startsWith('https://')) return path

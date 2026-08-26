@@ -7,7 +7,7 @@ import {
 // Axios 實例
 // ======================================================
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: `${import.meta.env.VITE_API_URL}/api`,
   timeout: 10000,
 
   // 讓瀏覽器可以攜帶 HttpOnly Cookie

@@ -7,7 +7,7 @@ import { useRouter } from 'vue-router'
 const authStore = useAuthStore()
 const router = useRouter()
 
-const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+const IMAGE_BASE = import.meta.env.VITE_API_URL
 
 // posts：後台要管理的全部貼文，不管 status 是 public、hide 還是 check 都要看得到
 // （跟前台 CommunityView.vue 不一樣，前台通常只給使用者看 public 的）。

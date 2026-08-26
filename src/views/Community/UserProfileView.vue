@@ -7,8 +7,8 @@ import { animate } from 'animejs'
 import { savedPosts, loadSavedPosts, formatCount, currentUserId, loadCurrentUserId } from '@/views/Community/CommunityView.vue'
 
 // IMAGE_BASE：圖片是靜態檔案，走的不是 /api 這條路徑，不能直接用 api 服務的
-// baseURL（那個含 /api）。這裡把 VITE_API_URL 尾巴的 /api 拿掉，變成純網域。
-const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+// baseURL（那個含 /api）；VITE_API_URL 本身就是純後端主機網址。
+const IMAGE_BASE = import.meta.env.VITE_API_URL
 
 const route = useRoute()
 

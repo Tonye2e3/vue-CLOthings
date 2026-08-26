@@ -43,7 +43,7 @@ async function login() {
 }
 
 function googleLogin() {
-  window.location.href = 'https://localhost:7255/api/User/google/login'
+  window.location.href = `${import.meta.env.VITE_API_URL}/api/User/google/login`
 }
 </script>
 
