@@ -214,7 +214,7 @@ const selectedSpec = computed(() => {
 
     <!-- 跟商品有關的穿搭靈感 -->
     <div>
-      <Post />
+      <Post :product-id="product?.productId" />
     </div>
   </div>
 </template>
