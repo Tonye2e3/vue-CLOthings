@@ -2,28 +2,31 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import IconChevronLeft from '@/components/icons/IconChevronLeft.vue'
 import IconChevronRight from '@/components/icons/IconChevronRight.vue'
+import hero1 from '@/assets/Shop/FangShaiYi.png'
+import hero2 from '@/assets/Shop/LiangGanYi.png'
+import hero3 from '@/assets/Shop/CLOthingsLianMing.png'
 
 const slides = [
   {
     title: '輕便抗UV連帽外套',
     tagline: '一件抵擋整個夏天的紫外線',
     price: 'NT$1,290',
-    badge: '限時優惠至 8/6',
-    bg: 'linear-gradient(135deg, #2b2b2b, #5a5a5a)',
+    badge: '限時優惠至 8/30',
+    bg: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(${hero1})`,
   },
   {
-    title: 'AIRism 涼感系列',
+    title: 'CLO.things涼感系列',
     tagline: '透氣涼感，舒適一整天',
     price: 'NT$490 起',
     badge: '新品上市',
-    bg: 'linear-gradient(135deg, #3a4750, #6b7d8c)',
+    bg: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(${hero2})`,
   },
   {
     title: 'CLOthings 聯名 UT',
     tagline: '經典角色，穿出態度',
     price: 'NT$390',
     badge: '期間限定',
-    bg: 'linear-gradient(135deg, #4a1e1e, #8c3a3a)',
+    bg: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(${hero3})`,
   },
 ]
 
@@ -54,7 +57,16 @@ onUnmounted(stopAutoplay)
 <template>
   <section class="hero" @mouseenter="stopAutoplay" @mouseleave="startAutoplay">
     <transition name="fade" mode="out-in">
-      <div class="slide" :key="current" :style="{ background: slides[current].bg }">
+      <div
+  class="slide"
+  :key="current"
+  :style="{
+    backgroundImage: slides[current].bg,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+  }"
+>
         <div class="slide-overlay">
           <p class="slide-badge">{{ slides[current].badge }}</p>
           <h2 class="slide-title">{{ slides[current].title }}</h2>
@@ -97,8 +109,11 @@ onUnmounted(stopAutoplay)
 .slide {
   width: 100%;
   height: 100%;
-  display: flex;
+  display:flex;
   align-items: flex-end;
+  background-size: cover;        
+  background-position: center;   
+  background-repeat: no-repeat;
 }
 
 .slide-overlay {
