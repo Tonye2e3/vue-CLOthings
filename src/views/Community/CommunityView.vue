@@ -237,7 +237,12 @@ const onAvatarError = (event, name) => {
 // fetchPosts：向後端要「全部貼文」的資料，成功拿到之後取代掉原本寫死的假資料。
 // async function：宣告成「非同步函式」，代表裡面可以用 await「等」一個需要花時間的動作
 // （像是打 API 這種要等網路回應的操作）完成，再繼續往下執行，而不會卡住整個網頁。
+// postsLoading：貼文資料還沒抓回來之前是 true，畫面上用這個判斷要不要顯示骨架佔位畫面
+// （灰色區塊），而不是讓使用者在資料回來之前，一路看著空白的頁面。
+const postsLoading = ref(true)
+
 const fetchPosts = async () => {
+  postsLoading.value = true
   try {
     // api.get(網址)：對這個網址發送 GET 請求。
     // await：先暫停在這一行，等 API 真的回應了，才把結果存進 res，再往下執行。
@@ -287,6 +292,8 @@ const fetchPosts = async () => {
     // 先在瀏覽器主控台印出錯誤內容方便除錯。posts 維持空陣列，畫面會顯示空清單，
     // 不會混進假資料——這是刻意的決定，寧可看到空白也不要顯示不是真的資料。
     console.error('讀取貼文列表失敗：', err)
+  } finally {
+    postsLoading.value = false
   }
 }
 
@@ -300,6 +307,7 @@ onMounted(async () => {
   fetchPosts()
   await loadCurrentUserId()
   loadSavedPosts()
+  loadLikedPosts()
   fetchCreators()
 })
 
@@ -313,6 +321,75 @@ const formatCount = (n) => {
     return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
   }
   return String(n)
+}
+
+// ============================================================
+// 按讚功能：跟 PostDetailView.vue 是同一套 PostLike API，
+// 只是那邊一次只顯示「一篇」貼文的按讚狀態，這裡是一整面卡片牆，
+// 用一個 Map 記錄「這個使用者總共讚過哪些貼文、每篇對應的 postLikesId」，
+// 不用每張卡片各自打一次 API 去問。
+// ============================================================
+
+// likedPostIds：key 是 communityPostId，value 是這筆讚的 postLikesId（取消讚要用到）。
+// 用 reactive 包住一個 Map，畫面才會隨著這份資料改變自動更新。
+const likedPostIds = reactive(new Map())
+
+// loadLikedPosts：打 PostLikeController.cs 的 GET api/PostLike/user/{userid}，
+// 把這個使用者按過的所有讚一次抓回來，填進 likedPostIds。
+const loadLikedPosts = async () => {
+  try {
+    const res = await api.get(`/PostLike/user/${currentUserId.value}`)
+    likedPostIds.clear()
+    res.data.forEach(like => {
+      likedPostIds.set(like.communityPostId, like.postLikesId)
+    })
+  } catch (err) {
+    console.error('讀取按讚清單失敗：', err)
+  }
+}
+
+// isPostLiked：這篇貼文（用 communityPostId 判斷）現在是不是在已讚清單裡。
+const isPostLiked = (communityPostId) => likedPostIds.has(communityPostId)
+
+// toggleLikePost：按下卡片上的愛心時執行。post 參數是 template 裡
+// @click="toggleLikePost(post)" 傳進來的，代表「使用者點的是哪一篇貼文」。
+// 跟 PostDetailView.vue 的 toggleLike 是同一套邏輯（先看有沒有讚過，決定要打 POST 還是
+// DELETE），只是這邊要多一個步驟：改到 likedPostIds 這個共用的 Map，而不是單一個變數。
+const toggleLikePost = async (post) => {
+  const likeId = likedPostIds.get(post.communityPostId)
+  if (likeId) {
+    // 已經讚過 → 這次是要取消讚 → 打 DELETE
+    try {
+      await api.delete(`/PostLike/${likeId}`)
+    } catch (err) {
+      console.error('取消讚失敗：', err)
+      return
+    }
+    likedPostIds.delete(post.communityPostId)
+    post.likesCount -= 1
+  } else {
+    // 還沒讚過 → 這次是要按讚 → 打 POST 新增一筆
+    try {
+      await api.post(`/PostLike`, {
+        communityPostId: post.communityPostId,
+        userId: currentUserId.value
+      })
+    } catch (err) {
+      console.error('按讚失敗：', err)
+      return
+    }
+    // POST 只會回傳成功與否，不會回傳剛剛新增那筆紀錄的 id，
+    // 所以要重新問一次後端才知道這筆讚的 postLikesId 是多少（之後要取消讚會用到），
+    // 跟 PostDetailView.vue toggleLike 的做法一樣，只是這裡只需要問「這一篇」就好，
+    // 不用整份 loadLikedPosts() 重打一次。
+    try {
+      const res = await api.get(`/PostLike/post/${post.communityPostId}/user/${currentUserId.value}`)
+      if (res.data) likedPostIds.set(post.communityPostId, res.data.postLikesId)
+    } catch (err) {
+      console.error('讀取剛剛按讚的紀錄失敗：', err)
+    }
+    post.likesCount += 1
+  }
 }
 
 // 分頁 Tab 狀態
@@ -344,7 +421,11 @@ const fetchCreators = async () => {
       name: c.name,
       // c.avatar 一樣是相對路徑，要接上 IMAGE_BASE；沒設大頭貼的人用預設頭像頂著。
       avatar: c.avatar ? `${IMAGE_BASE}${c.avatar}` : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + c.name,
-      meta: `${formatCount(c.followersCount)}追蹤`,
+      // followersCount 改存「純數字」，不是先組好的 "4追蹤" 字串——這樣按下追蹤／取消追蹤
+      // 的時候，才能直接把這個數字 +1 / -1，畫面上的粉絲數即時更新。
+      // 如果先組成字串存起來，之後要更新就要整個字串重新拼一次，不如一開始就存數字，
+      // 顯示的時候（template 裡）才用 formatCount() 轉成「4追蹤」這種格式。
+      followersCount: c.followersCount,
       isFollowing: c.isFollowing,
       userFollowId: c.userFollowId
     }))
@@ -675,6 +756,7 @@ const toggleFollow = async (creator) => {
     }
     creator.isFollowing = false
     creator.userFollowId = null
+    creator.followersCount -= 1 // 取消追蹤，粉絲數立刻減 1，不用重新整理頁面、重打 API 才看得到
   } else {
     try {
       await api.post(`/UserFollow`, {
@@ -686,6 +768,7 @@ const toggleFollow = async (creator) => {
       return
     }
     creator.isFollowing = true
+    creator.followersCount += 1 // 追蹤成功，粉絲數立刻加 1
     // POST 沒有回傳新建紀錄的 id，重新問一次這位使用者的追蹤狀態，拿到真正的 userFollowId。
     try {
       const statusRes = await api.get(`/UserFollow/follower/${currentUserId.value}/following/${creator.id}`)
@@ -798,6 +881,36 @@ const toggleFollow = async (creator) => {
         <div class="col-12 col-lg-9">
 
           <!--
+            骨架載入畫面：postsLoading 是 true（fetchPosts() 還在跑）的時候顯示，
+            用幾個灰色佔位區塊模擬「封面故事卡＋網格卡片」大概的版面形狀，
+            讓使用者知道「這裡等一下會有內容」，而不是盯著一片空白，
+            也避免資料還沒回來的那零點幾秒，先閃過一下「找不到符合的貼文」的空狀態文字
+            （filteredPosts 在資料回來之前本來就是空陣列，沒有這層 loading 判斷的話，
+            會先顯示錯誤的「沒有貼文」訊息，資料回來後才又換成真正的內容，畫面會閃一下）。
+          -->
+          <template v-if="postsLoading">
+            <div class="skeleton-feature">
+              <div class="skeleton-block skeleton-feature-media"></div>
+              <div class="skeleton-feature-body">
+                <div class="skeleton-block skeleton-avatar"></div>
+                <div class="skeleton-block skeleton-line skeleton-line-80"></div>
+                <div class="skeleton-block skeleton-line skeleton-line-60"></div>
+              </div>
+            </div>
+            <div class="skeleton-grid">
+              <div class="skeleton-card" v-for="n in 6" :key="n">
+                <div class="skeleton-block skeleton-card-media"></div>
+                <div class="skeleton-card-body">
+                  <div class="skeleton-block skeleton-line skeleton-line-50"></div>
+                  <div class="skeleton-block skeleton-line skeleton-line-90"></div>
+                  <div class="skeleton-block skeleton-line skeleton-line-70"></div>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <template v-else>
+          <!--
             封面故事卡（依目前分頁取第一筆）
             v-if="featurePost"：只有 featurePost 有值的時候（不是 null）才顯示這張大卡片。
             還記得上面 script 裡的邏輯嗎？正在搜尋的時候 featurePost 會是 null，
@@ -860,13 +973,16 @@ const toggleFollow = async (creator) => {
                   ♥、💬 原本是文字符號／emoji，這裡跟其他圖示一起換成 SVG 心形、對話框圖示，
                   不吃字型、風格也跟輪播箭頭這類線條圖示一致。icon-inline 這個共用 class
                   負責讓圖示跟旁邊的數字文字對齊。
+                  愛心那顆現在是可以按的：:class="{ liked: ... }" 決定要不要顯示紅色強調，
+                  :fill 決定要不要整顆填滿（已讚＝實心，跟 PostDetailView.vue 是同一套視覺邏輯），
+                  @click="toggleLikePost(featurePost)" 呼叫上面 script 定義的按讚／取消讚函式。
                 -->
-                <span>
-                  <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <button type="button" class="stat-like-btn" :class="{ liked: isPostLiked(featurePost.communityPostId) }" @click="toggleLikePost(featurePost)">
+                  <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" :fill="isPostLiked(featurePost.communityPostId) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                   </svg>
                   {{ formatCount(featurePost.likesCount) }}
-                </span>
+                </button>
                 <span>
                   <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" />
@@ -955,13 +1071,14 @@ const toggleFollow = async (creator) => {
                     （例如 1200），不是寫死的 '1.2k' 字串，畫面顯示時才呼叫 formatCount
                     轉換成縮寫格式。這樣資料本身仍然是「可以排序、可以比大小」的數字。
                     ♥、💬 一樣換成跟封面故事卡同樣的 SVG 圖示，兩邊風格才會一致。
+                    愛心一樣可以直接在卡片上按，跟封面故事卡是同一套 toggleLikePost 邏輯。
                   -->
-                  <span>
-                    <svg class="icon-inline" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <button type="button" class="stat-like-btn" :class="{ liked: isPostLiked(post.communityPostId) }" @click="toggleLikePost(post)">
+                    <svg class="icon-inline" viewBox="0 0 24 24" width="13" height="13" :fill="isPostLiked(post.communityPostId) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                     </svg>
                     {{ formatCount(post.likesCount) }}
-                  </span>
+                  </button>
                   <span>
                     <svg class="icon-inline" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" />
@@ -977,6 +1094,7 @@ const toggleFollow = async (creator) => {
           <div class="load-more-wrap" v-if="hasMoreGridPosts">
             <button class="btn-load" @click="loadMoreGridPosts">載入更多穿搭 ▾</button>
           </div>
+          </template>
         </div>
 
 
@@ -993,7 +1111,7 @@ const toggleFollow = async (creator) => {
                 <img class="stylist-avatar" :src="creator.avatar" alt="avatar" @error="onAvatarError($event, creator.name)" />
                 <div class="min-w-0">
                   <div class="stylist-name text-truncate">{{ creator.name }}</div>
-                  <div class="stylist-meta">{{ creator.meta }}</div>
+                  <div class="stylist-meta">{{ formatCount(creator.followersCount) }}追蹤</div>
                 </div>
               </router-link>
               <button
@@ -1232,6 +1350,17 @@ const toggleFollow = async (creator) => {
   font-size:.85rem; color:var(--ink-soft);
 }
 .stat-row span{ display:inline-flex; align-items:center; gap:.3rem; }
+/* stat-like-btn：跟旁邊 <span> 留言數字視覺上要對齊，但這個是可以點的 <button>，
+   要先把瀏覽器預設的按鈕樣式（邊框、底色、內距）都歸零，只留下跟 span 一樣的排版。
+   已讚時整體套用跟 PostDetailView.vue 一樣的紅色（#B4453A），呼應同一個「已按讚」的視覺語言。 */
+.stat-like-btn{
+  display:inline-flex; align-items:center; gap:.3rem;
+  background:none; border:none; padding:0; margin:0;
+  font-size:inherit; font-family:inherit; color:inherit;
+  cursor:pointer; transition:color .18s ease;
+}
+.stat-like-btn:hover{ color:#B4453A; }
+.stat-like-btn.liked{ color:#B4453A; font-weight:600; }
 .stat-row .link-out{ margin-left:auto; color:var(--plum); font-weight:600; text-decoration:none; border-bottom:1px solid var(--plum); }
 /* icon-inline：跟文字並排的小圖示共用樣式（心形、對話框、扳手），顏色跟著所在文字的
    顏色走（currentColor），不用每個地方各自寫一次顏色。 */
@@ -1272,6 +1401,59 @@ const toggleFollow = async (creator) => {
 
 .line-clamp-2{
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+
+/* ---------- 骨架載入畫面 ---------- */
+/*
+  skeleton-shimmer：灰色區塊上有一道淺色光斑，從左往右不斷掃過，是最常見的骨架畫面效果
+  （很多 App 讀取資料時都看得到）。做法是背景疊兩層：底色 var(--hairline) 加一個
+  用 linear-gradient 畫出來的「光斑」，用 background-position 的動畫讓光斑左右移動，
+  製造出「正在讀取」的感覺，比整塊灰色靜止不動更有生氣、更明確傳達「這裡還在忙」。
+*/
+@keyframes skeleton-shimmer {
+  0% { background-position: -300px 0; }
+  100% { background-position: 300px 0; }
+}
+.skeleton-block{
+  background-color: var(--hairline);
+  background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,.55) 50%, rgba(255,255,255,0) 100%);
+  background-size: 300px 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+/* 骨架版的封面故事卡：跟 .feature-card 用同一組尺寸（22px 圓角、320px 最小高度），
+   佔位期間版面高度盡量跟真正內容一致，資料回來後畫面不會突然跳動。 */
+.skeleton-feature{
+  background:var(--paper); border:1px solid var(--hairline); border-radius:22px;
+  overflow:hidden; margin-bottom:1.6rem;
+  display:grid; grid-template-columns:1.15fr 1fr;
+}
+.skeleton-feature-media{ min-height:320px; border-radius:0; }
+.skeleton-feature-body{ padding:1.9rem 1.8rem; display:flex; flex-direction:column; gap:.9rem; }
+.skeleton-avatar{ width:40px; height:40px; border-radius:50%; }
+.skeleton-line{ height:14px; }
+.skeleton-line-80{ width:80%; }
+.skeleton-line-60{ width:60%; }
+.skeleton-line-50{ width:50%; }
+.skeleton-line-90{ width:90%; }
+.skeleton-line-70{ width:70%; }
+
+/* 骨架版的網格卡片：跟 .post-grid／.post-card 同一組欄數、圓角、間距。 */
+.skeleton-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:1.4rem; }
+.skeleton-card{
+  background:var(--paper); border:1px solid var(--hairline); border-radius:16px; overflow:hidden;
+}
+.skeleton-card-media{ aspect-ratio:4/3; border-radius:0; }
+.skeleton-card-body{ padding:1rem 1.1rem 1.2rem; display:flex; flex-direction:column; gap:.6rem; }
+
+@media (max-width: 991px){
+  .skeleton-feature{ grid-template-columns:1fr; }
+  .skeleton-feature-media{ min-height:240px; }
+}
+@media (max-width: 767px){
+  .skeleton-grid{ grid-template-columns:1fr; }
 }
 
 .empty-state{
