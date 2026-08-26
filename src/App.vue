@@ -1,28 +1,52 @@
 <script setup>
+import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 //======== SiteHeader.vue 開始==========
 import { RouterLink } from 'vue-router'
 import IconSearch from '@/components/icons/IconSearch.vue'
 import IconHeart from '@/components/icons/IconHeart.vue'
+import NotificationBell from '@/components/Community/NotificationBell.vue'
 import IconUser from '@/components/icons/IconUser.vue'
 import IconCart from '@/components/icons/IconCart.vue'
-//======== SiteHeader.vue 結束==========
+import { ref } from 'vue'
 //======== Sitefooter.vue 開始==========
-
-//======== Sitefooter.vue 結束==========
+import IconFacebook from '@/components/icons/IconFacebook.vue'
+import IconInstagram from '@/components/icons/IconInstagram.vue'
+import IconLine from '@/components/icons/IconLine.vue'
+import IconYoutube from '@/components/icons/IconYoutube.vue'
 
 const authStore = useAuthStore()
+const route = useRoute()
 const router = useRouter()
 
 //======== SiteHeader.vue 開始==========
 const navItems = [
   { label: 'Home', to: { name: 'home' } },
-  { label: 'Shop', to: { name: 'Shop' } },
+  { label: 'Shop', to: { name: 'shop' } },
   { label: 'Community', to: { name: 'Community' } },
   { label: 'Group Buying', to: { name: 'GroupProducts' } },
 ]
-//======== SiteHeader.vue 結束==========
+
+// 判斷目前是不是在「團購 Group」相關頁面：在這些頁面時，導覽列自己的購物車圖示要隱藏
+// （團購頁面有自己的購物車機制，避免使用者混淆是哪一個購物車）
+const isGroupSection = computed(() => route.path.startsWith('/GroupShop'))
+
+const searchKeyword = ref('')
+
+function doSearch() {
+  if (!searchKeyword.value.trim()) return
+  router.push({ name: 'search', query: { keyword: searchKeyword.value } })
+  searchKeyword.value = ''
+}
+//======== Sitefooter.vue 開始==========
+const footerLinks = [
+  { label: '客服中心', routeName: 'service' },
+  { label: '常見問題（FAQ）', routeName: null },
+  { label: '公司資訊', routeName: 'about' },
+  { label: '隱私政策', routeName: null },
+]
+
 function logout() {
   authStore.clearAuth()
   router.push('/login')
@@ -30,9 +54,11 @@ function logout() {
 </script>
 
 <template>
-  <header class="site-header navbar" style="background-color: #f9f4f0">
+  <header class="site-header">
     <div class="header-inner">
-      <img src="@/assets/CLO.things LOGO.png" alt="CLO.things logo" class="logo" />
+      <RouterLink :to="{ name: 'home' }" aria-label="首頁"
+        ><img src="@/assets/CLO.things LOGO.png" alt="CLO.things logo" class="logo"
+      /></RouterLink>
       <nav class="main-nav">
         <RouterLink v-for="item in navItems" :key="item.label" :to="item.to" class="nav-link">
           {{ item.label }}
@@ -40,136 +66,144 @@ function logout() {
       </nav>
 
       <div class="header-actions">
-        <button class="icon-btn" type="button" aria-label="搜尋"><IconSearch /></button>
-        <button class="icon-btn" type="button" aria-label="收藏"><IconHeart /></button>
-        <RouterLink :to="{ name: 'login' }" class="icon-btn" aria-label="帳號"
-          ><IconUser
-        /></RouterLink>
-        <button class="icon-btn" type="button" aria-label="購物車"><IconCart /></button>
+
+        <div class="search-box">
+  <input
+    v-model="searchKeyword"
+    @keyup.enter="doSearch"
+    placeholder="搜尋商品..."
+    class="search-input"
+  />
+  <button class="icon-btn" @click="doSearch" aria-label="搜尋">
+    <IconSearch />
+  </button>
+</div>
+        <!-- <button class="icon-btn" type="button" aria-label="搜尋">
+          <IconSearch />
+        </button> -->
+
+        <RouterLink :to="{ name: 'favorite' }" class="icon-btn" aria-label="收藏">
+          <IconHeart />
+        </RouterLink>
+        <NotificationBell v-if="authStore.isLoggedIn" />
+        <RouterLink
+          v-if="authStore.isLoggedIn"
+          :to="{ name: 'user' }"
+          class="icon-btn"
+          aria-label="帳號"
+        >
+          <IconUser />
+        </RouterLink>
+        <RouterLink
+          v-else
+          :to="{ name: 'login' }"
+          class="icon-btn"
+          aria-label="帳號"
+        >
+          <IconUser />
+        </RouterLink>
+        <RouterLink
+          v-if="!isGroupSection"
+          :to="{ name: 'cart' }"
+          class="icon-btn"
+          aria-label="購物車"
+        >
+          <IconCart />
+        </RouterLink>
       </div>
     </div>
   </header>
 
-  <!-- <header class="navbar">
-    <div class="nav-left">
-      <img src="@/assets/CLOthingsLogo.svg" alt="CLO.things logo" class="logo" />
-      <span class="brand">CLO.things</span>
-    </div>
-
-    <nav class="nav-center">
-      <RouterLink to="/">首頁</RouterLink>
-      <RouterLink to="/categories">分類</RouterLink>
-      <RouterLink :to="{ name: 'Community' }">社群</RouterLink>
-      <RouterLink :to="{ name: 'GroupProducts' }">團購</RouterLink>
-      <RouterLink :to="{ name: 'sampleShop' }">購物車</RouterLink>
-    </nav>
-
-    <div class="nav-right">
-      <!- //搜尋欄
-       <input type="text" placeholder="Search in site" />
-      <i class="fa fa-search"></i>  -->
-  <!-- <RouterLink :to="{ name: 'user' }">使用者</RouterLink>
-      <RouterLink :to="{ name: 'login' }">登入</RouterLink>
-      <RouterLink :to="{ name: 'register' }">註冊</RouterLink>
-      <a href="/logout">登出</a>
-    </div>
-  </header>  -->
-
-  <div style="margin: auto 300px">
+  <div class="main-container">
     <!--頁面內容預留區-->
     <RouterView />
   </div>
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <nav class="footer-links">
+        <template v-for="l in footerLinks" :key="l.label">
+          <!-- 有 routeName 的 → 用 RouterLink 連到內部頁面 -->
+          <RouterLink v-if="l.routeName" :to="{ name: l.routeName }">
+            {{ l.label }}
+          </RouterLink>
+          <!-- !!!!!!還沒做的頁面 → 暫時用 <a href="#">，之後補!!!!! -->
+          <a v-else href="#">{{ l.label }}</a>
+        </template>
+      </nav>
+
+      <div class="social-icons">
+        <a href="#" aria-label="Facebook">
+          <IconFacebook />
+        </a>
+        <a href="#" aria-label="Instagram">
+          <IconInstagram />
+        </a>
+        <a href="#" aria-label="LINE">
+          <IconLine />
+        </a>
+        <a href="#" aria-label="YouTube">
+          <IconYoutube />
+        </a>
+      </div>
+
+      <p class="copyright">© 2026 CLOthings. All rights reserved.</p>
+    </div>
+  </footer>
 </template>
 
 <style scoped>
-.navbar {
-  position: fixed;
-  top: 0;
-  left: 0;
+.main-container {
   width: 100%;
-  background-color: #9d7762;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.6rem 2rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.nav-left {
-  display: flex;
-  align-items: center;
+  max-width: 1200px;
+  /* 依照設計需求調整內容的最大寬度 */
+  margin: 0 auto;
+  /* 上下 0，左右自動置中 */
+  padding: 0 20px;
+  /* 手機和平板時的左右安全邊距 */
+  box-sizing: border-box;
 }
 
 .logo {
   height: 40px;
-  margin-right: 0.5rem;
+  padding-left: 15px;
+  object-fit: cover;
+  /* 保持圖片比例填滿 */
+  overflow: hidden;
+  /* 超出部分裁掉 */
+  justify-self: start;
+  /* 靠左 */
   /*border-radius: 50%;  讓元素變成圓形 */
-  object-fit: cover; /* 保持圖片比例填滿 */
-  overflow: hidden; /* 超出部分裁掉 */
 }
 
-.brand {
-  font-weight: 600;
-  font-size: 1.1rem;
-}
-
-.nav-center a {
-  margin: 0 0.8rem;
-  color: #000000;
-  text-decoration: none;
-}
-
-.nav-center a:hover {
-  color: #000000;
-}
-
-.nav-right {
-  display: flex;
-  align-items: center;
-  color: #000000;
-}
-
-.nav-right input {
-  border: 1px solid #000000;
-  border-radius: 4px;
-  padding: 0.3rem 0.6rem;
-}
-
-.nav-right i {
-  margin-left: 0.4rem;
-  color: #666;
-}
 .site-header {
   position: sticky;
   top: 0;
   z-index: 100;
   background: var(--home-bg);
   border-bottom: 1px solid var(--home-border);
+  background-color: #f9f4f0;
 }
 
 .header-inner {
-  max-width: 1280px;
+  max-width: 1180px;
+  /* width: 100%; */
   margin: 0 auto;
   height: 64px;
   display: flex;
+  flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  padding: 0 24px;
-}
-
-.logo {
-  font-weight: 700;
-  font-size: 1.25rem;
-  letter-spacing: 0.05em;
-  color: var(--home-text);
-  text-decoration: none;
-  flex-shrink: 0;
+  padding: 0 2px;
+  /* 這個是左右安全邊距，可依需求調整大小 */
+  box-sizing: border-box;
+  position: relative;
 }
 
 .main-nav {
   display: flex;
   gap: 32px;
+  justify-self: center;
+  /* 永遠置中 */
 }
 
 .nav-link {
@@ -192,7 +226,8 @@ function logout() {
 .header-actions {
   display: flex;
   gap: 4px;
-  flex-shrink: 0;
+  justify-self: end;
+  /* 靠右 */
 }
 
 .icon-btn {
@@ -220,5 +255,72 @@ function logout() {
   .main-nav {
     display: none;
   }
+}
+
+/* SiteFooter */
+.site-footer {
+  border-top: 1px solid var(--home-border);
+  background: var(--home-bg-soft);
+}
+
+.footer-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 48px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  text-align: center;
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 24px;
+}
+
+.footer-links a {
+  color: var(--home-text);
+  text-decoration: none;
+  font-size: 0.85rem;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.footer-links a:hover {
+  opacity: 1;
+  color: var(--home-accent);
+}
+
+.social-icons {
+  display: flex;
+  gap: 16px;
+}
+
+.social-icons a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--home-text);
+  border: 1px solid var(--home-border);
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.social-icons a:hover {
+  background: var(--home-accent);
+  color: #fff;
+  border-color: var(--home-accent);
+}
+
+.copyright {
+  font-size: 0.75rem;
+  color: #888;
 }
 </style>

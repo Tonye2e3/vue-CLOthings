@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:lb": "vite --mode loadbalance",
     "build": "vite build",
     "preview": "vite preview",
     "test:unit": "vitest",
@@ -12,10 +13,20 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-free": "7.3.0",
+    "@fortawesome/fontawesome-svg-core": "^7.3.1",
+    "@fortawesome/free-solid-svg-icons": "^7.3.1",
+    "@fortawesome/vue-fontawesome": "^3.3.3",
+    "@microsoft/signalr": "^10.0.11",
+    "animejs": "^4.2.2",
+    "axios": "^1.19.0",
     "bootstrap": "^5.3.8",
     "pinia": "^4.0.2",
+    "pinia-plugin-persistedstate": "^4.7.1",
+    "signalr": "^2.4.3",
     "utils": "^0.3.1",
     "vue": "^3.5.40",
+    "vue-advanced-cropper": "^2.8.9",
     "vue-router": "^5.2.0"
   },
   "devDependencies": {

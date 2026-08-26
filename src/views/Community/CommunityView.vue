@@ -1,11 +1,403 @@
-<script setup>
-import { ref, computed } from 'vue'
+<script>
+// ============================================================
+// 注意：這個檔案有「兩個」<script> 標籤，這是比較少見、進階一點的寫法，
+// 這一個沒有寫 setup（就是普通的 <script>），
+// 下面還有一個 <script setup>。
+//
+// 為什麼要拆成兩個？
+// 因為這裡面的 posts（貼文清單）資料，不只這個頁面自己要用，
+// 「發文頁」(CreatePostView.vue) 發表新文章的時候，
+// 也需要把新文章加進「同一份」posts 清單裡，這樣使用者發文後，
+// 回到這個頁面才看得到自己剛剛發的文章。
+//
+// 一般 <script setup> 裡面宣告的變數，是「private 私有」的，
+// 外面的檔案沒辦法直接拿到；但如果用普通 <script> + export 關鍵字，
+// 就可以把這些變數「開放」給別的檔案 import 進去用，
+// 這樣兩個檔案就能共用同一份資料，而不是各自擁有一份自己的假資料。
+// ============================================================
+import { reactive, ref } from 'vue'
+// api：跟其他頁面共用同一個 axios 實例（src/services/api.js），
+// 這個實例會自動把登入後的 JWT token 帶進 Authorization header，
+// 跟直接 import axios from 'axios' 不一樣——那樣打 API 不會帶 token，
+// 登入後也一樣會被 [Authorize] 擋下來（401）。
+import api from '@/services/api'
+// useAuthStore：只「讀」登入狀態（有沒有登入），不會去改動共用的 authStore 本身。
+import { useAuthStore } from '@/stores/auth'
 
+// currentUserId：目前登入者真正的 userId。authStore 目前沒有存這個欄位
+// （只有 token/name/account/role），所以社群模組自己在這裡補：如果有登入，
+// 就打一次 GET /User/me（這支會從 JWT 解出使用者身份，回傳 userId），
+// 存進這個 ref，不去動共用的 authStore 或 LoginView.vue。
+// 沒登入的人，currentUserId 會維持 null——發文、留言、按讚這些動作原本就會被
+// 後端 [Authorize] 擋掉，所以 null 的情況下這些按鈕本來就打不通，是預期內的。
+// IMAGE_BASE：圖片是靜態檔案（wwwroot/images/posts/xxx.jpg），走的不是 /api 這條路徑，
+// 不能直接用 api 服務的 baseURL（那個是 https://localhost:7255/api，多了 /api）。
+// 這裡把 VITE_API_URL 尾巴的 /api 拿掉，變成純網域，圖片網址才會組對。
+const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+
+// export const：export 代表「把這個變數開放給其他檔案使用」，
+// 其他檔案只要寫 import { currentUser } from '這個檔案路徑'，就能拿到它。
+// 包成 ref() 是因為會在下面 loadCurrentUser() 裡被換成資料庫裡真正登入者的資料，
+// 換掉之後畫面上用到它的地方（例如 CreatePostView.vue 發文預覽）要能自動跟著更新。
+// 這裡先給一個預設值頂著，等 loadCurrentUser() 打完 API 才會換成真的。
+export const currentUser = ref({
+  name: '',
+  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=guest'
+})
+
+export const currentUserId = ref(null)
+export const loadCurrentUserId = async () => {
+  const authStore = useAuthStore()
+  if (!authStore.isLoggedIn) {
+    currentUserId.value = null
+    return
+  }
+  try {
+    const res = await api.get('/User/me')
+    currentUserId.value = res.data.userId
+    // 拿到真正的 userId 之後，順便把「我自己」的暱稱、大頭貼也從資料庫撈回來，
+    // 不再只是發文時用寫死的假資料頂著。這裡直接重用 PublicUserProfileController.cs
+    // 已經有的 GET api/PublicUserProfile/{userid}，不用另外多寫一支 API。
+    await loadCurrentUser()
+  } catch (err) {
+    console.error('讀取登入者 userId 失敗：', err)
+  }
+}
+
+// loadCurrentUser：跟後端要「我自己」的公開基本資料（暱稱、大頭貼），
+// 打的是 PublicUserProfileController.cs 裡的 GET api/PublicUserProfile/{userid}，
+// 跟 UserProfileView.vue 的 fetchPublicProfile 是同一支 API、同一套邏輯。
+const loadCurrentUser = async () => {
+  if (!currentUserId.value) return
+  try {
+    const res = await api.get(`/PublicUserProfile/${currentUserId.value}`)
+    currentUser.value = {
+      name: res.data.username,
+      // res.data.avatar 後端存的是相對路徑，要接上 IMAGE_BASE 才是完整網址；
+      // 沒設大頭貼的人（avatar 是 null）用預設頭像頂著，不要顯示破圖。
+      avatar: res.data.avatar ? `${IMAGE_BASE}${res.data.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${res.data.username}`
+    }
+  } catch (err) {
+    console.error('讀取自己的公開個人資料失敗：', err)
+  }
+}
+
+// reactive() 跟前面看到的 ref() 功能很像，也是讓 Vue 追蹤資料變化、
+// 資料一改畫面就自動更新。差別是 reactive() 通常用在「物件」或「陣列」上，
+// 而且在 <script> 裡面使用它包起來的資料時，不用加 .value（這點跟 ref 不一樣）。
+
+// formatCount：把純數字（例如 1200）轉成「1.2k」這種縮寫格式，只給畫面顯示用。
+// 之後接上真的 API 時，後端 likesCount／commentsCount 會是用
+// SELECT COUNT(*) FROM Post_Likes WHERE post_id = ... 這種方式算出來的「純數字」，
+// 不會是字串，所以資料本身要存數字，顯示的時候才格式化成「1.2k」，
+// 這樣排序、比大小的時候才不會出錯（字串 '1.2k' 沒辦法拿來做數學運算或排序）。
+export const formatCount = (n) => {
+  if (n >= 1000) {
+    // (n / 1000).toFixed(1)：除以 1000 後取到小數點第 1 位，例如 1234 → "1.2"
+    // .replace(/\.0$/, '')：如果結果剛好是整數（像 "2.0"），把 ".0" 拿掉，變成單純的 "2"
+    return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
+  }
+  return String(n)
+}
+
+// posts：全站所有貼文的清單，這是一個陣列，每個元素都是一篇貼文的資料物件。
+// 一樣用 export 開放給 CreatePostView.vue 使用。
+// 先給空陣列，等 fetchPosts() 打完 API 才會有真正資料庫裡的貼文——
+// 如果 API 打不通，畫面就是空清單，不會混進假資料。
+//
+// 欄位對照資料庫（Community_Post + Post_Images + Post_Tagged_Products）：
+// communityPostId      對應 post_id
+// userId      對應 user_id（真正串 API 後，user 顯示資訊會是後端 join Users 表回傳的）
+// content     對應 content（資料庫只有一個欄位，所以原本拆開的 title/desc 合併成一個）
+// postDate    對應 post_date
+// status      對應 status（貼文狀態，例如 'public' 公開、'hide' 隱藏）
+// images      對應 Post_Images 這張表（一篇貼文可以有多張圖，依 sortOrder 排序）
+// likesCount / commentsCount   後端算好的 COUNT(*) 數字，這裡存純數字
+// taggedProducts   對應 Post_Tagged_Products
+export const posts = reactive([])
+
+// addPost：一個函式，作用是「把一篇新貼文加到 posts 清單的最前面」。
+// CreatePostView.vue 裡使用者按「確認發布」的時候，就會呼叫這個函式。
+// posts.unshift(post)：unshift 是 JavaScript 陣列內建的方法，
+// 作用是「把新的東西塞進陣列的最前面」（相對的，push 是塞到最後面）。
+// 因為 posts 是用 reactive() 包起來的，這裡呼叫 unshift 之後，
+// Vue 會自動偵測到「陣列變了」，畫面上有顯示 posts 的地方會自動更新。
+export const addPost = (post) => {
+  posts.unshift(post)
+}
+
+// ------------------------------------------------------------
+// 收藏功能：PostDetailView.vue 按「收藏」時，會把貼文加進這份清單；
+// UserProfileView.vue 的「收藏」頁籤，直接讀這份清單來顯示。
+// 兩個檔案共用同一份 savedPosts，所以只要有一邊改了，另一邊畫面就會自動更新。
+// ------------------------------------------------------------
+
+// savedPosts：使用者收藏的貼文清單，一開始是空陣列，等 loadSavedPosts() 打完 API 才會有資料。
+export const savedPosts = reactive([])
+
+// loadSavedPosts：跟後端要「這個使用者收藏的所有貼文」，
+// 打的是 CommunityFavoriteController.cs 裡的 GET api/CommunityFavorite/user/{userid}。
+// App.vue 或這個頁面掛載時呼叫一次，把 savedPosts 填成資料庫裡真正的收藏清單。
+export const loadSavedPosts = async () => {
+  try {
+    const res = await api.get(`/CommunityFavorite/user/${currentUserId.value}`)
+    savedPosts.splice(0, savedPosts.length) // 先清空，避免重複呼叫時舊資料疊加
+    res.data.forEach(p => {
+      savedPosts.push({
+        communityPostId: p.communityPostId,
+        content: p.content,
+        image: (p.images && p.images.length) ? `${IMAGE_BASE}${p.images[0].imageFileName}` : '',
+        likesCount: p.likesCount,
+        commentsCount: p.commentsCount,
+        tags: (p.taggedProducts || []).map(t => `#${t.name}`)
+      })
+    })
+  } catch (err) {
+    console.error('讀取收藏清單失敗：', err)
+  }
+}
+
+// isPostSaved：檢查某篇貼文（用 communityPostId 判斷）現在是不是已經在收藏清單裡。
+// .some(...)：陣列方法，只要陣列裡「有任何一筆」符合條件，就回傳 true，否則回傳 false。
+export const isPostSaved = (communityPostId) => savedPosts.some(p => p.communityPostId === communityPostId)
+
+// toggleSavePost：切換某篇貼文的收藏狀態。改成 async，因為裡面要打真正的 API。
+// post 參數是一個「整理好格式」的貼文物件，欄位名稱對照 Community_Favorite +
+// Community_Post：communityPostId、content、image、likesCount、commentsCount、tags。
+export const toggleSavePost = async (post) => {
+  const idx = savedPosts.findIndex(p => p.communityPostId === post.communityPostId)
+
+  if (idx === -1) {
+    // 還沒收藏過 → 打 POST 新增一筆 Community_Favorite 紀錄
+    try {
+      await api.post(`/CommunityFavorite`, {
+        userId: currentUserId.value,
+        communityPostId: post.communityPostId
+      })
+    } catch (err) {
+      console.error('收藏失敗：', err)
+      return // API 失敗就不要動本地清單，避免畫面顯示「已收藏」但資料庫其實沒存到
+    }
+    savedPosts.unshift(post)
+  } else {
+    // 已經收藏過了 → 先問後端這筆收藏紀錄的 id，再打 DELETE 刪掉
+    try {
+      const res = await api.get(`/CommunityFavorite/post/${post.communityPostId}/user/${currentUserId.value}`)
+      if (res.data) {
+        await api.delete(`/CommunityFavorite/${res.data.communityFavoriteId}`)
+      }
+    } catch (err) {
+      console.error('取消收藏失敗：', err)
+      return
+    }
+    savedPosts.splice(idx, 1)
+  }
+}
+</script>
+
+<script setup>
+// ============================================================
+// 這裡開始是這個頁面「自己專屬」的邏輯，不會被其他檔案拿去用
+// ============================================================
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+// useRoute：讀網址上的查詢字串（例如從 PostDetailView.vue 點某個標記商品的標籤
+// 跳過來時，網址會帶 ?tag=商品名稱），讓這個頁面一打開就自動用那個商品名稱篩選貼文。
+import { useRoute } from 'vue-router'
+// animate：anime.js v4 的動畫函式。這裡用來做貼文卡片的捲動進場動畫——
+// 卡片捲動到看得見的範圍內才淡入＋往上滑一點點，不是一渲染出來就播。
+import { animate } from 'animejs'
+
+const route = useRoute()
+
+// authStore：只用來讀 isAdmin，決定要不要顯示「管理後台」入口按鈕。
+// useAuthStore 已經在上面那個 <script>（非 setup）區塊 import 過了，這裡直接呼叫就好。
+const authStore = useAuthStore()
+
+// onAvatarError：大頭貼圖片載入失敗時執行（例如資料庫存的路徑指到 wwwroot 裡
+// 實際上還沒有的檔案 — 跟先前貼文圖片遇到的狀況一樣，測試帳號的大頭貼路徑目前
+// 有些是佔位用的、對應的檔案還沒真的放上去）。
+// 失敗時把圖片來源換成 dicebear 產生的預設頭像，畫面才不會出現「圖片壞掉」的圖示。
+const onAvatarError = (event, name) => {
+  // 用「換過的網址是不是已經是預設圖」來判斷要不要再換一次，而不是用一個存在
+  // DOM 元素上的旗標（dataset.fallback）——原本那種寫法在「單一、被重複使用」的
+  // 大頭貼欄位上（不是 v-for 跑出來的，例如封面故事卡只有一個）會有問題：換了一篇
+  // 不同的貼文當封面故事，Vue 只會更新同一個 <img> 的 src，不會整個重新產生新元素，
+  // 舊的旗標還留著，新網址就算真的載入失敗，也會被舊旗標擋下來、不會真的換成預設圖。
+  // 改成比對「現在這個網址是不是已經是預設圖網址」，不會有這種「換了新資料，
+  // 但舊旗標還卡著」的問題。
+  const fallbackUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
+  if (event.target.src === fallbackUrl) return
+  event.target.src = fallbackUrl
+}
+
+// posts 已經在上面的 <script> 區塊宣告並 export，這裡同一個檔案內可以直接使用，不用再 import
+// api、currentUserId、IMAGE_BASE 現在也移到上面那個 <script> 區塊宣告了（因為 loadSavedPosts 也需要用到），
+// 這裡同樣不用再重複 import／宣告一次。
+
+// fetchPosts：向後端要「全部貼文」的資料，成功拿到之後取代掉原本寫死的假資料。
+// async function：宣告成「非同步函式」，代表裡面可以用 await「等」一個需要花時間的動作
+// （像是打 API 這種要等網路回應的操作）完成，再繼續往下執行，而不會卡住整個網頁。
+// postsLoading：貼文資料還沒抓回來之前是 true，畫面上用這個判斷要不要顯示骨架佔位畫面
+// （灰色區塊），而不是讓使用者在資料回來之前，一路看著空白的頁面。
+const postsLoading = ref(true)
+
+const fetchPosts = async () => {
+  postsLoading.value = true
+  try {
+    // api.get(網址)：對這個網址發送 GET 請求。
+    // await：先暫停在這一行，等 API 真的回應了，才把結果存進 res，再往下執行。
+    // GetCommunityPost 現在固定只回傳 status 是 public 的貼文（後端已經寫死篩選），
+    // 不用再自己帶查詢參數。
+    const res = await api.get(`/CommunityPost`)
+
+    // res.data：axios 已經把後端回傳的 JSON 自動轉換成 JavaScript 的陣列／物件了，
+    // 這裡直接可以用 .map(...) 這種陣列方法，不用自己再解析一次字串。
+    // .map(p => ({ ... }))：把後端回傳的每一筆資料，轉換成畫面需要的格式。
+    // 大部分欄位名稱其實跟後端 DTO 已經一致（因為之前有跟後端一起對過欄位名稱），
+    // 這裡主要是幫 images 陣列裡每張圖，組出一個可以直接放進 <img> 的完整網址，
+    // 因為後端目前只回傳 imageFileName（檔名），還沒有回傳完整網址。
+    const apiPosts = res.data.map(p => ({
+      communityPostId: p.communityPostId,
+      userId: p.userId,
+      // p.user.avatar 後端存的是相對路徑（例如 /avatars/user002.png），要接上 IMAGE_BASE
+      // 才是完整網址，跟貼文圖片是同一種處理方式；沒設大頭貼的人用預設頭像頂著。
+      user: p.user
+        ? { ...p.user, avatar: p.user.avatar ? `${IMAGE_BASE}${p.user.avatar}` : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + p.user.name }
+        : { name: '未知使用者', avatar: '' },
+      content: p.content,
+      postDate: p.postDate,
+      status: p.status,
+      images: (p.images || []).map(img => ({
+        postImageId: img.postImageId,
+        imageFileName: img.imageFileName,
+        sortOrder: img.sortOrder,
+        // imageFileName 本身已經帶路徑了（例如 "/images/posts/post01_1.jpg"），
+        // 不是單純的檔名，所以這裡直接接在 IMAGE_BASE 後面就好，
+        // 不用再自己加一段 /uploads/ 進去（之前那樣寫網址會多一層、變成錯的路徑）。
+        url: `${IMAGE_BASE}${img.imageFileName}`
+      })),
+      likesCount: p.likesCount,
+      commentsCount: p.commentsCount,
+      taggedProducts: p.taggedProducts || []
+    }))
+
+    // posts.splice(0, posts.length, ...apiPosts)：
+    // 因為 posts 是 reactive() 陣列，不能直接用 posts = apiPosts 整個換掉
+    // （reactive 包起來的變數不能重新賦值，只能改裡面的內容），
+    // 所以用 splice 先把陣列裡原本所有假資料都刪掉（從第 0 筆開始，刪 posts.length 筆），
+    // 再把 apiPosts 裡的每一筆都塞進去，這樣畫面才會正確地跟著更新。
+    posts.splice(0, posts.length, ...apiPosts)
+  } catch (err) {
+    // 如果打 API 失敗（後端沒開、網址打錯、CORS 設定問題...），
+    // 先在瀏覽器主控台印出錯誤內容方便除錯。posts 維持空陣列，畫面會顯示空清單，
+    // 不會混進假資料——這是刻意的決定，寧可看到空白也不要顯示不是真的資料。
+    console.error('讀取貼文列表失敗：', err)
+  } finally {
+    postsLoading.value = false
+  }
+}
+
+// onMounted：Vue 的生命週期鉤子，代表「這個元件的畫面第一次被畫出來、掛載到網頁上之後」
+// 要執行的動作。在這裡呼叫 fetchPosts，就是「頁面一打開，就馬上去後端要最新的貼文資料」。
+// fetchPosts 跟登入者是誰無關，可以直接平行呼叫；
+// loadSavedPosts、fetchCreators 都需要用到 currentUserId.value（收藏清單、追蹤狀態
+// 都是跟「我」綁定的），所以要先 await loadCurrentUserId() 確定 currentUserId 有值
+// 之後才呼叫，不然會在 currentUserId 還是 null 的時候就打出去，查到不對的資料。
+onMounted(async () => {
+  fetchPosts()
+  await loadCurrentUserId()
+  loadSavedPosts()
+  loadLikedPosts()
+  fetchCreators()
+})
+
+// formatCount：跟上面那個 <script>（非 setup）區塊裡的 formatCount 是「一模一樣」的函式，
+// 這裡要重複宣告一次，是因為 Vue 的規則是：<template> 只能直接使用宣告在
+// 這個 <script setup> 區塊裡的變數／函式，宣告在旁邊那個「非 setup」<script> 裡的東西
+// （即使有 export），<template> 是抓不到的，只有「其他檔案」import 進去才抓得到。
+// 所以「給別的檔案共用」跟「給這個檔案自己的畫面用」，要各自放一份。
+const formatCount = (n) => {
+  if (n >= 1000) {
+    return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
+  }
+  return String(n)
+}
+
+// ============================================================
+// 按讚功能：跟 PostDetailView.vue 是同一套 PostLike API，
+// 只是那邊一次只顯示「一篇」貼文的按讚狀態，這裡是一整面卡片牆，
+// 用一個 Map 記錄「這個使用者總共讚過哪些貼文、每篇對應的 postLikesId」，
+// 不用每張卡片各自打一次 API 去問。
+// ============================================================
+
+// likedPostIds：key 是 communityPostId，value 是這筆讚的 postLikesId（取消讚要用到）。
+// 用 reactive 包住一個 Map，畫面才會隨著這份資料改變自動更新。
+const likedPostIds = reactive(new Map())
+
+// loadLikedPosts：打 PostLikeController.cs 的 GET api/PostLike/user/{userid}，
+// 把這個使用者按過的所有讚一次抓回來，填進 likedPostIds。
+const loadLikedPosts = async () => {
+  try {
+    const res = await api.get(`/PostLike/user/${currentUserId.value}`)
+    likedPostIds.clear()
+    res.data.forEach(like => {
+      likedPostIds.set(like.communityPostId, like.postLikesId)
+    })
+  } catch (err) {
+    console.error('讀取按讚清單失敗：', err)
+  }
+}
+
+// isPostLiked：這篇貼文（用 communityPostId 判斷）現在是不是在已讚清單裡。
+const isPostLiked = (communityPostId) => likedPostIds.has(communityPostId)
+
+// toggleLikePost：按下卡片上的愛心時執行。post 參數是 template 裡
+// @click="toggleLikePost(post)" 傳進來的，代表「使用者點的是哪一篇貼文」。
+// 跟 PostDetailView.vue 的 toggleLike 是同一套邏輯（先看有沒有讚過，決定要打 POST 還是
+// DELETE），只是這邊要多一個步驟：改到 likedPostIds 這個共用的 Map，而不是單一個變數。
+const toggleLikePost = async (post) => {
+  const likeId = likedPostIds.get(post.communityPostId)
+  if (likeId) {
+    // 已經讚過 → 這次是要取消讚 → 打 DELETE
+    try {
+      await api.delete(`/PostLike/${likeId}`)
+    } catch (err) {
+      console.error('取消讚失敗：', err)
+      return
+    }
+    likedPostIds.delete(post.communityPostId)
+    post.likesCount -= 1
+  } else {
+    // 還沒讚過 → 這次是要按讚 → 打 POST 新增一筆
+    try {
+      await api.post(`/PostLike`, {
+        communityPostId: post.communityPostId,
+        userId: currentUserId.value
+      })
+    } catch (err) {
+      console.error('按讚失敗：', err)
+      return
+    }
+    // POST 只會回傳成功與否，不會回傳剛剛新增那筆紀錄的 id，
+    // 所以要重新問一次後端才知道這筆讚的 postLikesId 是多少（之後要取消讚會用到），
+    // 跟 PostDetailView.vue toggleLike 的做法一樣，只是這裡只需要問「這一篇」就好，
+    // 不用整份 loadLikedPosts() 重打一次。
+    try {
+      const res = await api.get(`/PostLike/post/${post.communityPostId}/user/${currentUserId.value}`)
+      if (res.data) likedPostIds.set(post.communityPostId, res.data.postLikesId)
+    } catch (err) {
+      console.error('讀取剛剛按讚的紀錄失敗：', err)
+    }
+    post.likesCount += 1
+  }
+}
 
 // 分頁 Tab 狀態
+// 記錄使用者現在點的是「熱門」「最新」還是「追蹤中」哪一個分頁，
+// 預設一開始是 'hot'（熱門）。
 const currentTab = ref('hot')
 
-// 熱門商品標籤
+// 熱門商品標籤：右側欄要顯示的標籤清單
 const popularProducts = ref([
   { id: 1, name: '經典圓領短T' },
   { id: 2, name: '法式碎花洋裝' },
@@ -14,84 +406,434 @@ const popularProducts = ref([
   { id: 5, name: '百褶及膝裙' }
 ])
 
-// 穿搭達人資料
-const creators = ref([
-  { id: 1, name: 'Amy_穿搭日記', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Amy', meta: '2.1萬追蹤', isFollowing: false },
-  { id: 2, name: 'Kevin.style', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Kevin', meta: '1.6萬追蹤', isFollowing: false },
-  { id: 3, name: '小雨 rainy', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Rainy', meta: '3.4萬追蹤', isFollowing: true }
-])
+// 穿搭達人資料：右側欄「熱門穿搭達人」清單，先給空陣列，等 fetchCreators() 打完 API 才會有資料。
+const creators = ref([])
 
-// 穿搭貼文假資料（圖片改用穩定可顯示的穿搭情境圖，避免空白）
-const posts = ref([
-  {
-    postId: 1,
-    user: { name: 'Amy_穿搭日記', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Amy' },
-    title: '秋季奶茶色系穿搭，寬褲+針織的溫柔搭配',
-    desc: '用奶茶色打底，寬褲修飾比例，針織外套增加層次，走在街上也很有電影感。',
-    imageUrl: 'https://picsum.photos/seed/outfit-cream-knit/900/720',
-    likesCount: '1.2k',
-    commentsCount: 89,
-    taggedProducts: [{ id: 3, name: '羊毛混紡針織外套' }]
-  },
-  {
-    postId: 2,
-    user: { name: 'Kevin.style', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Kevin' },
-    title: '極簡工裝風 | 大地色機能外套通勤也好看',
-    desc: '極簡工裝風，大地色機能外套通勤也好看，口袋設計實用又有型。',
-    imageUrl: 'https://picsum.photos/seed/outfit-utility-jacket/700/560',
-    likesCount: '856',
-    commentsCount: 42,
-    taggedProducts: [{ id: 1, name: '經典圓領短T' }]
-  },
-  {
-    postId: 3,
-    user: { name: '小雨 rainy', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Rainy' },
-    title: '約會小心機 | 法式碎花洋裝配藤編包 🌸',
-    desc: '約會小心機，法式碎花洋裝配藤編包，甜而不膩剛剛好。',
-    imageUrl: 'https://picsum.photos/seed/outfit-floral-dress/700/560',
-    likesCount: '2.4k',
-    commentsCount: 158,
-    taggedProducts: [{ id: 2, name: '法式碎花洋裝' }]
+// fetchCreators：跟後端要「粉絲數最多的前 3 名」使用者，
+// 打的是 UserFollowController.cs 裡的 GET api/UserFollow/popular-creators。
+const fetchCreators = async () => {
+  try {
+    const res = await api.get(`/UserFollow/popular-creators`, {
+      params: { take: 3, followerId: currentUserId.value }
+    })
+    creators.value = res.data.map(c => ({
+      id: c.userId, // 這個 id 現在是真的 userId，不再是這份清單自己編的假號碼了
+      name: c.name,
+      // c.avatar 一樣是相對路徑，要接上 IMAGE_BASE；沒設大頭貼的人用預設頭像頂著。
+      avatar: c.avatar ? `${IMAGE_BASE}${c.avatar}` : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + c.name,
+      // followersCount 改存「純數字」，不是先組好的 "4追蹤" 字串——這樣按下追蹤／取消追蹤
+      // 的時候，才能直接把這個數字 +1 / -1，畫面上的粉絲數即時更新。
+      // 如果先組成字串存起來，之後要更新就要整個字串重新拼一次，不如一開始就存數字，
+      // 顯示的時候（template 裡）才用 formatCount() 轉成「4追蹤」這種格式。
+      followersCount: c.followersCount,
+      isFollowing: c.isFollowing,
+      userFollowId: c.userFollowId
+    }))
+  } catch (err) {
+    console.error('讀取熱門穿搭達人失敗：', err)
   }
-])
+}
 
-// 第一篇當作「封面故事」，其餘進入雙欄網格
-const featurePost = computed(() => posts.value[0])
-const gridPosts = computed(() => posts.value.slice(1))
+// 頁籤文案（每個頁籤對應的封面卡標籤與副標、沒有內容時顯示的提示文字）
+// 這是一個「物件的物件」，外層用 hot / new / follow 三個 key，
+// 對應到現在的三個分頁；每個分頁裡面又是一個小物件，裝著這個分頁要顯示的文字。
+const tabCopy = {
+  hot:    { ribbon: '封面故事', role: '本週封面 · 秋季選品', empty: '目前沒有符合的熱門穿搭。' },
+  new:    { ribbon: '最新發布', role: '剛剛發布的穿搭',      empty: '目前還沒有最新的穿搭貼文。' },
+  follow: { ribbon: '追蹤精選', role: '來自你追蹤的達人',    empty: '你還沒有追蹤任何穿搭達人，去右側「熱門穿搭達人」追蹤幾位，這裡就會出現他們的貼文。' }
+}
 
-const toggleFollow = (creator) => {
-  creator.isFollowing = !creator.isFollowing
+// computed() 是 Vue 提供的另一種「特殊變數」，跟 ref() 不一樣的地方是：
+// computed 裡面放的是一段「計算邏輯」，它會根據裡面用到的其他變數
+// 自動重新計算結果，你可以把它想成一個「永遠保持最新答案的公式」。
+// 例如這裡：只要 currentTab 改變，currentTabCopy 就會自動重新算一次，
+// 抓出目前分頁對應的文案，不用自己手動去同步更新。
+//
+// tabCopy[currentTab.value]：這是「用變數當作 key，去物件裡面找對應的值」的寫法，
+// 例如 currentTab.value 是 'hot'，這行就等於在寫 tabCopy.hot。
+// || tabCopy.hot：如果前面那個找不到值（結果是 undefined），就改用 tabCopy.hot 當預設值，避免出錯。
+const currentTabCopy = computed(() => tabCopy[currentTab.value] || tabCopy.hot)
+
+// 依照目前分頁 (熱門 / 最新 / 追蹤中) 先篩出對應的貼文清單
+// 這也是一個 computed，裡面的邏輯比較長，逐行說明在下面。
+const tabPosts = computed(() => {
+  if (currentTab.value === 'new') {
+    // 最新：依發布時間新到舊排序
+    // [...posts]：這個寫法叫做「展開運算子」，作用是「複製一份新的陣列」，
+    // 不直接對原本的 posts 排序，是為了避免不小心把原始資料的順序也永久打亂。
+    // .sort((a, b) => ...)：sort 是陣列排序方法，a、b 代表「拿來互相比較的兩筆資料」。
+    // new Date(b.postDate) - new Date(a.postDate)：
+    // 把日期文字轉換成「時間」再相減，結果是正數還是負數，決定了 a、b 誰排前面，
+    // 這樣寫的效果就是「時間新的排前面、時間舊的排後面」。
+    return [...posts].sort(
+      (a, b) => new Date(b.postDate) - new Date(a.postDate)
+    )
+  }
+  if (currentTab.value === 'follow') {
+    // 追蹤中：只顯示已追蹤達人的貼文
+    // .filter(...)：filter 是陣列方法，作用是「留下符合條件的資料，其他丟掉」。
+    // 這裡先從 creators 裡面，篩出「isFollowing 是 true」的人，
+    // 再用 .map(...) 把這些人的名字抽出來，變成一個「名字陣列」。
+    const followingNames = creators.value
+      .filter(c => c.isFollowing)
+      .map(c => c.name)
+    // 接著再對 posts 做一次 filter：只留下「發文者的名字」有出現在
+    // followingNames 這個名單裡的貼文。
+    return posts.filter(p => followingNames.includes(p.user.name))
+  }
+  // 熱門：依按讚數（likesCount）新到舊排序，likesCount 是 Community_Post 那邊真正的資料，
+  // 不用再想像成「已經排好」了。跟「最新」那段一樣，用展開運算子複製一份陣列再排序，
+  // 避免直接改到原始 posts 的順序。
+  return [...posts].sort((a, b) => b.likesCount - a.likesCount)
+})
+
+// 搜尋（可搜尋貼文標題、標籤商品、用戶名），在目前分頁的結果之上再過濾一次
+// searchQuery：使用者在搜尋框打的文字，會透過 v-model 自動雙向同步（下面 template 會看到）。
+const searchQuery = ref(route.query.tag || '')
+
+// 從 PostDetailView.vue 點某個標記商品的標籤跳過來時，網址是 /community?tag=商品名稱，
+// 上面已經在宣告 searchQuery 的當下讀了一次網址的初始值；但如果使用者本來就已經在
+// 社群首頁，又點了另一篇貼文裡不同商品的標籤，Vue Router 會直接重用同一個元件
+// （不會整個重新整理、重新掛載），上面那個初始值只會套用一次，之後網址查詢字串
+// 再怎麼變都不會自動反映。這裡另外監看 route.query.tag，之後變了就同步更新搜尋框。
+watch(() => route.query.tag, (newTag) => {
+  if (newTag) searchQuery.value = newTag
+})
+
+const filteredPosts = computed(() => {
+  // .trim()：把文字前後多餘的空白刪掉。
+  // .toLowerCase()：把文字全部轉成小寫，這樣搜尋 "T恤" 或 "t恤" 才不會因為大小寫不同而搜不到。
+  const q = searchQuery.value.trim().toLowerCase()
+  const base = tabPosts.value
+  // 如果搜尋框是空的，就直接回傳目前分頁的完整清單，不用篩選。
+  if (!q) return base
+  return base.filter(post => {
+    // .includes(q)：判斷字串裡面「有沒有包含」q 這段文字。
+    // 原本是搜尋 post.title，因為資料庫沒有分開存 title/desc，改成搜尋 post.content。
+    const inContent = post.content.toLowerCase().includes(q)
+    const inUser = post.user.name.toLowerCase().includes(q)
+    // post.taggedProducts || []：如果這篇貼文沒有 taggedProducts（是 undefined），
+    // 就改用一個空陣列 []，避免下面呼叫 .some() 的時候噴錯。
+    // .some(...)：只要陣列裡「有任何一筆」符合條件，就回傳 true。
+    const inTags = (post.taggedProducts || []).some(p => p.name.toLowerCase().includes(q))
+    // 內文、發文者名字、標籤，只要其中一個有搜尋到關鍵字，這篇貼文就會被留下來。
+    return inContent || inUser || inTags
+  })
+})
+
+const filteredCreators = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return creators.value
+  return creators.value.filter(c => c.name.toLowerCase().includes(q))
+})
+
+const filteredTags = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return popularProducts.value
+  return popularProducts.value.filter(p => p.name.toLowerCase().includes(q))
+})
+
+// isSearching：判斷「使用者現在是不是正在搜尋」，
+// 只要搜尋框去掉前後空白後不是空字串，就代表正在搜尋中。
+const isSearching = computed(() => searchQuery.value.trim() !== '')
+
+// 未搜尋時：第一篇當作「封面故事」，其餘進入雙欄網格
+// 搜尋時：不特別放大第一篇，全部以網格呈現
+// featurePost：如果正在搜尋，就沒有封面故事（回傳 null，也就是「什麼都沒有」）；
+// 如果沒有在搜尋，就拿 filteredPosts 陣列的第 0 筆（陣列的第一筆，程式裡都是從 0 開始算）當封面故事。
+const featurePost = computed(() => (isSearching.value ? null : filteredPosts.value[0]))
+
+// ============================================================
+// 貼文照片輪播（封面故事卡 + 網格卡片都可以左右切換多張照片）
+// ============================================================
+
+// featureImageIndex：封面故事卡目前顯示第幾張照片（從 0 開始）。封面故事同一時間只有一張卡片，
+// 用單一個 ref 記錄就夠了，跟 PostDetailView.vue 主圖輪播的邏輯是同一套。
+const featureImageIndex = ref(0)
+const prevFeatureImage = () => {
+  const len = featurePost.value.images.length
+  featureImageIndex.value = (featureImageIndex.value - 1 + len) % len
+}
+const nextFeatureImage = () => {
+  const len = featurePost.value.images.length
+  featureImageIndex.value = (featureImageIndex.value + 1) % len
+}
+
+// cardImageIndex：網格卡片目前顯示第幾張照片，用 post.communityPostId 當 key 分別記錄。
+// 因為畫面上同時會有很多張卡片（v-for 跑出來的），不能像 featureImageIndex 那樣只用一個 ref，
+// 要幫「每一張卡片」各自存一份「目前是第幾張」，所以改用 reactive 物件、依貼文 id 查。
+const cardImageIndex = reactive({})
+const getCardImageIndex = (postId) => cardImageIndex[postId] || 0
+const prevCardImage = (post) => {
+  const len = post.images.length
+  const cur = getCardImageIndex(post.communityPostId)
+  cardImageIndex[post.communityPostId] = (cur - 1 + len) % len
+}
+const nextCardImage = (post) => {
+  const len = post.images.length
+  const cur = getCardImageIndex(post.communityPostId)
+  cardImageIndex[post.communityPostId] = (cur + 1) % len
+}
+
+// ============================================================
+// 滑鼠移上去才自動輪播（預覽用）：跟 PostDetailView.vue 主圖那種「進頁面就自動一直播」
+// 不一樣，這裡是一個上面同時會出現很多張卡片的動態牆，如果每張卡片自己就自動一直輪播，
+// 畫面會變得很雜亂。改成只有滑鼠正在看的那張卡片才會動，移開就停下來、
+// 回到第一張（封面圖）——跟很多購物網站「滑過商品圖預覽其他角度」的邏輯一樣。
+// ============================================================
+
+// cardAutoplayTimers：目前正在自動播放的網格卡片，用 Map 記錄「哪篇貼文對應哪個計時器」，
+// 因為同時可能有好幾張卡片被滑過，需要各自獨立的計時器（不能只用一個共用的）。
+const cardAutoplayTimers = new Map()
+const CARD_AUTOPLAY_INTERVAL = 1200
+
+const startCardAutoplay = (post) => {
+  if (post.images.length <= 1) return
+  const timer = setInterval(() => nextCardImage(post), CARD_AUTOPLAY_INTERVAL)
+  cardAutoplayTimers.set(post.communityPostId, timer)
+}
+const stopCardAutoplay = (post) => {
+  const timer = cardAutoplayTimers.get(post.communityPostId)
+  if (timer) {
+    clearInterval(timer)
+    cardAutoplayTimers.delete(post.communityPostId)
+  }
+  // 滑鼠移開後歸零，回到封面圖（第一張），不要停在滑到一半的那張。
+  cardImageIndex[post.communityPostId] = 0
+}
+
+// 封面故事卡只有單獨一張，邏輯一樣但不用像網格卡片那樣用 Map 記，單一個計時器變數就夠了。
+let featureAutoplayTimer = null
+const startFeatureAutoplay = () => {
+  if (!featurePost.value || featurePost.value.images.length <= 1) return
+  featureAutoplayTimer = setInterval(nextFeatureImage, CARD_AUTOPLAY_INTERVAL)
+}
+const stopFeatureAutoplay = () => {
+  if (featureAutoplayTimer) {
+    clearInterval(featureAutoplayTimer)
+    featureAutoplayTimer = null
+  }
+  featureImageIndex.value = 0
+}
+
+// gridPosts：如果正在搜尋，網格就顯示全部搜尋結果；
+// 如果沒有搜尋，網格就顯示「除了第一篇以外」的其他貼文
+// （.slice(1) 的意思是「從陣列的第 1 筆開始，取到最後」，等於跳過第 0 筆）。
+const gridPosts = computed(() => (isSearching.value ? filteredPosts.value : filteredPosts.value.slice(1)))
+
+// visibleGridCount：網格區「現在願意顯示到第幾篇」，一開始只顯示前 6 篇，
+// 按「載入更多穿搭」再一次多顯示 6 篇，不是一開始就把全部貼文塞滿畫面。
+const GRID_PAGE_SIZE = 6
+const visibleGridCount = ref(GRID_PAGE_SIZE)
+
+// visibleGridPosts：真正給 template 用 v-for 畫出來的清單，是 gridPosts 裡「前 visibleGridCount 篇」。
+// .slice(0, n)：從陣列開頭取到第 n 筆（不含第 n 筆）。
+const visibleGridPosts = computed(() => gridPosts.value.slice(0, visibleGridCount.value))
+
+// hasMoreGridPosts：判斷還有沒有更多沒顯示出來的貼文，用來決定「載入更多穿搭」按鈕要不要出現，
+// 全部都顯示完了就不用再讓使用者看到一顆按下去沒有反應的按鈕。
+const hasMoreGridPosts = computed(() => visibleGridCount.value < gridPosts.value.length)
+
+// loadMoreGridPosts：按下「載入更多穿搭」時執行，一次多開放顯示 6 篇。
+const loadMoreGridPosts = () => {
+  visibleGridCount.value += GRID_PAGE_SIZE
+}
+
+// 切換分頁（熱門／最新／追蹤中）或搜尋條件改變時，把「顯示到第幾篇」重設回第一頁，
+// 不然從「熱門」切到「最新」，網格會用上一個分頁殘留的展開數量，可能一次跳出一大堆貼文。
+watch([currentTab, searchQuery], () => {
+  visibleGridCount.value = GRID_PAGE_SIZE
+})
+
+// 換了一篇不同的貼文當封面故事時（例如切分頁），輪播位置重設回第一張，
+// 不然可能會卡在「上一篇封面故事」切到的第 3 張，但新的這篇根本沒有第 3 張圖。
+const featureCardEl = ref(null)
+watch(() => featurePost.value?.communityPostId, () => {
+  featureImageIndex.value = 0
+})
+
+// ============================================================
+// 捲動觸發進場動畫：卡片不是「一渲染出來就播動畫」，而是真的捲動到
+// 看得見的範圍內，才淡入＋往上滑一點點。用瀏覽器內建的 IntersectionObserver
+// 判斷「這個元素現在有沒有進入可視範圍」，交給 anime.js 的 animate() 做實際的動畫效果。
+// ============================================================
+
+// scrollAnimatedIds：記錄「已經播過捲動進場動畫」的貼文 id，避免同一張卡片捲出畫面
+// 又捲回來時重複播放（每張卡片只在第一次進入視窗時播一次，之後就維持顯示狀態）。
+const scrollAnimatedIds = new Set()
+
+// runRevealAnimation：實際播放淡入＋上滑的動畫，並在動畫播完後把 anime.js 留下的
+// 行內 opacity／transform 樣式清掉——原因跟之前貼文卡片進場動畫一樣：這幾張卡片本身
+// 有 :hover 效果會用到 transform（滑鼠移上去卡片往上浮），行內樣式的優先權比 CSS
+// class 高，動畫播完後如果不清掉，transform 會一直卡在動畫結束的值，蓋掉 hover 效果。
+const runRevealAnimation = (el, translateFrom = 20, duration = 500) => {
+  animate(el, {
+    opacity: [0, 1],
+    translateY: [translateFrom, 0],
+    duration,
+    ease: 'outQuad',
+    onComplete: () => {
+      el.style.opacity = ''
+      el.style.transform = ''
+    }
+  })
+}
+
+// cardObserver：只建立一次的 IntersectionObserver 實例，之後所有卡片都共用同一個，
+// 不用每張卡片各自 new 一個觀察器，比較省資源。
+// threshold: .15：卡片至少露出 15% 才算「進入畫面」，不用等整張卡片完全捲進來才觸發。
+// rootMargin 的 -40px：讓觸發點往上收一點，卡片還沒完全貼到畫面最底部就開始播動畫，
+// 使用者往下捲的時候比較不會覺得「動畫慢半拍」。
+let cardObserver = null
+const getCardObserver = () => {
+  if (cardObserver) return cardObserver
+  cardObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return
+      runRevealAnimation(entry.target)
+      // unobserve：這張卡片已經播過動畫了，不用繼續盯著它的捲動狀態，
+      // 節省效能，也確保「只在第一次進入畫面時播放一次」。
+      cardObserver.unobserve(entry.target)
+    })
+  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' })
+  return cardObserver
+}
+
+// observeGridCards：把「目前畫面上、還沒被觀察過」的卡片元素交給 IntersectionObserver
+// 盯著——呼叫時機是 visibleGridPosts 改變的時候（見下面的 watch）：不管是第一次載入、
+// 切換分頁、搜尋結果改變，還是按「載入更多穿搭」多顯示出幾篇，都會經過這裡。
+// 卡片本身一開始不會播動畫，是先把 opacity 設成 0（用行內樣式暫時藏起來），
+// 真正捲進畫面、被 IntersectionObserver 偵測到的那一刻，才會播放淡入效果。
+const observeGridCards = () => {
+  const observer = getCardObserver()
+  document.querySelectorAll('.post-grid .post-card').forEach((el, idx) => {
+    const post = visibleGridPosts.value[idx]
+    if (!post || scrollAnimatedIds.has(post.communityPostId)) return
+    scrollAnimatedIds.add(post.communityPostId)
+    el.style.opacity = '0'
+    observer.observe(el)
+  })
+}
+
+// flush: 'post'：這個 watch 的 callback 會在 Vue 把畫面（DOM）真正更新完之後才執行，
+// 不用自己再包一層 nextTick(...) 去等畫面更新——observeGridCards 裡面要用
+// document.querySelectorAll 抓真正畫出來的 <div class="post-card">，一定要等
+// DOM 更新完成才抓得到剛渲染出來的新卡片。
+watch(visibleGridPosts, () => {
+  observeGridCards()
+}, { flush: 'post' })
+
+// 封面故事卡片也用同一套邏輯，只是它只有單獨一張，直接用 featureCardEl 這個範本參照，
+// 不用像網格卡片那樣批次抓 DOM，動畫細節（滑動距離、時長）跟網格卡片共用同一顆
+// runRevealAnimation，維持一致的節奏感。
+watch(featureCardEl, (el) => {
+  if (!el) return
+  el.style.opacity = '0'
+  getCardObserver().observe(el)
+})
+
+// onUnmounted：離開這個頁面時，把 IntersectionObserver 跟所有還在跑的卡片自動輪播
+// 計時器都停掉，不然使用者離開頁面後，這些觀察器／計時器還留在記憶體裡繼續運作，
+// 是不必要的資源浪費。
+onUnmounted(() => {
+  if (cardObserver) cardObserver.disconnect()
+  cardAutoplayTimers.forEach(timer => clearInterval(timer))
+  cardAutoplayTimers.clear()
+  if (featureAutoplayTimer) clearInterval(featureAutoplayTimer)
+})
+
+// 點擊追蹤按鈕時呼叫：把該達人的 isFollowing 改成相反的值。
+// 這裡的 creator 是從 template 裡 @click="toggleFollow(creator)" 傳進來的，
+// 代表「使用者點的是哪一位達人」。
+// toggleFollow：按下側欄某位達人的追蹤按鈕時執行。改成 async，因為裡面要 await 打 API。
+const toggleFollow = async (creator) => {
+  if (creator.isFollowing) {
+    try {
+      await api.delete(`/UserFollow/${creator.userFollowId}`)
+    } catch (err) {
+      console.error('取消追蹤失敗：', err)
+      return
+    }
+    creator.isFollowing = false
+    creator.userFollowId = null
+    creator.followersCount -= 1 // 取消追蹤，粉絲數立刻減 1，不用重新整理頁面、重打 API 才看得到
+  } else {
+    try {
+      await api.post(`/UserFollow`, {
+        followerId: currentUserId.value,
+        followingId: creator.id
+      })
+    } catch (err) {
+      console.error('追蹤失敗：', err)
+      return
+    }
+    creator.isFollowing = true
+    creator.followersCount += 1 // 追蹤成功，粉絲數立刻加 1
+    // POST 沒有回傳新建紀錄的 id，重新問一次這位使用者的追蹤狀態，拿到真正的 userFollowId。
+    try {
+      const statusRes = await api.get(`/UserFollow/follower/${currentUserId.value}/following/${creator.id}`)
+      creator.userFollowId = statusRes.data ? statusRes.data.userFollowId : null
+    } catch (err) {
+      console.error('讀取追蹤狀態失敗：', err)
+    }
+  }
 }
 </script>
 
 <template>
-  <!-- 引入 Bootstrap CSS + 字體 -->
-  <component is="style">
-    @import "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css";
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&amp;family=Noto+Sans+TC:wght@400;500;600;700&amp;display=swap');
-  </component>
-
   <div class="community-page min-vh-100 w-100">
 
     
 
     <div class="container-fluid container-lg pb-5">
 
-      <!-- 頁首：眉題 + 手繪底線標題 -->
+      <!-- 頁首：韓風簡約版 — 左側細直線引導，字體維持原本的 Noto Serif TC -->
       <div class="page-head">
-        <div class="eyebrow">CLOthings</div>
-        <h1 class="page-title">
-          穿搭社群
-          <svg viewBox="0 0 260 14" preserveAspectRatio="none">
-            <path d="M2 8 C 40 2, 80 12, 120 6 S 200 2, 258 8" fill="none" stroke="#B8862E" stroke-width="2.5" stroke-linecap="round"/>
+        <div class="page-head-inner">
+          <div class="page-head-divider"></div>
+          <div class="page-head-text">
+            <div class="eyebrow">Style Journal</div>
+            <h1 class="page-title">CLO Daily</h1>
+            <p class="page-sub">紀錄每一天的穿著練習</p>
+          </div>
+        </div>
+
+        <!-- 搜尋列：可搜尋穿搭標籤、單品或用戶 -->
+        <div class="search-bar">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+            <path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
-        </h1>
-        <p class="page-sub">OOTD — 紀錄每一天的穿著練習</p>
+          <!--
+            v-model="searchQuery"：這是「雙向綁定」，白話說：
+            使用者在這個輸入框打字，searchQuery 這個變數會自動同步更新；
+            反過來，如果程式改了 searchQuery 的值，輸入框顯示的文字也會跟著變。
+            不用自己寫「監聽輸入 → 手動更新變數」這種重複的程式碼。
+          -->
+          <input
+            type="text"
+            v-model="searchQuery"
+            class="search-input"
+            placeholder="搜尋穿搭、標籤或用戶..."
+          />
+          <!--
+            v-if="searchQuery"：只有搜尋框裡有文字的時候，才顯示這個「清除」按鈕。
+            @click="searchQuery = ''"：點下去，直接把 searchQuery 設回空字串，等於清空搜尋框。
+          -->
+          <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''" aria-label="清除搜尋">✕</button>
+        </div>
       </div>
 
       <!-- 分頁與分享按鈕 -->
       <div class="section-row mb-4">
         <div class="tab-group">
+          <!--
+            這三顆按鈕沒有用 v-for（因為只有固定 3 個、不是從陣列畫出來的），
+            是各自手動寫好，但邏輯是一樣的模式：
+            :class="{ active: currentTab === 'hot' }"：
+            如果目前分頁是 'hot'，就幫這顆按鈕加上 active 樣式（看起來「被選中」）。
+            @click="currentTab = 'hot'"：點下去就把目前分頁切成 'hot'。
+          -->
           <button
             class="tab-btn"
             :class="{ active: currentTab === 'hot' }"
@@ -109,9 +851,27 @@ const toggleFollow = (creator) => {
           >追蹤中</button>
         </div>
 
-        <router-link to="/community/create" class="btn-share text-decoration-none">
-          ＋ 分享我的穿搭
-        </router-link>
+        <div class="d-flex align-items-center gap-2">
+          <!-- 管理後台入口：只有登入者是管理員才會出現。放在這裡（社群首頁）是因為
+               管理員帳號沒有自己的個人頁可以放這顆按鈕，但每個登入的人本來就會經過這頁。
+               原本這裡是用 emoji（🛠）當圖示，跟之前 ChatView.vue 相機按鈕、
+               UserProfileView.vue 收藏空狀態圖示消失是同一類風險：emoji 靠字型渲染，
+               換一台電腦、換個瀏覽器字型設定就可能跑掉或消失。這裡也一起換成 SVG
+               扳手圖示，統一整個 Community 的圖示風格。 -->
+          <router-link
+            v-if="authStore.isAdmin"
+            to="/admin/community/posts"
+            class="btn-admin-entry text-decoration-none"
+          >
+            <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.8 2.8-2-2 2.8-2.8z" />
+            </svg>
+            管理後台
+          </router-link>
+          <router-link to="/community/create" class="btn-share text-decoration-none">
+            ＋ 分享我的穿搭
+          </router-link>
+        </div>
       </div>
 
       <!-- 主要內容區 -->
@@ -120,79 +880,238 @@ const toggleFollow = (creator) => {
         <!-- 左側：貼文列表區 -->
         <div class="col-12 col-lg-9">
 
-          <!-- 封面故事卡（取貼文第一筆） -->
-          <div class="feature-card" v-if="featurePost">
-            <router-link :to="`/community/post/${featurePost.postId}`" class="feature-media d-block text-decoration-none">
-              <span class="tag-label">封面故事</span>
-              <img :src="featurePost.imageUrl" :alt="featurePost.title" />
-            </router-link>
+          <!--
+            骨架載入畫面：postsLoading 是 true（fetchPosts() 還在跑）的時候顯示，
+            用幾個灰色佔位區塊模擬「封面故事卡＋網格卡片」大概的版面形狀，
+            讓使用者知道「這裡等一下會有內容」，而不是盯著一片空白，
+            也避免資料還沒回來的那零點幾秒，先閃過一下「找不到符合的貼文」的空狀態文字
+            （filteredPosts 在資料回來之前本來就是空陣列，沒有這層 loading 判斷的話，
+            會先顯示錯誤的「沒有貼文」訊息，資料回來後才又換成真正的內容，畫面會閃一下）。
+          -->
+          <template v-if="postsLoading">
+            <div class="skeleton-feature">
+              <div class="skeleton-block skeleton-feature-media"></div>
+              <div class="skeleton-feature-body">
+                <div class="skeleton-block skeleton-avatar"></div>
+                <div class="skeleton-block skeleton-line skeleton-line-80"></div>
+                <div class="skeleton-block skeleton-line skeleton-line-60"></div>
+              </div>
+            </div>
+            <div class="skeleton-grid">
+              <div class="skeleton-card" v-for="n in 6" :key="n">
+                <div class="skeleton-block skeleton-card-media"></div>
+                <div class="skeleton-card-body">
+                  <div class="skeleton-block skeleton-line skeleton-line-50"></div>
+                  <div class="skeleton-block skeleton-line skeleton-line-90"></div>
+                  <div class="skeleton-block skeleton-line skeleton-line-70"></div>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <template v-else>
+          <!--
+            封面故事卡（依目前分頁取第一筆）
+            v-if="featurePost"：只有 featurePost 有值的時候（不是 null）才顯示這張大卡片。
+            還記得上面 script 裡的邏輯嗎？正在搜尋的時候 featurePost 會是 null，
+            這時候這整塊就不會出現，搜尋結果會全部乖乖排在下面的網格裡。
+          -->
+          <div class="feature-card" v-if="featurePost" ref="featureCardEl">
+            <!--
+              feature-media 現在是一個普通的 div，不是 router-link 了——
+              因為裡面要放輪播箭頭／圓點按鈕，如果整塊還是 router-link，
+              點箭頭會被瀏覽器當成「點到連結」一起觸發跳轉。
+              改成：router-link 只包住圖片本身（點圖片才會跳轉到貼文詳情），
+              箭頭、圓點則是跟 router-link 平級的兄弟元素，點下去不會觸發跳轉。
+            -->
+            <div class="feature-media" @mouseenter="startFeatureAutoplay" @mouseleave="stopFeatureAutoplay">
+              <router-link :to="`/community/post/${featurePost.communityPostId}`" class="feature-media-link d-block text-decoration-none">
+                <span class="tag-label">{{ currentTabCopy.ribbon }}</span>
+                <img :src="featurePost.images[featureImageIndex]?.url" :alt="featurePost.content" />
+              </router-link>
+
+              <!-- 只有超過 1 張照片才顯示箭頭／圓點，單張照片顯示輪播控制項沒意義 -->
+              <template v-if="featurePost.images.length > 1">
+                <button class="media-arrow media-arrow-prev" @click.stop="prevFeatureImage" aria-label="上一張">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                  </svg>
+                </button>
+                <button class="media-arrow media-arrow-next" @click.stop="nextFeatureImage" aria-label="下一張">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </button>
+                <div class="media-dots">
+                  <button
+                    v-for="(img, idx) in featurePost.images"
+                    :key="idx"
+                    class="media-dot"
+                    :class="{ active: idx === featureImageIndex }"
+                    @click.stop="featureImageIndex = idx"
+                  ></button>
+                </div>
+              </template>
+            </div>
             <div class="feature-body">
-              <router-link to="/community/profile" class="author-row text-decoration-none">
-                <img class="avatar" :src="featurePost.user.avatar" alt="avatar" />
+              <router-link :to="`/community/profile/${featurePost.userId}`" class="author-row text-decoration-none">
+                <img class="avatar" :src="featurePost.user.avatar" alt="avatar" @error="onAvatarError($event, featurePost.user.name)" />
                 <div>
                   <div class="author-name">{{ featurePost.user.name }}</div>
-                  <div class="author-role">本週封面 · 秋季選品</div>
+                  <div class="author-role">{{ currentTabCopy.role }}</div>
                 </div>
               </router-link>
-              <router-link :to="`/community/post/${featurePost.postId}`" class="text-decoration-none text-dark">
-                <h3>{{ featurePost.title }}</h3>
+              <!--
+                資料庫的 content 只有一個欄位（不像以前假資料分開存 title/desc），
+                所以這裡直接把 content 當內文顯示，不再另外拆一段標題。
+              -->
+              <router-link :to="`/community/post/${featurePost.communityPostId}`" class="text-decoration-none text-dark">
+                <h3>{{ featurePost.content }}</h3>
               </router-link>
-              <p class="desc">{{ featurePost.desc }}</p>
               <div class="stat-row">
-                <span>♥ {{ featurePost.likesCount }}</span>
-                <span>💬 {{ featurePost.commentsCount }}</span>
-                <a href="#" class="link-out">查看單品 →</a>
+                <!--
+                  ♥、💬 原本是文字符號／emoji，這裡跟其他圖示一起換成 SVG 心形、對話框圖示，
+                  不吃字型、風格也跟輪播箭頭這類線條圖示一致。icon-inline 這個共用 class
+                  負責讓圖示跟旁邊的數字文字對齊。
+                  愛心那顆現在是可以按的：:class="{ liked: ... }" 決定要不要顯示紅色強調，
+                  :fill 決定要不要整顆填滿（已讚＝實心，跟 PostDetailView.vue 是同一套視覺邏輯），
+                  @click="toggleLikePost(featurePost)" 呼叫上面 script 定義的按讚／取消讚函式。
+                -->
+                <button type="button" class="stat-like-btn" :class="{ liked: isPostLiked(featurePost.communityPostId) }" @click="toggleLikePost(featurePost)">
+                  <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" :fill="isPostLiked(featurePost.communityPostId) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                  {{ formatCount(featurePost.likesCount) }}
+                </button>
+                <span>
+                  <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" />
+                  </svg>
+                  {{ formatCount(featurePost.commentsCount) }}
+                </span>
               </div>
             </div>
           </div>
 
-          <!-- 其餘貼文：雙欄網格 -->
-          <div class="post-grid">
-            <div v-for="post in gridPosts" :key="post.postId" class="post-card">
+          <!--
+            沒有結果（搜尋無結果 / 追蹤中還沒有內容 等）
+            v-if="filteredPosts.length === 0"：如果篩選完的貼文陣列長度是 0（一筆都沒有），才顯示這個提示。
+            裡面用了 {{ }} 搭配三元運算子：
+            如果正在搜尋，顯示「找不到符合關鍵字」的訊息（用樣板字串把 searchQuery 塞進句子裡）；
+            如果不是搜尋造成的空清單（例如切到「追蹤中」但還沒追蹤任何人），
+            就改顯示 currentTabCopy.empty 這個針對目前分頁寫好的提示文字。
+          -->
+          <div class="empty-state" v-if="filteredPosts.length === 0">
+            {{ isSearching ? `找不到符合「${searchQuery}」的穿搭、標籤或用戶，換個關鍵字試試。` : currentTabCopy.empty }}
+          </div>
 
-              <router-link :to="`/community/post/${post.postId}`" class="post-media d-block text-decoration-none">
-                <span class="tag-label" v-if="post.taggedProducts && post.taggedProducts[0]">
-                  {{ post.taggedProducts[0].name }}
-                </span>
-                <img :src="post.imageUrl" :alt="post.title" />
-              </router-link>
+          <!--
+            其餘貼文：雙欄網格
+            v-if="gridPosts.length"：gridPosts 陣列裡如果「有東西」(長度大於 0，也就是條件成立)，才畫這個區塊。
+            v-for="post in visibleGridPosts"：只把「目前願意顯示的那幾篇」畫成小卡片，
+            不是把 gridPosts 全部畫出來——視覺上一開始只會看到 6 篇，按「載入更多穿搭」才會再多幾篇。
+          -->
+          <div class="post-grid" v-if="gridPosts.length">
+            <div v-for="post in visibleGridPosts" :key="post.communityPostId" class="post-card">
+
+              <!--
+                跟上面封面故事卡一樣的道理：post-media 改成普通 div，
+                router-link 只包住圖片，箭頭／圓點是平級的兄弟元素，
+                點箭頭切換照片才不會被當成「點到卡片」一起跳轉到貼文詳情。
+              -->
+              <div class="post-media" @mouseenter="startCardAutoplay(post)" @mouseleave="stopCardAutoplay(post)">
+                <router-link :to="`/community/post/${post.communityPostId}`" class="post-media-link d-block text-decoration-none">
+                  <span class="tag-label" v-if="post.taggedProducts && post.taggedProducts[0]">
+                    {{ post.taggedProducts[0].name }}
+                  </span>
+                  <!--
+                    post.images[getCardImageIndex(post.communityPostId)]?.url：
+                    跟固定顯示 images[0] 不一樣，改成依這張卡片「目前切到第幾張」動態抓圖，
+                    getCardImageIndex 找不到這篇貼文的紀錄時預設是第 0 張（第一張）。
+                  -->
+                  <img :src="post.images[getCardImageIndex(post.communityPostId)]?.url" :alt="post.content" />
+                </router-link>
+
+                <template v-if="post.images.length > 1">
+                  <button class="media-arrow media-arrow-prev" @click.stop="prevCardImage(post)" aria-label="上一張">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                  </button>
+                  <button class="media-arrow media-arrow-next" @click.stop="nextCardImage(post)" aria-label="下一張">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                  </button>
+                  <div class="media-dots">
+                    <button
+                      v-for="(img, idx) in post.images"
+                      :key="idx"
+                      class="media-dot"
+                      :class="{ active: idx === getCardImageIndex(post.communityPostId) }"
+                      @click.stop="cardImageIndex[post.communityPostId] = idx"
+                    ></button>
+                  </div>
+                </template>
+              </div>
 
               <div class="post-body">
-                <router-link to="/community/profile" class="post-author text-decoration-none">
-                  <img :src="post.user.avatar" alt="avatar" />
+                <router-link :to="`/community/profile/${post.userId}`" class="post-author text-decoration-none">
+                  <img :src="post.user.avatar" alt="avatar" @error="onAvatarError($event, post.user.name)" />
                   <span>{{ post.user.name }}</span>
                 </router-link>
 
-                <router-link :to="`/community/post/${post.postId}`" class="text-decoration-none">
-                  <p class="post-desc line-clamp-2">{{ post.title }}</p>
+                <router-link :to="`/community/post/${post.communityPostId}`" class="text-decoration-none">
+                  <p class="post-desc line-clamp-2">{{ post.content }}</p>
                 </router-link>
 
                 <div class="post-foot">
-                  <span>♥ {{ post.likesCount }}</span>
-                  <span>💬 {{ post.commentsCount }}</span>
-                  <a href="#">單品</a>
+                  <!--
+                    formatCount(...)：post.likesCount／commentsCount 現在存的是純數字
+                    （例如 1200），不是寫死的 '1.2k' 字串，畫面顯示時才呼叫 formatCount
+                    轉換成縮寫格式。這樣資料本身仍然是「可以排序、可以比大小」的數字。
+                    ♥、💬 一樣換成跟封面故事卡同樣的 SVG 圖示，兩邊風格才會一致。
+                    愛心一樣可以直接在卡片上按，跟封面故事卡是同一套 toggleLikePost 邏輯。
+                  -->
+                  <button type="button" class="stat-like-btn" :class="{ liked: isPostLiked(post.communityPostId) }" @click="toggleLikePost(post)">
+                    <svg class="icon-inline" viewBox="0 0 24 24" width="13" height="13" :fill="isPostLiked(post.communityPostId) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                    </svg>
+                    {{ formatCount(post.likesCount) }}
+                  </button>
+                  <span>
+                    <svg class="icon-inline" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" />
+                    </svg>
+                    {{ formatCount(post.commentsCount) }}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- 載入更多 -->
-          <div class="load-more-wrap">
-            <button class="btn-load">載入更多穿搭 ▾</button>
+          <!-- 載入更多：只有還有更多沒顯示出來的貼文時才出現，全部顯示完就自動收起來 -->
+          <div class="load-more-wrap" v-if="hasMoreGridPosts">
+            <button class="btn-load" @click="loadMoreGridPosts">載入更多穿搭 ▾</button>
           </div>
+          </template>
         </div>
+
 
         <!-- 右側：側邊欄 -->
         <div class="col-12 col-lg-3">
 
           <div class="side-card">
             <div class="side-title"><span class="dot"></span>熱門穿搭達人</div>
-            <div v-for="creator in creators" :key="creator.id" class="stylist-row">
-              <router-link to="/community/profile" class="d-flex align-items-center text-decoration-none flex-grow-1 min-w-0">
-                <img class="stylist-avatar" :src="creator.avatar" alt="avatar" />
+            <!-- 把 filteredCreators（可能被搜尋篩選過的達人清單）逐筆畫成一列 -->
+            <!-- creator.id 現在是真的 userId（來自 fetchCreators 打的 popular-creators API），
+                 可以放心接 router-link 了，不會再連到不相干的使用者。 -->
+            <div v-for="creator in filteredCreators" :key="creator.id" class="stylist-row">
+              <router-link :to="`/community/profile/${creator.id}`" class="d-flex align-items-center text-decoration-none flex-grow-1 min-w-0">
+                <img class="stylist-avatar" :src="creator.avatar" alt="avatar" @error="onAvatarError($event, creator.name)" />
                 <div class="min-w-0">
                   <div class="stylist-name text-truncate">{{ creator.name }}</div>
-                  <div class="stylist-meta">{{ creator.meta }}</div>
+                  <div class="stylist-meta">{{ formatCount(creator.followersCount) }}追蹤</div>
                 </div>
               </router-link>
               <button
@@ -207,13 +1126,19 @@ const toggleFollow = (creator) => {
 
           <div class="side-card">
             <div class="side-title"><span class="dot"></span>熱門商品標籤</div>
-            <div class="tag-cloud">
+            <div class="tag-cloud" v-if="filteredTags.length">
+              <!--
+                @click="searchQuery = product.name"：
+                點一個標籤，直接把它的名字塞進搜尋框，等於「幫使用者按下這個關鍵字搜尋」。
+              -->
               <span
-                v-for="product in popularProducts"
+                v-for="product in filteredTags"
                 :key="product.id"
                 class="tag-chip"
+                @click="searchQuery = product.name"
               >#{{ product.name }}</span>
             </div>
+            <p class="empty-hint" v-else>沒有符合的標籤</p>
           </div>
 
           <div class="side-card">
@@ -228,13 +1153,17 @@ const toggleFollow = (creator) => {
 </template>
 
 <style scoped>
+/*
+  這個 <style> 標籤有加 scoped，代表這裡的 CSS 只會套用在這個檔案自己的 HTML 上，
+  不會不小心影響到其他頁面。詳細原理可以參考 UserProfileView.vue 裡的說明。
+*/
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
+
 .community-page {
-  top: 0;
-  left: 0;
+  width: 100%;
   min-height: 100vh;
   background-color: #F9F4F0 !important;
   box-sizing: border-box;
-  z-index: 10;
   --cream:#F9F4F0;
   --paper:#FFFDFB;
   --ink:#2A2420;
@@ -243,32 +1172,74 @@ const toggleFollow = (creator) => {
   --plum-deep:#5E3941;
   --ochre:#B8862E;
   --hairline:#E4D8CC;
+  --font-serif:'Noto Serif TC', serif;
+  --font-sans:'Noto Sans TC', sans-serif;
   color: var(--ink);
-  font-family: 'Noto Sans TC', sans-serif;
+  font-family: var(--font-sans);
 }
 
-/* ---------- 頁首 ---------- */
+/* ---------- 頁首：韓風簡約版（左側細直線引導） ---------- */
 .page-head{ padding:2.4rem 0 1.2rem; }
+.page-head-inner{
+  display:flex; align-items:center; gap:1.2rem;
+}
+.page-head-divider{
+  width:1px; align-self:stretch;
+  background:var(--hairline);
+  flex-shrink:0;
+}
+.page-head-text{ padding-left:.2rem; }
 .eyebrow{
-  font-size:.78rem; letter-spacing:.28em; text-transform:uppercase;
-  color:var(--ochre); font-weight:700; margin-bottom:.6rem;
+  font-size:.7rem; letter-spacing:.24em; text-transform:uppercase;
+  color:#A9A196; font-weight:600; margin-bottom:.4rem;
 }
 .page-title{
-  font-family:'Noto Serif TC', serif;
+  font-family:var(--font-serif);
   font-weight:900;
-  font-size:clamp(2rem, 4.5vw, 3rem);
-  line-height:1.05;
-  margin:0;
+  font-size:clamp(1.7rem, 3.2vw, 2.1rem);
+  line-height:1.1;
+  margin:0 0 .4rem;
   color: var(--ink);
 }
-.page-title svg{ display:block; width:220px; max-width:60%; height:14px; margin-top:2px; }
 .page-sub{
-  font-family:'Noto Serif TC', serif;
+  font-family:var(--font-serif);
   font-style:italic;
-  color:var(--ink-soft);
-  font-size:1.02rem;
-  margin-top:.6rem;
+  color:#9C9086;
+  font-size:.92rem;
+  margin:0;
 }
+
+/* ---------- 搜尋列 ---------- */
+.search-bar{
+  position:relative;
+  display:flex; align-items:center;
+  max-width:420px;
+  margin-top:1.4rem;
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  border-radius:999px;
+  padding:.55rem 1rem;
+  transition:border-color .18s ease, box-shadow .18s ease;
+}
+.search-bar:focus-within{
+  border-color:var(--plum);
+  box-shadow:0 0 0 3px rgba(122,75,84,.12);
+}
+.search-icon{ width:17px; height:17px; color:var(--ink-soft); flex-shrink:0; }
+.search-input{
+  border:none; outline:none; background:transparent;
+  flex:1; margin-left:.6rem;
+  font-family:var(--font-sans);
+  font-size:.88rem; color:var(--ink);
+}
+.search-input::placeholder{ color:var(--ink-soft); }
+.search-clear{
+  border:none; background:var(--hairline); color:var(--ink-soft);
+  width:20px; height:20px; border-radius:50%; font-size:.7rem;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  cursor:pointer;
+}
+.search-clear:hover{ background:var(--plum); color:#fff; }
 
 /* ---------- 分頁列 ---------- */
 .section-row{
@@ -280,7 +1251,7 @@ const toggleFollow = (creator) => {
 .tab-group{ display:flex; gap:1.8rem; }
 .tab-btn{
   background:none; border:none; padding:.7rem 0;
-  font-family:'Noto Serif TC', serif;
+  font-family:var(--font-serif);
   font-size:1.02rem; color:var(--ink-soft);
   position:relative; cursor:pointer;
 }
@@ -297,11 +1268,19 @@ const toggleFollow = (creator) => {
 }
 .btn-share:hover{ background:var(--plum-deep); transform:translateY(-1px); }
 
+.btn-admin-entry{
+  background:var(--ochre); color:#fff !important; border:none;
+  border-radius:999px; padding:.6rem 1.2rem; font-size:.88rem; font-weight:600;
+  display:inline-flex; align-items:center; gap:.4rem;
+  transition:opacity .18s ease;
+}
+.btn-admin-entry:hover{ opacity:.85; }
+
 /* ---------- 封面故事卡 ---------- */
 .feature-card{
   background:var(--paper);
   border:1px solid var(--hairline);
-  border-radius:2px 22px 2px 2px;
+  border-radius:22px;
   overflow:hidden;
   display:grid;
   grid-template-columns:1.15fr 1fr;
@@ -310,20 +1289,43 @@ const toggleFollow = (creator) => {
 }
 .feature-card:hover{ box-shadow:0 18px 34px -22px rgba(42,36,32,.35); }
 .feature-media{ position:relative; overflow:hidden; min-height:320px; background:var(--hairline); }
+.feature-media-link{ display:block; width:100%; height:100%; }
 .feature-media img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform .6s ease; }
 .feature-card:hover .feature-media img{ transform:scale(1.04); }
 
+/*
+  media-arrow／media-dots：跟 PostDetailView.vue 主圖輪播是同一套樣式（尺寸、位置、
+  互動效果都一樣），這裡複製一份過來是因為兩個檔案是各自獨立的 <style scoped>，
+  樣式不會互相共用。
+*/
+.media-arrow{
+  position:absolute; top:50%; transform:translateY(-50%); z-index:3;
+  width:36px; height:36px; border-radius:50%;
+  background:rgba(0,0,0,.45); color:#fff; border:none; padding:0;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .18s ease;
+}
+.media-arrow:hover{ background:rgba(0,0,0,.7); }
+.media-arrow-prev{ left:12px; }
+.media-arrow-next{ right:12px; }
+.media-dots{
+  position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:3;
+  display:flex; gap:.4rem;
+}
+.media-dot{
+  width:7px; height:7px; border-radius:50%;
+  background:rgba(255,255,255,.55); border:none; padding:0;
+  transition:background .18s ease, transform .18s ease;
+}
+.media-dot.active{ background:#fff; transform:scale(1.25); }
+
 .tag-label{
-  position:absolute; top:16px; left:-8px; z-index:2;
+  position:absolute; top:16px; left:16px; z-index:2;
   background:var(--plum); color:#fff;
   font-size:.72rem; letter-spacing:.05em; font-weight:600;
-  padding:.32rem .8rem .32rem 1.1rem;
+  padding:.32rem .85rem;
+  border-radius:999px;
   box-shadow:0 4px 10px rgba(0,0,0,.18);
-}
-.tag-label::after{
-  content:""; position:absolute; left:0; bottom:-7px;
-  border-width:0 8px 7px 0; border-style:solid;
-  border-color:transparent var(--plum-deep) transparent transparent;
 }
 
 .feature-body{ padding:1.9rem 1.8rem; display:flex; flex-direction:column; }
@@ -333,29 +1335,56 @@ const toggleFollow = (creator) => {
 .author-role{ font-size:.76rem; color:var(--ink-soft); }
 
 .feature-body h3{
-  font-family:'Noto Serif TC', serif;
-  font-size:1.4rem; font-weight:700; line-height:1.35; margin-bottom:.6rem;
+  font-family:var(--font-serif);
+  font-size:1.3rem; font-weight:700; line-height:1.5; margin-bottom:.6rem;
+  flex:1;
+  /* content 是合併過的完整內文，原本用 line-clamp:5 讓封面故事卡看起來還是塞了一大段文字，
+     跟旁邊 line-clamp-2 的網格卡片比起來重點不夠突出——改成一樣只顯示前 2 行，
+     完整內容点進貼文詳情頁看就好，卡片這裡只留一眼看得完的重點。 */
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
 }
-.feature-body p.desc{ color:var(--ink-soft); font-size:.92rem; line-height:1.7; flex:1; }
 
 .stat-row{
   display:flex; align-items:center; gap:1.2rem;
   border-top:1px dashed var(--hairline); padding-top:1rem; margin-top:1rem;
   font-size:.85rem; color:var(--ink-soft);
 }
+.stat-row span{ display:inline-flex; align-items:center; gap:.3rem; }
+/* stat-like-btn：跟旁邊 <span> 留言數字視覺上要對齊，但這個是可以點的 <button>，
+   要先把瀏覽器預設的按鈕樣式（邊框、底色、內距）都歸零，只留下跟 span 一樣的排版。
+   已讚時整體套用跟 PostDetailView.vue 一樣的紅色（#B4453A），呼應同一個「已按讚」的視覺語言。 */
+.stat-like-btn{
+  display:inline-flex; align-items:center; gap:.3rem;
+  background:none; border:none; padding:0; margin:0;
+  font-size:inherit; font-family:inherit; color:inherit;
+  cursor:pointer; transition:color .18s ease;
+}
+.stat-like-btn:hover{ color:#B4453A; }
+.stat-like-btn.liked{ color:#B4453A; font-weight:600; }
 .stat-row .link-out{ margin-left:auto; color:var(--plum); font-weight:600; text-decoration:none; border-bottom:1px solid var(--plum); }
+/* icon-inline：跟文字並排的小圖示共用樣式（心形、對話框、扳手），顏色跟著所在文字的
+   顏色走（currentColor），不用每個地方各自寫一次顏色。 */
+.icon-inline{ flex-shrink:0; }
 
 /* ---------- 貼文網格 ---------- */
 .post-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:1.4rem; }
 .post-card{
   background:var(--paper); border:1px solid var(--hairline);
+  border-radius:16px;
   overflow:hidden; transition:transform .25s ease, box-shadow .25s ease;
 }
 .post-card:hover{ transform:translateY(-4px) rotate(-0.3deg); box-shadow:0 16px 30px -20px rgba(42,36,32,.4); }
 .post-media{ position:relative; display:block; aspect-ratio:4/3; overflow:hidden; background:var(--hairline); }
+.post-media-link{ display:block; width:100%; height:100%; }
 .post-media img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform .5s ease; }
 .post-card:hover .post-media img{ transform:scale(1.06); }
-.post-media .tag-label{ font-size:.66rem; padding:.26rem .65rem .26rem .9rem; top:12px; }
+.post-media .tag-label{ font-size:.66rem; padding:.24rem .7rem; top:12px; left:12px; }
+/* 網格卡片比封面故事卡小很多，箭頭、圓點跟著縮小一點，不會佔掉太多圖片空間 */
+.post-media .media-arrow{ width:26px; height:26px; }
+.post-media .media-arrow-prev{ left:8px; }
+.post-media .media-arrow-next{ right:8px; }
+.post-media .media-dots{ bottom:8px; }
+.post-media .media-dot{ width:5px; height:5px; }
 
 .post-body{ padding:1rem 1.1rem 1.2rem; }
 .post-author{ display:flex; align-items:center; gap:.5rem; margin-bottom:.6rem; color:var(--ink); }
@@ -367,11 +1396,72 @@ const toggleFollow = (creator) => {
   padding-top:.8rem; border-top:1px solid var(--hairline);
   font-size:.8rem; color:var(--ink-soft);
 }
+.post-foot span{ display:inline-flex; align-items:center; gap:.3rem; }
 .post-foot a{ margin-left:auto; color:var(--plum); text-decoration:none; font-weight:600; }
 
 .line-clamp-2{
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
 }
+
+/* ---------- 骨架載入畫面 ---------- */
+/*
+  skeleton-shimmer：灰色區塊上有一道淺色光斑，從左往右不斷掃過，是最常見的骨架畫面效果
+  （很多 App 讀取資料時都看得到）。做法是背景疊兩層：底色 var(--hairline) 加一個
+  用 linear-gradient 畫出來的「光斑」，用 background-position 的動畫讓光斑左右移動，
+  製造出「正在讀取」的感覺，比整塊灰色靜止不動更有生氣、更明確傳達「這裡還在忙」。
+*/
+@keyframes skeleton-shimmer {
+  0% { background-position: -300px 0; }
+  100% { background-position: 300px 0; }
+}
+.skeleton-block{
+  background-color: var(--hairline);
+  background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,.55) 50%, rgba(255,255,255,0) 100%);
+  background-size: 300px 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+/* 骨架版的封面故事卡：跟 .feature-card 用同一組尺寸（22px 圓角、320px 最小高度），
+   佔位期間版面高度盡量跟真正內容一致，資料回來後畫面不會突然跳動。 */
+.skeleton-feature{
+  background:var(--paper); border:1px solid var(--hairline); border-radius:22px;
+  overflow:hidden; margin-bottom:1.6rem;
+  display:grid; grid-template-columns:1.15fr 1fr;
+}
+.skeleton-feature-media{ min-height:320px; border-radius:0; }
+.skeleton-feature-body{ padding:1.9rem 1.8rem; display:flex; flex-direction:column; gap:.9rem; }
+.skeleton-avatar{ width:40px; height:40px; border-radius:50%; }
+.skeleton-line{ height:14px; }
+.skeleton-line-80{ width:80%; }
+.skeleton-line-60{ width:60%; }
+.skeleton-line-50{ width:50%; }
+.skeleton-line-90{ width:90%; }
+.skeleton-line-70{ width:70%; }
+
+/* 骨架版的網格卡片：跟 .post-grid／.post-card 同一組欄數、圓角、間距。 */
+.skeleton-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:1.4rem; }
+.skeleton-card{
+  background:var(--paper); border:1px solid var(--hairline); border-radius:16px; overflow:hidden;
+}
+.skeleton-card-media{ aspect-ratio:4/3; border-radius:0; }
+.skeleton-card-body{ padding:1rem 1.1rem 1.2rem; display:flex; flex-direction:column; gap:.6rem; }
+
+@media (max-width: 991px){
+  .skeleton-feature{ grid-template-columns:1fr; }
+  .skeleton-feature-media{ min-height:240px; }
+}
+@media (max-width: 767px){
+  .skeleton-grid{ grid-template-columns:1fr; }
+}
+
+.empty-state{
+  background:var(--paper); border:1px dashed var(--hairline); border-radius:16px;
+  padding:2.2rem 1.5rem; text-align:center; color:var(--ink-soft);
+  font-size:.92rem; margin-bottom:1.6rem;
+}
+.empty-hint{ font-size:.8rem; color:var(--ink-soft); margin:0; }
 
 /* ---------- 載入更多 ---------- */
 .load-more-wrap{ text-align:center; margin-top:2.2rem; }
@@ -383,9 +1473,9 @@ const toggleFollow = (creator) => {
 .btn-load:hover{ background:var(--ink); color:var(--cream); }
 
 /* ---------- 側邊欄 ---------- */
-.side-card{ background:var(--paper); border:1px solid var(--hairline); padding:1.4rem 1.3rem; margin-bottom:1.4rem; }
+.side-card{ background:var(--paper); border:1px solid var(--hairline); border-radius:16px; padding:1.4rem 1.3rem; margin-bottom:1.4rem; }
 .side-title{
-  font-family:'Noto Serif TC', serif; font-weight:700; font-size:1.02rem;
+  font-family:var(--font-serif); font-weight:700; font-size:1.02rem;
   margin-bottom:1.1rem; display:flex; align-items:center; gap:.5rem; color:var(--ink);
 }
 .side-title .dot{ width:6px; height:6px; border-radius:50%; background:var(--ochre); }
@@ -415,7 +1505,7 @@ const toggleFollow = (creator) => {
 .tag-chip:hover{ border-color:var(--ochre); color:var(--ochre); }
 
 .side-note{
-  font-family:'Noto Serif TC', serif; font-style:italic;
+  font-family:var(--font-serif); font-style:italic;
   font-size:.84rem; color:var(--ink-soft); line-height:1.7;
   border-left:2px solid var(--plum); padding-left:.9rem; margin:0;
 }
@@ -427,5 +1517,17 @@ const toggleFollow = (creator) => {
 @media (max-width: 767px){
   .post-grid{ grid-template-columns:1fr; }
   .section-row{ flex-direction:column; align-items:flex-start; }
+  .search-bar{ max-width:100%; }
+}
+</style>
+
+<!--
+  這個區塊「不加 scoped」：scoped 樣式只會作用在這個元件模板裡面的元素上，
+  body 不在模板裡，寫在 scoped 區塊不會生效。不加 scoped 的話，
+  這段 CSS 編譯出來就是全域樣式，不用改共用的 App.vue 也能讓 body 變成統一背景色。
+-->
+<style>
+body {
+  background-color: #F9F4F0 !important;
 }
 </style>

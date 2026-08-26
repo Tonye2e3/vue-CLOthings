@@ -1,87 +1,102 @@
 <script setup>
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
+import api from '@/services/api'
 
 const route = useRoute()
 
-const categories = ['WOMEN', 'MEN', 'KIDS', 'BABY']
+const products = ref([])
+const categories = ref([])
 
-const products = [
-  { name: '寬版落肩T恤', desc: '柔軟純棉，寬鬆版型', price: 'NT$390', tag: '新品上市', category: 'WOMEN' },
-  { name: '輕薄羽絨外套', desc: '輕量保暖，可收納', price: 'NT$1,990', tag: '期間限定', category: 'WOMEN' },
-  { name: '直筒牛仔褲', desc: '百搭版型，彈性耐穿布料', price: 'NT$890', tag: '新品上市', category: 'WOMEN' },
-  { name: '素色連帽外套', desc: '簡約百搭，四季皆宜', price: 'NT$1,290', tag: '新品上市', category: 'MEN' },
-  { name: '修身西裝褲', desc: '俐落版型，商務休閒兩用', price: 'NT$990', tag: '期間限定', category: 'MEN' },
-  { name: '針織開襟衫', desc: '簡約線條，四季皆宜', price: 'NT$690', tag: '期間限定', category: 'MEN' },
-  { name: '童趣印花T恤', desc: '柔軟純棉，活動好穿脫', price: 'NT$290', tag: '新品上市', category: 'KIDS' },
-  { name: '保暖刷毛外套', desc: '輕量刷毛，戶外遊玩必備', price: 'NT$690', tag: '期間限定', category: 'KIDS' },
-  { name: '彈性運動褲', desc: '彈性布料，好動不受限', price: 'NT$490', tag: '新品上市', category: 'KIDS' },
-  { name: '純棉包屁衣', desc: '親膚透氣，呵護寶寶肌膚', price: 'NT$290', tag: '新品上市', category: 'BABY' },
-  { name: '柔軟連身衣', desc: '柔軟布料，寶寶穿著更舒適', price: 'NT$390', tag: '期間限定', category: 'BABY' },
-  { name: '透氣嬰兒外套', desc: '輕薄透氣，四季皆宜', price: 'NT$590', tag: '新品上市', category: 'BABY' },
-]
-
-const selectedCategory = computed(() => {
-  const category = route.query.category
-  return categories.includes(category) ? category : ''
+const selectedCategoryId = computed(() => {
+  const id = route.query.categoryId // 網址參數改用 categoryId
+  return id ? Number(id) : null // 網址參數是文字，轉成數字才能跟 id 比對
 })
 
-const filteredProducts = computed(() =>
-  selectedCategory.value
-    ? products.filter((p) => p.category === selectedCategory.value)
-    : products,
-)
+const filteredProducts = computed(() => {
+  if (!selectedCategoryId.value) {
+    return products.value // 沒選分類 → 全部商品
+  }
 
-const title = computed(() =>
-  selectedCategory.value ? `${selectedCategory.value} 商品` : '全部商品',
-)
+  return products.value.filter((p) => p.productCategoryId === selectedCategoryId.value)
+})
+
+const title = computed(() => {
+  if (!selectedCategoryId.value) return '全部商品'
+  // 找出目前分類的名稱來顯示
+  const cat = categories.value.find((c) => c.productCategoryId === selectedCategoryId.value)
+  return cat ? `${cat.categoryName} 商品` : '全部商品'
+})
+
+function getImageUrl(fileName) {
+  if (!fileName) {
+    return 'https://placehold.co/300x400?text=No+Image'
+  }
+
+  const baseUrl = api.defaults.baseURL.replace(/\/api\/?$/, '')
+
+  return `${baseUrl}/images/product/${fileName}`
+}
+
+// 頁面一仔入，就打API拿商品
+onMounted(async () => {
+  try {
+    // 同時打「商品」和「分類」兩個 API
+    const productRes = await api.get('/product')
+    products.value = productRes.data
+
+    const categoryRes = await api.get('/productCategory')
+    categories.value = categoryRes.data
+  } catch (error) {
+    console.error('載入資料失敗：', error)
+  }
+})
 </script>
 
 <template>
   <section class="promo">
     <h2 class="section-title">{{ title }}</h2>
+    <div class="category-filter">
+      <RouterLink :to="{ query: {} }" class="cat-btn" :class="{ active: !selectedCategoryId }">
+        全部
+      </RouterLink>
+      <RouterLink v-for="cat in categories" :key="cat.productCategoryId"
+        :to="{ query: { categoryId: cat.productCategoryId } }" class="cat-btn"
+        :class="{ active: selectedCategoryId === cat.productCategoryId }">
+        {{ cat.categoryName }}
+      </RouterLink>
+    </div>
     <div class="grid">
-      <article v-for="p in filteredProducts" :key="p.category + p.name" class="card">
+      <RouterLink v-for="p in filteredProducts" :key="p.productId"
+        :to="{ name: 'product', params: { id: p.productId } }" class="card">
         <div class="card-image">
-          <span class="card-tag">{{ p.tag }}</span>
-          <span class="placeholder-label">商品圖片</span>
+          <span class="card-tag">{{ p.status }}</span>
+          <img :src="getImageUrl(p.productImgFile)" :alt="p.productName" class="product-img" />
         </div>
         <div class="card-body">
-          <h3 class="card-name">{{ p.name }}</h3>
-          <p class="card-desc">{{ p.desc }}</p>
-          <p class="card-price">{{ p.price }}</p>
+          <h3 class="card-name">{{ p.productName }}</h3>
+          <p class="card-desc">{{ p.description }}</p>
+          <p class="card-price">TWD {{ p.price.toLocaleString() }}</p>
         </div>
-      </article>
+      </RouterLink>
     </div>
   </section>
 </template>
 
 <style scoped>
-.promo {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 64px 24px;
-}
-
-.section-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-bottom: 32px;
-  color: var(--home-text);
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
-}
-
 .card {
   border: 1px solid var(--home-border);
   transition:
     box-shadow 0.25s ease,
     transform 0.25s ease;
+  text-decoration: none;
+  /* 拿掉連結底線 */
+  color: inherit;
+  /* 文字用原本顏色，不要變成連結藍色 */
+  display: block;
+  /* 讓它像區塊一樣（RouterLink 預設是行內） */
 }
+
 .card:hover {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
   transform: translateY(-4px);
@@ -89,16 +104,9 @@ const title = computed(() =>
 
 .card-image {
   position: relative;
+  width: 100%;
   aspect-ratio: 3 / 4;
-  background: linear-gradient(135deg, #f2f2f2, #e5e5e5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.placeholder-label {
-  color: #999;
-  font-size: 0.85rem;
+  overflow: hidden;
 }
 
 .card-tag {
@@ -135,12 +143,68 @@ const title = computed(() =>
   color: var(--home-text);
 }
 
+.category-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.cat-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--home-border);
+  border-radius: 4px;
+  text-decoration: none;
+  color: var(--home-text);
+  font-size: 0.85rem;
+  transition: all 0.15s ease;
+}
+
+.cat-btn:hover,
+.cat-btn.active {
+  background: var(--home-text);
+  color: #fff;
+  border-color: var(--home-text);
+}
+
+.product-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.placeholder-label {
+  color: #999;
+  font-size: 0.85rem;
+}
+
+.promo {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 64px 24px;
+}
+
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 32px;
+  color: var(--home-text);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+
 @media (max-width: 1024px) {
   .grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
-@media (max-width: 480px) {
+
+@media (max-width: 768px) {
   .grid {
     grid-template-columns: 1fr;
   }

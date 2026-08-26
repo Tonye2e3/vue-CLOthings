@@ -1,21 +1,16 @@
 <script setup>
-import SiteHeader from '@/components/home/SiteHeader.vue'
 import HeroCarousel from '@/components/home/HeroCarousel.vue'
 import ProductGrid from '@/components/Shop/ProductGrid.vue'
 import CategoryShowcase from '@/components/home/CategoryShowcase.vue'
-import SiteFooter from '@/components/home/SiteFooter.vue'
 </script>
 
 <template>
   <div class="uniqlo-home">
-    <SiteHeader />
     <main>
+      <h1>2026/08/26 15:02</h1>
       <HeroCarousel />
-      <CategoryShowcase />
-      <ProductGrid/>
-      
+      <ProductGrid />
     </main>
-    <SiteFooter />
   </div>
 </template>
 
@@ -29,11 +24,6 @@ import SiteFooter from '@/components/home/SiteFooter.vue'
 
   background: var(--home-bg);
   color: var(--home-text);
-  font-family:
-    'Noto Sans TC',
-    'Helvetica Neue',
-    Helvetica,
-    Arial,
-    sans-serif;
+  font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 </style>
