@@ -30,6 +30,8 @@
       </div>
     </div>
     <div class="card-body p-0">
+      <!-- 響應式：外層包 table-responsive，窄螢幕可以左右滑動 -->
+      <div class="table-responsive">
       <table class="table mb-0 align-middle">
         <thead class="table-light">
           <tr>
@@ -74,6 +76,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
     <div v-if="totalPages > 1" class="card-footer d-flex justify-content-between align-items-center">
       <span class="text-muted small">第 {{ currentPage }} / {{ totalPages }} 頁</span>
@@ -181,6 +184,7 @@
           <!-- 團購階層管理：只有編輯已存在的商品時才能設定（新增商品要先存檔拿到 id） -->
           <div v-if="editingId" class="mb-3">
             <label class="form-label fw-semibold">團購階層</label>
+            <div class="table-responsive">
             <table class="table table-sm align-middle">
               <thead>
                 <tr>
@@ -217,6 +221,7 @@
                 </tr>
               </tbody>
             </table>
+            </div>
             <div class="row g-2">
               <div class="col">
                 <input type="text" class="form-control form-control-sm" placeholder="階層名稱，例如「第一階」" v-model="newTier.tierLevel" />
@@ -237,6 +242,7 @@
           <!-- 商品規格管理（尺寸/顏色）：跟團購階層一樣，只有編輯已存在的商品時才能設定 -->
           <div v-if="editingId" class="mb-3">
             <label class="form-label fw-semibold">商品規格（尺寸/顏色）</label>
+            <div class="table-responsive">
             <table class="table table-sm align-middle">
               <thead>
                 <tr>
@@ -257,6 +263,7 @@
                 </tr>
               </tbody>
             </table>
+            </div>
             <div class="row g-2">
               <div class="col">
                 <input type="text" class="form-control form-control-sm" placeholder="尺寸，例如 M" v-model="newSpec.size" />

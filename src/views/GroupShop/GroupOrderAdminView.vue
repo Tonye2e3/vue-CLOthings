@@ -39,6 +39,8 @@
       <span>共 {{ filteredOrders.length }} 筆</span>
     </div>
     <div class="card-body p-0">
+      <!-- 響應式：外層包 table-responsive，欄位太多時窄螢幕可以左右滑動，不會直接爆版 -->
+      <div class="table-responsive">
       <table class="table mb-0 align-middle">
         <thead class="table-light">
           <tr>
@@ -89,6 +91,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
     <div v-if="totalPages > 1" class="card-footer d-flex justify-content-between align-items-center">
       <span class="text-muted small">第 {{ currentPage }} / {{ totalPages }} 頁</span>
@@ -268,6 +271,8 @@
           <button type="button" class="btn-close" aria-label="Close" @click="showServiceListModal = false"></button>
         </div>
         <div class="modal-body">
+          <!-- 響應式：外層包 table-responsive，窄螢幕可以左右滑動 -->
+          <div class="table-responsive">
           <table class="table table-sm align-middle mb-0">
             <thead class="table-light">
               <tr>
@@ -305,6 +310,7 @@
               </tr>
             </tbody>
           </table>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" @click="showServiceListModal = false">關閉</button>
