@@ -12,7 +12,7 @@ const props = defineProps({
 
 const reviews = ref([])
 
-const API_BASE = 'https://localhost:7255'
+const API_BASE = import.meta.env.VITE_API_URL
 function getImageUrl(fileName) {
   if (!fileName) return null
   return `${API_BASE}/images/review/${fileName}`   // 評價圖片路徑（依你實際擺放調整）

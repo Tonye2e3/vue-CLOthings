@@ -17,7 +17,7 @@ const route = useRoute()
 const router = useRouter()
 
 // IMAGE_BASE：大頭貼是靜態檔案，走的不是 /api 這條路徑，邏輯跟其他頁面一樣。
-const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+const IMAGE_BASE = import.meta.env.VITE_API_URL
 
 const conversations = ref([])
 const loadingConversations = ref(true)

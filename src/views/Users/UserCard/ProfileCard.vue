@@ -5,7 +5,7 @@ import api from '@/services/api'
 import { Cropper, CircleStencil } from 'vue-advanced-cropper'
 import 'vue-advanced-cropper/dist/style.css'
 
-const apiBaseUrl = 'https://localhost:7255'
+const apiBaseUrl = import.meta.env.VITE_API_URL
 
 const profileData = reactive({
   firstName: '',

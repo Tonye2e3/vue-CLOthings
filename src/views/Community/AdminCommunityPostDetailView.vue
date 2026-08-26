@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
 
-const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+const IMAGE_BASE = import.meta.env.VITE_API_URL
 const route = useRoute()
 const router = useRouter()
 
