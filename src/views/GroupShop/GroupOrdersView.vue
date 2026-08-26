@@ -7,7 +7,7 @@ import { useRoute } from 'vue-router'
 import { useGroupCartStore } from '@/stores/groupCart'
 import { useAuthStore } from '@/stores/auth'
 // 訂單相關 API：查詢、取消、編輯
-import { getGroupOrders, getGroupOrderDetail, cancelGroupOrder, editGroupOrder, createCustomerService, getCustomerServiceByOrder } from '@/api/groupShop'
+import { getGroupOrders, getGroupOrderDetail, cancelGroupOrder, editGroupOrder } from '@/api/groupShop'
 
 const route = useRoute()
 const cartStore = useGroupCartStore()
@@ -16,44 +16,32 @@ const authStore = useAuthStore()
 // 一般管理員（Admin）前台只能看不能操作，SuperAdmin 不受限
 const isReadOnly = computed(() => authStore.role === 'Admin')
 
-// 左側選單：一般會員只看得到「專案瀏覽」「團購紀錄」，
-// Admin / SuperAdmin 登入時，「團購紀錄」下面會多出後台管理的兩個項目
-const navItems = computed(() => {
-  const items = [
-    { label: '專案瀏覽', icon: 'user', to: '/GroupShop' },
-    { label: '團購紀錄', icon: 'history', to: '/GroupShop/orders' }
-  ]
-  if (authStore.isAdmin) {
-    items.push(
-      { label: '團購商品管理', icon: 'box', to: '/GroupShop/admin/products' },
-      { label: '團購訂單管理', icon: 'clipboard', to: '/GroupShop/admin/orders' }
-    )
-  }
-  return items
-})
-const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : route.path.startsWith(to))
-
-// 會員名稱：登入狀態統一用 useAuthStore()，尚未登入則顯示預設值
-const memberName = computed(() => authStore.name || '會員')
 // 購物車商品數量
 const cartCount = computed(() => cartStore.items.length)
 
 // 訂單清單：改成向後端拿真正的資料，不再存 localStorage
 // 欄位對應後端 GroupOrderListDTO，這裡把 groupOrderId 轉成 id，template 才不用改
 const myOrders = reactive([])
+// 訂單是否還在讀取中，讀取期間顯示骨架屏（go-skeleton）
+const isLoading = ref(true)
 
 const loadOrders = async () => {
-  // UserId 不用帶了，後端一律從 JWT 判斷是誰的訂單
-  const rows = await getGroupOrders()
-  const mapped = rows.map(r => ({
-    id: r.groupOrderId,
-    productName: r.productName,
-    status: r.status,
-    totalPrice: r.totalPrice,
-    orderDate: r.orderDate,
-    shipName: r.shipName
-  }))
-  myOrders.splice(0, myOrders.length, ...mapped)
+  isLoading.value = true
+  try {
+    // UserId 不用帶了，後端一律從 JWT 判斷是誰的訂單
+    const rows = await getGroupOrders()
+    const mapped = rows.map(r => ({
+      id: r.groupOrderId,
+      productName: r.productName,
+      status: r.status,
+      totalPrice: r.totalPrice,
+      orderDate: r.orderDate,
+      shipName: r.shipName
+    }))
+    myOrders.splice(0, myOrders.length, ...mapped)
+  } finally {
+    isLoading.value = false
+  }
 }
 
 onMounted(() => {
@@ -122,6 +110,9 @@ const closeEditModal = () => {
   showEditModal.value = false
 }
 
+// 儲存中狀態：儲存按鈕顯示 loading 動畫、避免重複送出
+const isSaving = ref(false)
+
 // 按下 Modal 裡的「儲存」時執行的動作：改成呼叫後端編輯 API，
 // 團購價、運費怎麼重算都交給後端處理，前端不用再自己算一次
 const saveEdit = async () => {
@@ -137,68 +128,26 @@ const saveEdit = async () => {
     return
   }
 
-  const updated = await editGroupOrder(editingOrderId.value, {
-    shipName: editForm.shipName.trim(),
-    items: editForm.items.map(i => ({ groupProductId: i.id, quantity: i.qty }))
-  })
+  isSaving.value = true
+  try {
+    const updated = await editGroupOrder(editingOrderId.value, {
+      shipName: editForm.shipName.trim(),
+      items: editForm.items.map(i => ({ groupProductId: i.id, quantity: i.qty }))
+    })
 
-  // 把後端算好的結果寫回這筆訂單
-  order.shipName = updated.shipName
-  order.productName = updated.productName
-  order.totalPrice = updated.totalPrice
+    // 把後端算好的結果寫回這筆訂單
+    order.shipName = updated.shipName
+    order.productName = updated.productName
+    order.totalPrice = updated.totalPrice
 
-  showEditModal.value = false
+    showEditModal.value = false
+  } finally {
+    isSaving.value = false
+  }
 }
 
 // 把數字格式化成千分位顯示（例如 1234 -> 1,234）
 const formatCurrency = (amount) => new Intl.NumberFormat('zh-TW').format(amount)
-
-// ---- 以下是「聯絡客服」Modal 相關的狀態與方法 ----
-
-const showServiceModal = ref(false)
-const activeServiceOrderId = ref(null)
-const serviceRecords = ref([]) // 這筆訂單之前送過的客服紀錄
-
-const serviceForm = reactive({
-  name: authStore.name || '',
-  email: '',
-  phone: '',
-  title: '',
-  content: ''
-})
-
-// 按下「聯絡客服」時執行的動作：打開 Modal 並帶出這筆訂單過去的客服紀錄
-const openServiceModal = async (id) => {
-  activeServiceOrderId.value = id
-  serviceForm.title = ''
-  serviceForm.content = ''
-  serviceRecords.value = await getCustomerServiceByOrder(id)
-  showServiceModal.value = true
-}
-
-const closeServiceModal = () => {
-  showServiceModal.value = false
-}
-
-// 按下「送出」時執行的動作：呼叫後端新增一筆客服紀錄，成功後加進畫面上的清單
-const submitService = async () => {
-  if (!serviceForm.title.trim() || !serviceForm.content.trim()) {
-    alert('請填寫標題與內容')
-    return
-  }
-
-  const saved = await createCustomerService(activeServiceOrderId.value, {
-    name: serviceForm.name,
-    email: serviceForm.email,
-    phone: serviceForm.phone,
-    title: serviceForm.title.trim(),
-    content: serviceForm.content.trim()
-  })
-
-  serviceRecords.value.push(saved)
-  serviceForm.title = ''
-  serviceForm.content = ''
-}
 </script>
 
 <template>
@@ -254,8 +203,6 @@ const submitService = async () => {
                         @click="openEditModal(order.id)">編輯</button>
                       <button class="cancel-btn go-btn-tap" :disabled="order.status.includes('已取消') || isReadOnly"
                         @click="cancelOrder(order.id)">取消</button>
-                      <button class="service-btn go-btn-tap" :disabled="isReadOnly"
-                        @click="openServiceModal(order.id)">聯絡客服</button>
                     </div>
                   </td>
                 </tr>
@@ -301,72 +248,6 @@ const submitService = async () => {
                   </button>
                 </div>
               </div>
-            </div>
-          </div>
-        </Transition>
-
-        <!-- ============ 聯絡客服 Modal ============ -->
-        <Transition name="go-fade">
-          <div v-if="showServiceModal" class="modal-backdrop fade show"></div>
-        </Transition>
-        <Transition name="go-pop">
-          <div v-if="showServiceModal" class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
-            <div class="modal-dialog">
-              <div class="modal-content">
-                <div class="modal-header">
-                  <h5 class="modal-title fw-bold mb-0">聯絡客服 #{{ activeServiceOrderId }}</h5>
-                  <button type="button" class="btn-close go-icon-tap" aria-label="Close"
-                    @click="closeServiceModal"></button>
-                </div>
-                <div class="modal-body">
-                  <div class="row g-2 mb-2">
-                    <div class="col">
-                      <label class="form-label small">姓名</label>
-                      <input type="text" class="form-control form-control-sm" v-model="serviceForm.name" />
-                    </div>
-                    <div class="col">
-                      <label class="form-label small">Email</label>
-                      <input type="email" class="form-control form-control-sm" v-model="serviceForm.email" />
-                    </div>
-                    <div class="col">
-                      <label class="form-label small">電話</label>
-                      <input type="tel" class="form-control form-control-sm" v-model="serviceForm.phone" />
-                    </div>
-                  </div>
-                  <div class="mb-2">
-                    <label class="form-label small">標題</label>
-                    <input type="text" class="form-control" v-model="serviceForm.title" placeholder="請簡短描述問題" />
-                  </div>
-                  <div class="mb-3">
-                    <label class="form-label small">內容</label>
-                    <textarea class="form-control" rows="3" v-model="serviceForm.content"
-                      placeholder="請詳細描述您的問題"></textarea>
-                  </div>
-                  <button type="button" class="btn btn-primary btn-sm mb-3 go-btn-tap" :disabled="isSubmittingService"
-                    @click="submitService">
-                    <span v-if="isSubmittingService" class="go-spinner me-2"></span>
-                    送出
-                  </button>
-
-                  <hr />
-                  <p class="small fw-bold mb-2">過去的客服紀錄</p>
-                  <p v-if="serviceRecords.length === 0" class="small text-muted">目前沒有客服紀錄</p>
-                  <div v-for="r in serviceRecords" :key="r.groupCustomerServiceId" class="service-record-row">
-                    <p class="small fw-bold mb-1">{{ r.title }}</p>
-                    <p class="small text-muted mb-1">{{ r.content }}</p>
-                    <p v-if="r.replyContent" class="small text-success mb-0">
-                      客服回覆：{{ r.replyContent }}（{{ r.repliedAt }}）
-                    </p>
-                    <p v-else class="small text-muted mb-0">尚未回覆</p>
-                  </div>
-                </div>
-                <div class="modal-footer">
-                  <button type="button" class="btn btn-outline-secondary" @click="closeServiceModal">關閉</button>
-                </div>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-outline-secondary go-btn-tap" @click="closeServiceModal">關閉</button>
             </div>
           </div>
         </Transition>
@@ -440,10 +321,9 @@ table tbody td {
   gap: 6px;
 }
 
-/* 三個按鈕外觀骨架一樣（底色、字級、字重、padding、圓角、游標），只有邊框色/文字色不同 */
+/* 兩個按鈕外觀骨架一樣（底色、字級、字重、padding、圓角、游標），只有邊框色/文字色不同 */
 .cancel-btn,
-.edit-btn,
-.service-btn {
+.edit-btn {
   background-color: #fff;
   font-size: 0.8rem;
   font-weight: 600;
@@ -461,47 +341,32 @@ table tbody td {
   background-color: var(--color-danger-bg);
 }
 
-/* edit-btn 跟 service-btn 邊框色、hover 底色都一樣，只有文字色不同 */
-.edit-btn,
-.service-btn {
-  border: 1px solid var(--color-border-input);
-}
-
-.edit-btn:hover,
-.service-btn:hover {
-  background-color: var(--color-hover-bg);
-}
-
 .edit-btn {
+  border: 1px solid var(--color-border-input);
   color: var(--color-text);
 }
 
-.service-btn {
-  color: var(--color-text-muted);
+.edit-btn:hover {
+  background-color: var(--color-hover-bg);
 }
 
-/* disabled 狀態 edit-btn / cancel-btn / service-btn 完全一樣，合併成一組 */
+/* disabled 狀態 edit-btn / cancel-btn 完全一樣，合併成一組 */
 .edit-btn:disabled,
-.cancel-btn:disabled,
-.service-btn:disabled {
+.cancel-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
 .edit-btn:disabled:hover,
-.cancel-btn:disabled:hover,
-.service-btn:disabled:hover {
+.cancel-btn:disabled:hover {
   background-color: #fff;
 }
 
-/* 服務紀錄列跟編輯品項列樣式相同，合併 */
-.service-record-row,
 .edit-item-row {
   padding: 8px 0;
   border-bottom: 1px solid var(--color-hover-bg);
 }
 
-.service-record-row:last-child,
 .edit-item-row:last-child {
   border-bottom: none;
 }
@@ -560,7 +425,62 @@ table tbody td {
   min-width: 0;
 }
 
+/* 拿掉左側導覽列後，內容區改成置中、限制最大寬度，版面才不會在寬螢幕上被拉得過開
+   跟 GroupProductsView.vue 的 .clo-main-full 用同一套慣例 */
+.clo-main {
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
 
+/* ============ 響應式：畫面變窄時，內距、字級、操作按鈕都跟著縮小 ============ */
+@media (max-width: 900px) {
+  .clo-main {
+    padding: 20px 16px;
+  }
+
+  .page-header h2 {
+    font-size: 1.35rem;
+  }
+
+  table thead th,
+  table tbody td {
+    padding: 10px 10px;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .clo-main {
+    padding: 16px 12px;
+  }
+
+  table thead th,
+  table tbody td {
+    padding: 8px 8px;
+    font-size: 0.78rem;
+  }
+
+  /* 手機上「編輯」「取消」兩個按鈕改成上下排列，避免擠成一團 */
+  .action-buttons {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .cancel-btn,
+  .edit-btn {
+    width: 100%;
+  }
+
+  /* 編輯訂單 Modal 在小螢幕上留邊距，不要貼齊螢幕邊緣 */
+  .modal-dialog {
+    margin: 16px;
+  }
+
+  .edit-qty-input {
+    width: 64px;
+  }
+}
 
 /* ============ 本頁用到的特效樣式（進場動畫／懸停／按鈕微動效／載入動畫），class 一律以 go- 開頭 ============ */
 @keyframes goFadeInUp {

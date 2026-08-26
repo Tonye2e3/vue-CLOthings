@@ -86,6 +86,10 @@ const post = ref({
 // notFound：如果這個 id 在資料庫裡根本找不到對應的貼文，用這個來控制畫面顯示「找不到這篇貼文」。
 const notFound = ref(false)
 
+// postLoading：貼文完整資料還沒抓回來之前是 true，畫面用這個顯示骨架佔位畫面，
+// 跟 CommunityView.vue 動態牆的骨架畫面是同一套做法。
+const postLoading = ref(true)
+
 // currentImageIndex：主圖輪播現在顯示 post.images 裡的第幾張（從 0 開始算）。
 // 每次換到新的一篇貼文時要記得歸零，不然會出現「這篇貼文明明只有 1 張圖，
 // 卻想顯示上一篇貼文停在的第 3 張」這種指到不存在的索引的情況。
@@ -144,6 +148,7 @@ const fetchPost = async () => {
   // route.params.id：讀出網址上 :id 這段動態參數的值，是字串型別
   // （例如網址是 /community/post/3，這裡拿到的就是 "3"）。
   const id = route.params.id
+  postLoading.value = true
   try {
     const res = await api.get(`/CommunityPost/${id}`)
 
@@ -191,12 +196,21 @@ const fetchPost = async () => {
     // 不能提早在 fetchPost 呼叫之前就開始，那時候 post.value.images 還是預設的假資料。
     startAutoplay()
 
-    // fetchFollowStatus 要用到 post.value.userId，一定要等上面 post.value 設定完才能呼叫，
-    // 不能跟 fetchPost() 平行呼叫（那樣 userId 還是初始值 null，會查到錯的人）。
+    // fetchFollowStatus、fetchLikeStatus 都要等上面 post.value 設定完才能呼叫——
+    // 這兩支原本是在 onMounted 裡跟 fetchPost() 平行呼叫的，看起來各自獨立、
+    // 互不相干，但其實有問題：post.value = { ... } 那段是「整包蓋掉」，
+    // 裡面 isLiked、isFollowing 都寫死是預設值 false。如果 fetchLikeStatus 先回來、
+    // 正確把 isLiked 設成 true，緊接著上面這段 post.value = { ... } 才執行完，
+    // 就會把剛剛設對的 isLiked 又蓋回 false——使用者明明已經按過讚，
+    // 畫面卻顯示成還沒按，一按下去又想新增一筆，才會撞到資料庫的唯一鍵限制。
+    // 改成在這裡（post.value 已經設定完之後）才呼叫，就不會有這個「後到的蓋掉先到的」問題。
     fetchFollowStatus()
+    fetchLikeStatus()
   } catch (err) {
     console.error('讀取貼文詳細資料失敗：', err)
     notFound.value = true
+  } finally {
+    postLoading.value = false
   }
 }
 
@@ -230,7 +244,6 @@ onMounted(async () => {
   await loadCurrentUserId()
   fetchPost()
   fetchComments()
-  fetchLikeStatus()
   fetchSimilarPosts()
 })
 
@@ -246,9 +259,9 @@ watch(() => route.params.id, () => {
   replyingTo.value = null // 取消原本在回覆的狀態，避免對新貼文的留言用到舊貼文的 parentCommentId
   currentImageIndex.value = 0 // 換到新貼文時輪播歸零，從第一張開始顯示
   stopAutoplay() // 換貼文了，先把舊貼文的自動輪播計時器停掉，fetchPost 拿到新資料後會重新啟動
+  visibleCommentCount.value = COMMENTS_PAGE_SIZE // 換貼文了，留言分頁也重設回第一頁
   fetchPost()
   fetchComments()
-  fetchLikeStatus()
   fetchSimilarPosts()
 })
 
@@ -411,6 +424,53 @@ const closeShareMenu = () => {
   showShareMenu.value = false
 }
 
+// ============================================================
+// 檢舉功能
+// ============================================================
+
+const showReportMenu = ref(false)
+const reportReason = ref('')
+const reportSubmitting = ref(false)
+
+const toggleReportMenu = () => {
+  showReportMenu.value = !showReportMenu.value
+}
+const closeReportMenu = () => {
+  showReportMenu.value = false
+  reportReason.value = ''
+}
+
+// submitReport：送出檢舉。後端 PostReportController.cs 不是用真正的 HTTP 409 狀態碼
+// 表示「已經檢舉過了」，是回傳 200 但內容是 { ok: false, code: 409 } 這種格式
+// （跟專案裡其他 Controller 是同一套 ResultDTO 慣例），所以這裡要檢查 res.data.ok，
+// 不能只靠 try/catch 抓錯誤——用 try/catch 抓不到「已經檢舉過」這種情況，
+// 因為對 axios 來說這仍然是一個成功的 200 回應。
+const submitReport = async () => {
+  const reason = reportReason.value.trim()
+  if (!reason) return
+  reportSubmitting.value = true
+  try {
+    const res = await api.post('/PostReport', {
+      communityPostId: post.value.communityPostId,
+      reporterId: currentUserId.value,
+      reason
+    })
+    if (res.data.ok) {
+      alert('已送出檢舉，謝謝你的回報！')
+    } else if (res.data.code === 409) {
+      alert('你已經檢舉過這篇貼文了')
+    } else {
+      alert('檢舉失敗，請稍後再試一次！')
+    }
+  } catch (err) {
+    console.error('檢舉失敗：', err)
+    alert('檢舉失敗，請稍後再試一次！')
+  } finally {
+    reportSubmitting.value = false
+    closeReportMenu()
+  }
+}
+
 // linkCopied：複製連結成功後，短暫把按鈕文字換成「已複製！」給使用者一個回饋，
 // 用 setTimeout 在 1.5 秒後自動切回「複製連結」。
 const linkCopied = ref(false)
@@ -500,6 +560,29 @@ const groupedComments = computed(() => {
       .sort((a, b) => new Date(a.commentDate) - new Date(b.commentDate))
   }))
 })
+
+// ============================================================
+// 留言分頁：留言一多（幾十則），一次全部攤開會把頁面撐得很長。
+// 改成一開始只顯示前幾則「主留言」（連同它們的回覆），按「查看更多留言」才多顯示幾則，
+// 跟 CommunityView.vue 網格區「載入更多穿搭」是同一套做法。
+// ============================================================
+
+const COMMENTS_PAGE_SIZE = 5
+// visibleCommentCount：目前願意顯示到第幾則「主留言」（不含回覆，回覆是跟著主留言一起出現的）。
+const visibleCommentCount = ref(COMMENTS_PAGE_SIZE)
+
+// visibleGroupedComments：真正給 template 用 v-for 畫出來的清單，是 groupedComments
+// 裡「前 visibleCommentCount 則」。.slice(0, n)：從陣列開頭取到第 n 筆（不含第 n 筆）。
+const visibleGroupedComments = computed(() => groupedComments.value.slice(0, visibleCommentCount.value))
+
+// hasMoreComments：判斷還有沒有更多沒顯示出來的主留言，用來決定「查看更多留言」
+// 按鈕要不要出現，全部顯示完就不用再讓使用者看到一顆按下去沒有反應的按鈕。
+const hasMoreComments = computed(() => visibleCommentCount.value < groupedComments.value.length)
+
+// loadMoreComments：按下「查看更多留言」時執行，一次多開放顯示 5 則主留言。
+const loadMoreComments = () => {
+  visibleCommentCount.value += COMMENTS_PAGE_SIZE
+}
 
 // replyingTo：目前正在回覆哪一則留言。null 代表現在是要發「新的主留言」，
 // 有值的話代表輸入框上面會出現「回覆 @xxx」的提示，送出時會帶上 parentCommentId。
@@ -629,10 +712,34 @@ const addComment = async () => {
       <router-link to="/community" class="back-pill">← 返回社群</router-link>
 
       <!--
+        postLoading：貼文完整資料還沒抓回來之前顯示骨架佔位畫面，
+        取代原本「直接空白，資料到了才整個跳出來」的體驗。
+      -->
+      <div v-if="postLoading" class="row g-4">
+        <div class="col-12 col-lg-8">
+          <div class="post-main-card">
+            <div class="skeleton-author-bar">
+              <div class="skeleton-block skeleton-avatar-lg"></div>
+              <div class="skeleton-author-lines">
+                <div class="skeleton-block skeleton-line skeleton-line-40"></div>
+                <div class="skeleton-block skeleton-line skeleton-line-30"></div>
+              </div>
+            </div>
+            <div class="skeleton-block skeleton-main-media"></div>
+            <div class="skeleton-block skeleton-line skeleton-line-90" style="margin-top:1.2rem;"></div>
+            <div class="skeleton-block skeleton-line skeleton-line-60" style="margin-top:.6rem;"></div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-4">
+          <div class="skeleton-block skeleton-side-card"></div>
+        </div>
+      </div>
+
+      <!--
         notFound：如果網址上的 id 在資料庫裡找不到對應的貼文（例如網址被亂改、
         或貼文已經被刪除），就顯示這個提示，不要繼續顯示「載入中...」那份假資料。
       -->
-      <div v-if="notFound" class="not-found-state">
+      <div v-else-if="notFound" class="not-found-state">
         <p>找不到這篇貼文，可能已經被刪除，或網址不正確。</p>
         <router-link to="/community" class="back-pill">← 返回社群</router-link>
       </div>
@@ -792,6 +899,37 @@ const addComment = async () => {
                     </button>
                   </div>
                 </div>
+
+                <!--
+                  檢舉：跟分享選單同一種「小面板」做法（position:relative 的外層包住
+                  position:absolute 的面板 + 透明背景擋點外面），不用像編輯貼文那種
+                  Teleport 彈出視窗那麼重，畢竟只是一個文字欄位加送出按鈕。
+                -->
+                <div class="report-wrapper">
+                  <button class="action-btn" @click="toggleReportMenu">
+                    <svg class="icon-inline" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M5 3v18" />
+                      <path d="M5 4h13l-3 4 3 4H5" />
+                    </svg>
+                    檢舉
+                  </button>
+                  <div v-if="showReportMenu" class="share-menu-backdrop" @click="closeReportMenu"></div>
+                  <div v-if="showReportMenu" class="report-panel">
+                    <p class="report-panel-title">檢舉這篇貼文</p>
+                    <textarea
+                      v-model="reportReason"
+                      class="report-textarea"
+                      rows="3"
+                      placeholder="請簡短說明檢舉原因（例如：不實廣告、冒犯言論...）"
+                    ></textarea>
+                    <div class="report-panel-actions">
+                      <button type="button" class="report-btn-cancel" @click="closeReportMenu">取消</button>
+                      <button type="button" class="report-btn-submit" :disabled="!reportReason.trim() || reportSubmitting" @click="submitReport">
+                        {{ reportSubmitting ? '送出中...' : '送出檢舉' }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
               <!--
                 收藏按鈕：
@@ -865,8 +1003,11 @@ const addComment = async () => {
               </div>
 
               <div class="comments-list">
-                <!-- v-for="c in groupedComments"：只跑主留言，每則主留言底下再跑一次 c.replies 畫出它的回覆 -->
-                <div v-for="c in groupedComments" :key="c.postCommentId" class="comment-thread">
+                <!-- v-for="c in visibleGroupedComments"：只跑「目前願意顯示的那幾則」主留言，
+                     不是把 groupedComments 全部畫出來——跟 CommunityView.vue 網格區的
+                     「載入更多穿搭」是同一種做法，一開始只看得到前 5 則，按「查看更多留言」
+                     才會再多顯示幾則。每則主留言底下再跑一次 c.replies 畫出它的回覆。 -->
+                <div v-for="c in visibleGroupedComments" :key="c.postCommentId" class="comment-thread">
                   <div class="comment-row">
                     <img :src="c.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, c.user)" />
                     <div class="comment-bubble">
@@ -895,6 +1036,11 @@ const addComment = async () => {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <!-- 查看更多留言：只有還有更多沒顯示出來的主留言時才出現，全部顯示完就自動收起來 -->
+              <div class="load-more-comments-wrap" v-if="hasMoreComments">
+                <button class="btn-load-comments" @click="loadMoreComments">查看更多留言 ▾</button>
               </div>
             </div>
 
@@ -982,6 +1128,35 @@ const addComment = async () => {
   transition:all .18s ease;
 }
 .back-pill:hover{ background:var(--ink); color:var(--cream); }
+
+/* ---------- 骨架載入畫面 ---------- */
+/* 跟 CommunityView.vue 的骨架畫面是同一套「光斑掃過」效果，各自獨立的 <style scoped>
+   沒辦法共用，這裡複製一份對應這個頁面的版面形狀（發文者列＋大圖＋內文＋側欄）。 */
+@keyframes skeleton-shimmer {
+  0% { background-position: -300px 0; }
+  100% { background-position: 300px 0; }
+}
+.skeleton-block{
+  background-color: var(--hairline);
+  background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,.55) 50%, rgba(255,255,255,0) 100%);
+  background-size: 300px 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+.skeleton-author-bar{ display:flex; align-items:center; gap:.7rem; margin-bottom:1.1rem; }
+.skeleton-avatar-lg{ width:44px; height:44px; border-radius:50%; flex-shrink:0; }
+.skeleton-author-lines{ display:flex; flex-direction:column; gap:.5rem; flex:1; }
+.skeleton-line{ height:14px; }
+.skeleton-line-40{ width:40%; }
+.skeleton-line-30{ width:30%; }
+.skeleton-line-90{ width:90%; }
+.skeleton-line-60{ width:60%; }
+.skeleton-main-media{ width:100%; height:550px; border-radius:8px; }
+.skeleton-side-card{ width:100%; height:320px; border-radius:16px; }
+@media (max-width: 767px){
+  .skeleton-main-media{ height:340px; }
+}
 
 /* ---------- 找不到貼文 ---------- */
 .not-found-state{
@@ -1137,6 +1312,43 @@ const addComment = async () => {
    統一用同一條規則控制尺寸／顏色，currentColor 會直接跟著這裡設定的 color 走。 */
 .share-menu-item svg{ width:16px; height:16px; flex-shrink:0; color:var(--ink-soft); }
 
+/* 檢舉面板：跟分享選單同一種定位邏輯（.report-wrapper 是參考點），
+   共用同一顆 .share-menu-backdrop 處理「點外面關閉」。 */
+.report-wrapper{ position:relative; }
+.report-panel{
+  position:absolute; top:calc(100% + 8px); right:0; z-index:10;
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  border-radius:8px;
+  box-shadow:0 10px 30px rgba(42,36,32,.18);
+  padding:1rem;
+  width:260px;
+}
+.report-panel-title{
+  margin:0 0 .6rem; font-size:.86rem; font-weight:700; color:var(--ink);
+}
+.report-textarea{
+  width:100%; border:1px solid var(--hairline); background:var(--cream);
+  border-radius:6px; padding:.6rem .7rem; font-size:.82rem; color:var(--ink);
+  font-family:inherit; resize:vertical;
+}
+.report-textarea:focus{ outline:none; border-color:var(--plum); }
+.report-panel-actions{ display:flex; gap:.5rem; margin-top:.7rem; }
+.report-btn-cancel{
+  flex:1; padding:.45rem; font-size:.78rem;
+  background:transparent; color:var(--ink-soft);
+  border:1px solid var(--hairline); border-radius:4px; cursor:pointer;
+}
+.report-btn-cancel:hover{ border-color:var(--ink); color:var(--ink); }
+.report-btn-submit{
+  flex:1; padding:.45rem; font-size:.78rem; font-weight:600;
+  background:var(--ink); color:var(--paper);
+  border:none; border-radius:4px; cursor:pointer;
+  transition:background .18s ease;
+}
+.report-btn-submit:hover:not(:disabled){ background:var(--plum-deep); }
+.report-btn-submit:disabled{ opacity:.5; cursor:not-allowed; }
+
 /* ---------- 內文 ---------- */
 .post-content{
   font-size:.94rem; line-height:1.8; color:var(--ink);
@@ -1176,6 +1388,15 @@ const addComment = async () => {
 }
 
 .comments-list{ display:flex; flex-direction:column; gap:1rem; margin-bottom:1.1rem; }
+/* 查看更多留言：跟 CommunityView.vue「載入更多穿搭」是同一顆按鈕樣式，維持整個網站
+   一致的「還有更多內容」互動語言。 */
+.load-more-comments-wrap{ text-align:center; margin-bottom:1.3rem; }
+.btn-load-comments{
+  background:transparent; border:1px solid var(--ink); color:var(--ink);
+  border-radius:999px; padding:.5rem 1.6rem; font-size:.82rem; letter-spacing:.03em;
+  transition:all .2s ease;
+}
+.btn-load-comments:hover{ background:var(--ink); color:var(--cream); }
 .comment-thread{ display:flex; flex-direction:column; gap:.5rem; }
 .comment-row{ display:flex; align-items:flex-start; gap:.6rem; }
 .comment-row.comment-reply{ margin-left:2.4rem; } /* 往內縮排，跟 IG 的回覆呈現方式一樣 */

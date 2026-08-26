@@ -1,7 +1,6 @@
 <script setup>
 
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
 
 // 團購購物車 store：跟商品詳情頁共用同一份購物車資料
 import { useGroupCartStore } from '@/stores/groupCart'
@@ -20,32 +19,11 @@ const resolveImageUrl = (path) => {
 }
 
 
-const route = useRoute()
 const cartStore = useGroupCartStore()
 const authStore = useAuthStore()
 
 const searchKeyword = ref('')
 
-// 左側選單：一般會員只看得到「專案瀏覽」「團購紀錄」，
-// Admin / SuperAdmin 登入時，「團購紀錄」下面會多出後台管理的兩個項目
-const navItems = computed(() => {
-  const items = [
-    { label: '專案瀏覽', icon: 'user', to: '/GroupShop' },
-    { label: '團購紀錄', icon: 'history', to: '/GroupShop/orders' }
-  ]
-  if (authStore.isAdmin) {
-    items.push(
-      { label: '團購商品管理', icon: 'box', to: '/GroupShop/admin/products' },
-      { label: '團購訂單管理', icon: 'clipboard', to: '/GroupShop/admin/orders' }
-    )
-  }
-  return items
-})
-// 判斷選單項目是否為目前所在頁面（用來加上醒目樣式）
-const isActive = (to) => !!to && (to === '/GroupShop' ? route.path === to : route.path.startsWith(to))
-
-// 會員名稱：登入狀態統一用 useAuthStore()，尚未登入則顯示預設值
-const memberName = computed(() => authStore.name || '會員')
 // 一般管理員（Admin）前台只能看不能操作，SuperAdmin 不受限
 const isReadOnly = computed(() => authStore.role === 'Admin')
 // 購物車商品數量：直接從 store 拿，跨頁面即時反映實際品項數
@@ -54,6 +32,8 @@ const cartCount = computed(() => cartStore.items.length)
 // 商品目錄：改成向 GroupProductController 拿，欄位跟原本的假資料結構相容
 // （id / name / imageUrl / listPrice / tiers[{qty,discount,unitPrice}] / orderedQty / intro）
 const products = ref([])
+// 商品是否還在讀取中，讀取期間顯示骨架屏（go-skeleton），跟 GroupOrdersView.vue 用同一套慣例
+const isLoading = ref(true)
 
 onMounted(async () => {
   // 管理員（Admin）沒有購物車權限，fetchCart 會回 403，
@@ -63,7 +43,11 @@ onMounted(async () => {
   } catch (e) {
     // 忽略，購物車數量顯示 0 即可
   }
-  products.value = await getGroupProducts()
+  try {
+    products.value = await getGroupProducts()
+  } finally {
+    isLoading.value = false
+  }
 })
 
 // 讀取購物車裡此商品目前的數量：直接從 store 裡的 items 陣列找
@@ -159,47 +143,8 @@ const nextSlide = () => {
   <div class="clo-shell">
     <!-- 搜尋欄在輪播圖下方；購物車圖示改為右下角浮動按鈕，見頁面最下方 -->
     <div class="clo-body">
-      <!-- ============ 左側選單 ============ -->
-      <aside class="clo-sidebar">
-        <nav class="sidebar-nav">
-          <template v-for="item in navItems" :key="item.label">
-            <router-link
-              v-if="item.to"
-              :to="item.to"
-              class="nav-item"
-              :class="{ active: isActive(item.to) }"
-            >
-              <span class="nav-icon">
-                <!--顯示對應的嵌入式 SVG 圖示-->
-                <svg v-if="item.icon === 'user'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-                <svg v-else-if="item.icon === 'history'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="1 4 1 10 7 10"></polyline>
-                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                </svg>
-                <svg v-else-if="item.icon === 'box'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
-                  <polyline points="3.29 7 12 12 20.71 7"></polyline>
-                  <line x1="12" y1="22" x2="12" y2="12"></line>
-                </svg>
-                <svg v-else-if="item.icon === 'clipboard'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                  <line x1="9" y1="12" x2="15" y2="12"></line>
-                  <line x1="9" y1="16" x2="15" y2="16"></line>
-                </svg>
-              </span>
-              <span>{{ item.label }}</span>
-            </router-link>
-          </template>
-        </nav>
-
-      </aside>
-
       <!-- ============ 主要內容區：商品列表 ============ -->
-      <main class="clo-main">
+      <main class="clo-main clo-main-full">
     <!-- ============ 首頁輪播圖 ============ -->
     <section class="carousel">
       <button class="carousel-arrow carousel-arrow-left" type="button" @click="prevSlide" aria-label="上一張">
@@ -254,13 +199,19 @@ const nextSlide = () => {
       </button>
     </div>
 
+    <!-- 載入中：顯示骨架屏卡片 -->
+    <div v-if="isLoading" class="product-grid mb-4">
+      <div v-for="n in 4" :key="n" class="go-skeleton skeleton-card"></div>
+    </div>
+
+    <template v-else>
     <!-- 搜尋完全找不到符合的商品時顯示提示，避免使用者以為畫面壞掉 -->
     <div v-if="filteredProducts.length === 0" class="empty-hint">
       找不到符合「{{ searchKeyword }}」的商品
     </div>
 
     <!-- 未達團購數量（進行中）區塊 -->
-    <section class="mb-4">
+    <section class="mb-4 go-fade-in-up">
       <div class="section-title bg-ongoing">
         <span class="section-icon">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -269,8 +220,8 @@ const nextSlide = () => {
           </svg>
         </span> 未達團購數量 (進行中)
       </div>
-      <div class="product-grid">
-        <div v-for="p in ongoingProducts" :key="p.id" class="product-card">
+      <TransitionGroup tag="div" name="go-fade" class="product-grid">
+        <div v-for="p in ongoingProducts" :key="p.id" class="product-card go-card-hover">
           <router-link :to="`/GroupShop/product/${p.id}`" class="card-img-wrap">
             <img :src="resolveImageUrl(p.imageUrl)" class="card-img" :alt="p.name" />
           </router-link>
@@ -289,7 +240,7 @@ const nextSlide = () => {
               <router-link
                 v-if="!isReadOnly"
                 :to="`/GroupShop/product/${p.id}`"
-                class="btn btn-main btn-sm"
+                class="btn btn-main btn-sm go-btn-tap"
               >
                 加入此團購
               </router-link>
@@ -299,11 +250,11 @@ const nextSlide = () => {
             </div>
           </div>
         </div>
-      </div>
+      </TransitionGroup>
     </section>
 
     <!-- 已達團購數量（完成）區塊 -->
-    <section>
+    <section class="go-fade-in-up">
       <div class="section-title bg-done">
         <span class="section-icon">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -312,9 +263,9 @@ const nextSlide = () => {
           </svg>
         </span> 已達團購數量 (完成)
       </div>
-      <div class="product-grid">
+      <TransitionGroup tag="div" name="go-fade" class="product-grid">
         <!-- v-for 把 completedProducts 陣列裡每一筆商品，重複產生一張卡片 -->
-        <div v-for="p in completedProducts" :key="p.id" class="product-card">
+        <div v-for="p in completedProducts" :key="p.id" class="product-card go-card-hover">
           <router-link :to="`/GroupShop/product/${p.id}`" class="card-img-wrap">
             <img :src="resolveImageUrl(p.imageUrl)" class="card-img" :alt="p.name" />
           </router-link>
@@ -333,8 +284,9 @@ const nextSlide = () => {
             </div>
           </div>
         </div>
-      </div>
+      </TransitionGroup>
     </section>
+    </template>
       </main>
     </div>
 
@@ -668,61 +620,107 @@ const nextSlide = () => {
   align-items: flex-start;
 }
 
-.clo-sidebar {
-  width: 220px;
-  flex-shrink: 0;
-  min-height: calc(100vh - 65px);
-  background-color: var(--color-bg-page);
-  border-right: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 20px 0;
-}
-
-.sidebar-nav {
-  display: flex;
-  flex-direction: column;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 24px;
-  color: var(--color-text-muted);
-  text-decoration: none;
-  font-size: 0.92rem;
-  border-left: 3px solid transparent;
-  cursor: pointer;
-}
-.nav-item:hover {
-  background-color: var(--color-hover-bg);
-}
-.nav-item.active {
-  color: var(--color-text);
-  font-weight: 700;
-  background-color: var(--color-active-bg);
-  border-left-color: var(--color-accent);
-}
-.nav-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-}
-
 .clo-main {
   flex: 1;
   padding: 28px 32px;
   min-width: 0;
 }
 
+/* 拿掉左側導覽列後，內容區改成置中、限制最大寬度，版面才不會在寬螢幕上被拉得過開 */
+.clo-main-full {
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+
 @media (max-width: 900px) {
-  .clo-sidebar { width: 72px; }
-  .nav-item span:last-child { display: none; }
   .carousel { height: 260px; }
   .carousel-content { max-width: 80%; left: 20px; bottom: 24px; }
   .carousel-title { font-size: 1.25rem; }
+}
+
+/* ============ 本頁用到的特效樣式，跟 GroupOrdersView.vue 同一套命名慣例，class 一律以 go- 開頭 ============ */
+/* 加了 scoped，這些 class 只作用在這個元件裡，不會跟其他檔案的同名 class 衝突 */
+@keyframes goFadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.go-fade-in-up {
+  animation: goFadeInUp 0.5s ease both;
+}
+
+/* <TransitionGroup name="go-fade"> 用：卡片淡入 */
+.go-fade-enter-active,
+.go-fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.go-fade-enter-from,
+.go-fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.go-card-hover {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.go-card-hover:hover {
+  box-shadow: 0 8px 20px rgba(74, 62, 61, 0.14);
+  transform: translateY(-3px);
+}
+
+.go-btn-tap {
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.go-btn-tap:hover {
+  filter: brightness(1.06);
+}
+.go-btn-tap:active {
+  transform: scale(0.94);
+}
+
+@keyframes goShimmer {
+  0% { background-position: -300px 0; }
+  100% { background-position: 300px 0; }
+}
+.go-skeleton {
+  background: linear-gradient(90deg, #ece3d8 25%, #f6f0e8 37%, #ece3d8 63%);
+  background-size: 600px 100%;
+  animation: goShimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius-card);
+}
+.skeleton-card {
+  height: 260px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .go-fade-in-up,
+  .go-card-hover,
+  .go-btn-tap,
+  .go-skeleton {
+    animation-duration: 0.001s !important;
+    transition-duration: 0.001s !important;
+  }
+}
+
+/* ============ 響應式：手機螢幕再縮小內距與搜尋欄寬度 ============ */
+@media (max-width: 600px) {
+  .clo-main {
+    padding: 16px 12px;
+  }
+
+  .clo-search-below {
+    max-width: 100%;
+  }
+
+  .product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+  }
 }
 </style>

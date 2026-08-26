@@ -484,6 +484,7 @@ const toggleFollow = async () => {
     }
     userProfile.value.isFollowing = false
     myFollowId.value = null
+    userProfile.value.followersCount -= 1 // 取消追蹤，粉絲數立刻減 1，不用重新整理頁面才看得到
   } else {
     // 目前是「還沒追蹤」狀態 → 這次是要追蹤 → 打 POST 新增一筆 User_Follow 紀錄
     try {
@@ -495,6 +496,7 @@ const toggleFollow = async () => {
       console.error('追蹤失敗：', err)
       return
     }
+    userProfile.value.followersCount += 1 // 追蹤成功，粉絲數立刻加 1
     // POST 只會回傳成功與否，不會回傳剛剛新增那筆紀錄的 id，
     // 所以要重新問一次後端才知道 myFollowId 是多少（之後要取消追蹤會用到）。
     await fetchFollowStatus()

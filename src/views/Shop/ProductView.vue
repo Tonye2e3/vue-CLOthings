@@ -224,7 +224,7 @@ const selectedSpec = computed(() => {
 
     <!-- 使用者評價 -->
     <div>
-      <Review />
+      <Review v-if="product" :product-id="product.productId" />
     </div>
 
     <!-- 跟商品有關的穿搭靈感 -->
