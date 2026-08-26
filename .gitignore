@@ -43,5 +43,5 @@ playwright-report/
 
 # 環境設定檔不上傳
 .env
-.env.*
-!.env.production
+.env.local
+.env.*.local
