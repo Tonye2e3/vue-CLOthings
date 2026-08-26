@@ -12,7 +12,7 @@ import { currentUserId, loadCurrentUserId } from '@/views/Community/CommunityVie
 
 const router = useRouter()
 
-const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+const IMAGE_BASE = import.meta.env.VITE_API_URL
 const avatarUrl = (avatarPath, username) => {
   return avatarPath
     ? `${IMAGE_BASE}${avatarPath}`

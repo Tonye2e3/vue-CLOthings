@@ -12,7 +12,7 @@ const cartStore = useCartStore()
 const favoriteStore = useFavoriteStore()
 const route = useRoute()
 const router = useRouter()
-const API_BASE = 'https://localhost:7255'
+const API_BASE = import.meta.env.VITE_API_URL
 const buyNowStore = useBuyNowStore()
 
 
