@@ -1,10 +1,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import axios from 'axios'
+import api from '@/services/api'
 
 const route = useRoute()
-const API_BASE = 'https://localhost:7255'
 
 const products = ref([])
 const categories = ref([])
@@ -30,22 +29,23 @@ const title = computed(() => {
 })
 
 function getImageUrl(fileName) {
-  // 沒有圖檔名時，回傳佔位圖（防呆：有些商品可能還沒圖）
   if (!fileName) {
     return 'https://placehold.co/300x400?text=No+Image'
   }
 
-  return `${API_BASE}/images/product/${fileName}`
+  const baseUrl = api.defaults.baseURL.replace(/\/api\/?$/, '')
+
+  return `${baseUrl}/images/product/${fileName}`
 }
 
 // 頁面一仔入，就打API拿商品
 onMounted(async () => {
   try {
     // 同時打「商品」和「分類」兩個 API
-    const productRes = await axios.get(`${API_BASE}/api/product`)
+    const productRes = await api.get('/product')
     products.value = productRes.data
 
-    const categoryRes = await axios.get(`${API_BASE}/api/productCategory`)
+    const categoryRes = await api.get('/productCategory')
     categories.value = categoryRes.data
   } catch (error) {
     console.error('載入資料失敗：', error)
@@ -60,23 +60,15 @@ onMounted(async () => {
       <RouterLink :to="{ query: {} }" class="cat-btn" :class="{ active: !selectedCategoryId }">
         全部
       </RouterLink>
-      <RouterLink
-        v-for="cat in categories"
-        :key="cat.productCategoryId"
-        :to="{ query: { categoryId: cat.productCategoryId } }"
-        class="cat-btn"
-        :class="{ active: selectedCategoryId === cat.productCategoryId }"
-      >
+      <RouterLink v-for="cat in categories" :key="cat.productCategoryId"
+        :to="{ query: { categoryId: cat.productCategoryId } }" class="cat-btn"
+        :class="{ active: selectedCategoryId === cat.productCategoryId }">
         {{ cat.categoryName }}
       </RouterLink>
     </div>
     <div class="grid">
-      <RouterLink
-        v-for="p in filteredProducts"
-        :key="p.productId"
-        :to="{ name: 'product', params: { id: p.productId } }"
-        class="card"
-      >
+      <RouterLink v-for="p in filteredProducts" :key="p.productId"
+        :to="{ name: 'product', params: { id: p.productId } }" class="card">
         <div class="card-image">
           <span class="card-tag">{{ p.status }}</span>
           <img :src="getImageUrl(p.productImgFile)" :alt="p.productName" class="product-img" />
@@ -97,10 +89,14 @@ onMounted(async () => {
   transition:
     box-shadow 0.25s ease,
     transform 0.25s ease;
-  text-decoration: none; /* 拿掉連結底線 */
-  color: inherit; /* 文字用原本顏色，不要變成連結藍色 */
-  display: block; /* 讓它像區塊一樣（RouterLink 預設是行內） */
+  text-decoration: none;
+  /* 拿掉連結底線 */
+  color: inherit;
+  /* 文字用原本顏色，不要變成連結藍色 */
+  display: block;
+  /* 讓它像區塊一樣（RouterLink 預設是行內） */
 }
+
 .card:hover {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
   transform: translateY(-4px);
@@ -153,6 +149,7 @@ onMounted(async () => {
   gap: 12px;
   margin-bottom: 32px;
 }
+
 .cat-btn {
   padding: 8px 16px;
   border: 1px solid var(--home-border);
@@ -162,6 +159,7 @@ onMounted(async () => {
   font-size: 0.85rem;
   transition: all 0.15s ease;
 }
+
 .cat-btn:hover,
 .cat-btn.active {
   background: var(--home-text);
@@ -199,11 +197,13 @@ onMounted(async () => {
   grid-template-columns: repeat(4, 1fr);
   gap: 24px;
 }
+
 @media (max-width: 1024px) {
   .grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
 @media (max-width: 768px) {
   .grid {
     grid-template-columns: 1fr;

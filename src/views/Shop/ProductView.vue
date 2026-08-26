@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute,useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api'
 import Review from '@/components/Shop/ProductReview.vue'
 import Post from '@/components/Shop/ProductPost.vue'
@@ -148,13 +148,8 @@ const selectedSpec = computed(() => {
 
         <!-- 小圖列表，點擊切換大圖 -->
         <div class="gallery-smallpics">
-          <button
-            v-for="(img, index) in product.images"
-            :key="index"
-            class="smallpic-btn"
-            :class="{ active: currentImage === getImageUrl(img) }"
-            @click="currentImage = getImageUrl(img)"
-          >
+          <button v-for="(img, index) in product.images" :key="index" class="smallpic-btn"
+            :class="{ active: currentImage === getImageUrl(img) }" @click="currentImage = getImageUrl(img)">
             <img :src="getImageUrl(img)" alt="商品縮圖" />
           </button>
         </div>
@@ -180,13 +175,8 @@ const selectedSpec = computed(() => {
         <div class="option-group">
           <p class="option-label">顏色</p>
           <div class="option-list">
-            <button
-              v-for="color in colorOptions"
-              :key="color"
-              class="option-btn"
-              :class="{ selected: selectedColor === color }"
-              @click="selectedColor = color"
-            >
+            <button v-for="color in colorOptions" :key="color" class="option-btn"
+              :class="{ selected: selectedColor === color }" @click="selectedColor = color">
               {{ color }}
             </button>
           </div>
@@ -196,13 +186,8 @@ const selectedSpec = computed(() => {
         <div class="option-group">
           <p class="option-label">尺寸</p>
           <div class="option-list">
-            <button
-              v-for="size in sizeOptions"
-              :key="size"
-              class="option-btn"
-              :class="{ selected: selectedSize === size }"
-              @click="selectedSize = size"
-            >
+            <button v-for="size in sizeOptions" :key="size" class="option-btn"
+              :class="{ selected: selectedSize === size }" @click="selectedSize = size">
               {{ size }}
             </button>
           </div>
@@ -247,7 +232,8 @@ const selectedSpec = computed(() => {
 /* 大圖容器 */
 .gallery-main {
   width: 100%;
-  aspect-ratio: 1 / 1; /* 保持正方形比例，不管圖片原始比例是什麼 */
+  aspect-ratio: 1 / 1;
+  /* 保持正方形比例，不管圖片原始比例是什麼 */
   overflow: hidden;
   background: #f5f5f5;
 }
@@ -255,13 +241,15 @@ const selectedSpec = computed(() => {
 .gallery-main img {
   width: 100%;
   height: 100%;
-  object-fit: cover; /* 讓圖片填滿容器，多餘部分裁掉，不會變形 */
+  object-fit: cover;
+  /* 讓圖片填滿容器，多餘部分裁掉，不會變形 */
 }
 
 /* 小圖列表容器 */
 .gallery-smallpics {
   display: grid;
-  grid-template-columns: repeat(6, 1fr); /* 固定 6 欄，符合您的設計稿 */
+  grid-template-columns: repeat(6, 1fr);
+  /* 固定 6 欄，符合您的設計稿 */
   gap: 8px;
 }
 
@@ -278,18 +266,21 @@ const selectedSpec = computed(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block; /* 消除 img 預設的行內元素間隙 */
+  display: block;
+  /* 消除 img 預設的行內元素間隙 */
 }
 
 .smallpic-btn.active {
-  border-color: #111111; /* 選中時邊框變深色，符合高對比風格 */
+  border-color: #111111;
+  /* 選中時邊框變深色，符合高對比風格 */
   border-width: 2px;
 }
 
 /* 右側商品資訊的樣式 */
 .product-page {
   display: grid;
-  grid-template-columns: 1fr 1fr; /* 左右各佔一半 */
+  grid-template-columns: 1fr 1fr;
+  /* 左右各佔一半 */
   gap: 48px;
   max-width: 1200px;
   margin: 0 auto;
@@ -350,7 +341,8 @@ const selectedSpec = computed(() => {
 .option-list {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap; /* 選項太多時自動換行 */
+  flex-wrap: wrap;
+  /* 選項太多時自動換行 */
 }
 
 .option-btn {
@@ -378,6 +370,7 @@ const selectedSpec = computed(() => {
   color: #999999;
   margin-top: 8px;
 }
+
 /* 按鈕區域，收藏、立即購買、加入購物車 */
 .action-buttons {
   display: flex;
@@ -410,7 +403,8 @@ const selectedSpec = computed(() => {
 .btn-add-cart {
   background: #111111;
   color: #ffffff;
-  flex: 1; /* 讓這個按鈕佔用剩餘空間，視覺上更主要 */
+  flex: 1;
+  /* 讓這個按鈕佔用剩餘空間，視覺上更主要 */
 }
 
 .btn-favorite:hover,
