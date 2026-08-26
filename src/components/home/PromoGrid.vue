@@ -49,12 +49,17 @@ onMounted(async () => {
 
 <template>
   <section class="promo">
-    <h2 class="section-title">限時團購專區</h2>
+    <div class="promo-header go-fade-in-up">
+      <h2 class="section-title mb-0">限時團購專區</h2>
+      <RouterLink to="/GroupShop" class="group-link">前往團購 →</RouterLink>
+    </div>
 
-    <p v-if="isLoading" class="state-label">載入中...</p>
+    <div v-if="isLoading" class="grid">
+      <div v-for="n in 4" :key="n" class="go-skeleton promo-skeleton-card"></div>
+    </div>
     <p v-else-if="displayProducts.length === 0" class="state-label">目前尚無團購商品</p>
 
-    <div v-else class="grid">
+    <TransitionGroup v-else tag="div" name="go-fade" class="grid">
       <RouterLink
         v-for="p in displayProducts"
         :key="p.id"
@@ -77,7 +82,7 @@ onMounted(async () => {
           <p class="card-price">NT${{ p.listPrice.toLocaleString() }}</p>
         </div>
       </RouterLink>
-    </div>
+    </TransitionGroup>
   </section>
 </template>
 
@@ -93,6 +98,34 @@ onMounted(async () => {
   font-weight: 700;
   margin-bottom: 32px;
   color: var(--home-text);
+}
+
+.promo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+.promo-header .section-title {
+  margin-bottom: 0;
+}
+
+.group-link {
+  font-size: 0.85rem;
+  color: var(--home-text);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s ease;
+  white-space: nowrap;
+}
+.group-link:hover {
+  border-color: var(--home-accent);
+  color: var(--home-accent);
+}
+
+.promo-skeleton-card {
+  aspect-ratio: 3 / 4;
+  border-radius: 4px;
 }
 
 .grid {
@@ -183,6 +216,62 @@ onMounted(async () => {
 @media (max-width: 480px) {
   .grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ============ 本頁用到的特效樣式，跟 GroupOrdersView.vue 同一套命名慣例，class 一律以 go- 開頭 ============ */
+/* 加了 scoped，這些 class 只作用在這個元件裡，不會跟其他檔案的同名 class 衝突 */
+@keyframes goFadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.go-fade-in-up {
+  animation: goFadeInUp 0.5s ease both;
+}
+
+/* <TransitionGroup name="go-fade"> 用：卡片淡入 */
+.go-fade-enter-active,
+.go-fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.go-fade-enter-from,
+.go-fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.go-btn-tap {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+.go-btn-tap:hover {
+  filter: brightness(1.1);
+}
+.go-btn-tap:active {
+  transform: scale(0.95);
+}
+
+@keyframes goShimmer {
+  0% { background-position: -300px 0; }
+  100% { background-position: 300px 0; }
+}
+.go-skeleton {
+  background: linear-gradient(90deg, #ececec 25%, #f6f6f6 37%, #ececec 63%);
+  background-size: 600px 100%;
+  animation: goShimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .go-fade-in-up,
+  .go-btn-tap,
+  .go-skeleton {
+    animation-duration: 0.001s !important;
+    transition-duration: 0.001s !important;
   }
 }
 </style>
