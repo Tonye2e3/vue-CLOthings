@@ -7,7 +7,7 @@ import api from '@/services/api'
 
 // IMAGE_BASE：貼文圖片是靜態檔案，走的不是 /api 這條路徑，
 // 跟 CommunityView.vue 拿圖片網址的邏輯一樣。
-const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+const IMAGE_BASE = import.meta.env.VITE_API_URL
 
 // posts：先給空陣列，等 fetchTopPosts() 打完 API 才會有真正資料庫裡的熱門貼文。
 const posts = ref([])

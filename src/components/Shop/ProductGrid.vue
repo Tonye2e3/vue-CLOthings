@@ -33,7 +33,7 @@ function getImageUrl(fileName) {
     return 'https://placehold.co/300x400?text=No+Image'
   }
 
-  const baseUrl = api.defaults.baseURL.replace(/\/api\/?$/, '')
+  const baseUrl = import.meta.env.VITE_API_URL
 
   return `${baseUrl}/images/product/${fileName}`
 }

@@ -9,7 +9,7 @@ const router = useRouter()
 const products = ref([])
 const keyword = ref('')
 
-const API_BASE = 'https://localhost:7255'
+const API_BASE = import.meta.env.VITE_API_URL
 function getImageUrl(fileName) {
   if (!fileName) return 'https://placehold.co/300x400?text=No+Image'
   return `${API_BASE}/images/product/${fileName}`

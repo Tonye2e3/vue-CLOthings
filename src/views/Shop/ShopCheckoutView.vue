@@ -35,7 +35,7 @@ function validateForm() {
   return true // 全部填了 → 回傳 true，可以送出
 }
 
-const API_BASE = 'https://localhost:7255'
+const API_BASE = import.meta.env.VITE_API_URL
 function getImageUrl(image) {
   if (!image) return 'https://placehold.co/80x80?text=No+Image'
   // 已經是完整網址（立即購買）→ 直接用
