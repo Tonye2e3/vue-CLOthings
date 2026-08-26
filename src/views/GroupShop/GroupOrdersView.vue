@@ -425,7 +425,62 @@ table tbody td {
   min-width: 0;
 }
 
+/* 拿掉左側導覽列後，內容區改成置中、限制最大寬度，版面才不會在寬螢幕上被拉得過開
+   跟 GroupProductsView.vue 的 .clo-main-full 用同一套慣例 */
+.clo-main {
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
 
+/* ============ 響應式：畫面變窄時，內距、字級、操作按鈕都跟著縮小 ============ */
+@media (max-width: 900px) {
+  .clo-main {
+    padding: 20px 16px;
+  }
+
+  .page-header h2 {
+    font-size: 1.35rem;
+  }
+
+  table thead th,
+  table tbody td {
+    padding: 10px 10px;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .clo-main {
+    padding: 16px 12px;
+  }
+
+  table thead th,
+  table tbody td {
+    padding: 8px 8px;
+    font-size: 0.78rem;
+  }
+
+  /* 手機上「編輯」「取消」兩個按鈕改成上下排列，避免擠成一團 */
+  .action-buttons {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .cancel-btn,
+  .edit-btn {
+    width: 100%;
+  }
+
+  /* 編輯訂單 Modal 在小螢幕上留邊距，不要貼齊螢幕邊緣 */
+  .modal-dialog {
+    margin: 16px;
+  }
+
+  .edit-qty-input {
+    width: 64px;
+  }
+}
 
 /* ============ 本頁用到的特效樣式（進場動畫／懸停／按鈕微動效／載入動畫），class 一律以 go- 開頭 ============ */
 @keyframes goFadeInUp {

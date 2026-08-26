@@ -473,4 +473,19 @@ const handleJoin = async () => {
   margin: 0 auto;
   width: 100%;
 }
+
+/* ============ 響應式：手機螢幕縮小內距與主圖高度 ============ */
+@media (max-width: 600px) {
+  .clo-main {
+    padding: 16px 12px;
+  }
+
+  .hero-img {
+    height: 200px;
+  }
+
+  .hero-info {
+    padding: 14px 16px;
+  }
+}
 </style>

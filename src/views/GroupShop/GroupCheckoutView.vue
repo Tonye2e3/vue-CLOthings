@@ -456,4 +456,15 @@ const handleSubmit = async () => {
   margin: 0 auto;
   width: 100%;
 }
+
+/* ============ 響應式：手機螢幕縮小內距與表單卡片間距 ============ */
+@media (max-width: 600px) {
+  .clo-main {
+    padding: 16px 12px;
+  }
+
+  .form-card {
+    padding: 16px;
+  }
+}
 </style>

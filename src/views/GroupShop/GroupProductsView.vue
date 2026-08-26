@@ -707,4 +707,20 @@ const nextSlide = () => {
     transition-duration: 0.001s !important;
   }
 }
+
+/* ============ 響應式：手機螢幕再縮小內距與搜尋欄寬度 ============ */
+@media (max-width: 600px) {
+  .clo-main {
+    padding: 16px 12px;
+  }
+
+  .clo-search-below {
+    max-width: 100%;
+  }
+
+  .product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+  }
+}
 </style>

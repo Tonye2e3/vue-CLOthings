@@ -374,4 +374,25 @@ const handleCheckout = () => {
   margin: 0 auto;
   width: 100%;
 }
+
+/* ============ 響應式：手機螢幕縮小內距，購物車每列改成換行排列 ============ */
+@media (max-width: 600px) {
+  .clo-main {
+    padding: 16px 12px;
+  }
+
+  .cart-row,
+  .addon-row {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+
+  .cart-item-price {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+}
 </style>
