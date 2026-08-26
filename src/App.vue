@@ -6,6 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { RouterLink } from 'vue-router'
 import IconSearch from '@/components/icons/IconSearch.vue'
 import IconHeart from '@/components/icons/IconHeart.vue'
+import NotificationBell from '@/components/Community/NotificationBell.vue'
 import IconUser from '@/components/icons/IconUser.vue'
 import IconCart from '@/components/icons/IconCart.vue'
 import { ref } from 'vue'
@@ -84,6 +85,7 @@ function logout() {
         <RouterLink :to="{ name: 'favorite' }" class="icon-btn" aria-label="收藏">
           <IconHeart />
         </RouterLink>
+        <NotificationBell v-if="authStore.isLoggedIn" />
         <RouterLink
           v-if="authStore.isLoggedIn"
           :to="{ name: 'user' }"

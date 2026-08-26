@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import { useAuthStore } from '@/stores/auth'
 
+import GoogleOAuthCallback from '@/views/Users/GoogleOAuthCallback.vue'
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -243,46 +245,44 @@ const router = createRouter({
           path: '',
           name: 'user',
 
-          // 🟢 新增
+          // 🟢 AccountCard.vue 變成會員中心首頁
           component: () => import('@/views/Users/UserCard/AccountCard.vue'),
         },
 
-        // ==============================
-        // 🟢 新增：商城訂單
-        // ==============================
+        // 商城訂單
         {
           path: 'orders',
           name: 'UserShopOrders',
           component: () => import('@/views/Shop/ShopOrdersView.vue'),
         },
 
-        // ==============================
-        // 🟢 新增：團購訂單
-        // ==============================
+        // 團購訂單
         {
           path: 'group-orders',
           name: 'UserGroupOrders',
           component: () => import('@/views/GroupShop/GroupOrdersView.vue'),
         },
 
-        // ==============================
-        // 🟢 新增：社群個人頁
-        // ==============================
+        // 社群個人頁
         {
           path: 'community/:userId',
           name: 'UserCommunityProfile',
           component: () => import('@/views/Community/UserProfileView.vue'),
         },
 
-        // ==============================
-        // 🟢 新增：訊息
-        // ==============================
+        // 訊息
         {
           path: 'messages',
           name: 'UserMessages',
           component: () => import('@/views/Community/ChatView.vue'),
         },
+
       ],
+    },
+    {
+      path: '/oauth/google',
+      name: 'google-oauth-callback',
+      component: GoogleOAuthCallback,
     },
   ],
 })
