@@ -3,6 +3,25 @@ export function isValidAccount(str) {
   return isValid ? '' : '帳號格式錯誤，只能英數字，4～50 字元'
 }
 
+// 登入帳號驗證：允許「帳號」或「Email」
+export function isValidLoginAccount(str) {
+  if (!str) {
+    return '請輸入帳號或電子郵件'
+  }
+
+  // 有 @ 就當 Email 驗證
+  if (str.includes('@')) {
+    const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(str)
+
+    return isValidEmail ?
+      '' :
+      '電子郵件格式錯誤'
+  }
+
+  // 沒有 @ 就使用原本帳號驗證
+  return isValidAccount(str)
+}
+
 export function isValidPassword(str) {
   // 至少一個大寫、一個小寫，僅限英數字，長度 ≥ 6
   const isValid = /^(?=.*[A-Z])(?=.*[a-z])[A-Za-z0-9]{6,}$/.test(str)

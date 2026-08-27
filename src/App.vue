@@ -56,9 +56,8 @@ function logout() {
 <template>
   <header class="site-header">
     <div class="header-inner">
-      <RouterLink :to="{ name: 'home' }" aria-label="首頁"
-        ><img src="@/assets/CLO.things LOGO.png" alt="CLO.things logo" class="logo"
-      /></RouterLink>
+      <RouterLink :to="{ name: 'home' }" aria-label="首頁"><img src="@/assets/CLO.things LOGO.png" alt="CLO.things logo"
+          class="logo" /></RouterLink>
       <nav class="main-nav">
         <RouterLink v-for="item in navItems" :key="item.label" :to="item.to" class="nav-link">
           {{ item.label }}
@@ -68,16 +67,11 @@ function logout() {
       <div class="header-actions">
 
         <div class="search-box">
-  <input
-    v-model="searchKeyword"
-    @keyup.enter="doSearch"
-    placeholder="搜尋商品..."
-    class="search-input"
-  />
-  <button class="icon-btn" @click="doSearch" aria-label="搜尋">
-    <IconSearch />
-  </button>
-</div>
+          <input v-model="searchKeyword" @keyup.enter="doSearch" placeholder="搜尋商品..." class="search-input" />
+          <button class="icon-btn" @click="doSearch" aria-label="搜尋">
+            <IconSearch />
+          </button>
+        </div>
         <!-- <button class="icon-btn" type="button" aria-label="搜尋">
           <IconSearch />
         </button> -->
@@ -86,28 +80,13 @@ function logout() {
           <IconHeart />
         </RouterLink>
         <NotificationBell v-if="authStore.isLoggedIn" />
-        <RouterLink
-          v-if="authStore.isLoggedIn"
-          :to="{ name: 'user' }"
-          class="icon-btn"
-          aria-label="帳號"
-        >
+        <RouterLink v-if="authStore.isLoggedIn" :to="{ name: 'user' }" class="icon-btn" aria-label="帳號">
           <IconUser />
         </RouterLink>
-        <RouterLink
-          v-else
-          :to="{ name: 'login' }"
-          class="icon-btn"
-          aria-label="帳號"
-        >
+        <RouterLink v-else :to="{ name: 'login' }" class="icon-btn" aria-label="帳號">
           <IconUser />
         </RouterLink>
-        <RouterLink
-          v-if="!isGroupSection"
-          :to="{ name: 'cart' }"
-          class="icon-btn"
-          aria-label="購物車"
-        >
+        <RouterLink v-if="!isGroupSection" :to="{ name: 'cart' }" class="icon-btn" aria-label="購物車">
           <IconCart />
         </RouterLink>
       </div>
@@ -154,7 +133,7 @@ function logout() {
 <style scoped>
 .main-container {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1600px;
   /* 依照設計需求調整內容的最大寬度 */
   margin: 0 auto;
   /* 上下 0，左右自動置中 */
