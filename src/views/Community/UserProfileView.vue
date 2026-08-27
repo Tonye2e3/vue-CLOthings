@@ -2,59 +2,52 @@
 import { ref, onMounted, watch, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '@/services/api'
-// animate：anime.js v4 的動畫函式，這裡用來做編輯貼文彈出視窗的開關動畫，
+// anime.js：編輯彈窗的開關動畫
 import { animate } from 'animejs'
+
+// 收藏清單、formatCount、currentUserId 都從 CommunityView.vue 共用
 import { savedPosts, loadSavedPosts, formatCount, currentUserId, loadCurrentUserId } from '@/views/Community/CommunityView.vue'
 
-// IMAGE_BASE：圖片是靜態檔案，走的不是 /api 這條路徑，不能直接用 api 服務的
-// baseURL（那個含 /api）；VITE_API_URL 本身就是純後端主機網址。
-const IMAGE_BASE = import.meta.env.VITE_API_URL
+// 圖片是靜態檔案，不走 /api，用 VITE_API_URL 去掉 /api 尾巴
+const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
 
 const route = useRoute()
 
-// onAvatarError：大頭貼圖片載入失敗時執行（例如資料庫存的路徑指到 wwwroot 裡
-// 實際上還沒有的檔案），失敗時把圖片來源換成 dicebear 產生的預設頭像，
-// 跟 CommunityView.vue 的 onAvatarError 是同一套邏輯。
+// 大頭貼載入失敗時換成 dicebear 預設圖；比對網址而非用旗標，避免同一個 img 元素重複使用時卡住舊狀態
 const onAvatarError = (event, name) => {
   const fallbackUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
   if (event.target.src === fallbackUrl) return
   event.target.src = fallbackUrl
 }
+
+// viewedUserId：正在看誰的頁面（網址參數）；currentUserId：我是誰（import 進來）
+// 用 computed 才會隨路由切換即時更新（Vue Router 會重用同一個元件）
 const viewedUserId = computed(() => Number(route.params.userId))
 
-
-
-// 使用者個人資料
 const userProfile = ref({
   name: '',
   handle: '',
   bioTag: '',
   bio: '',
-  avatar: '', // 大頭貼圖片網址
-  postsCount: 0,    // 貼文數（純文字顯示用，不是拿來計算的數字）
+  avatar: '',
+  postsCount: 0,
   followersCount: 0,
   followingCount: 0,
-  isFollowing: false // 「我」有沒有追蹤這個人，true/false 這種只有兩種狀態的值叫做布林值
+  isFollowing: false
 })
 
-// 當前頁籤 (穿搭作品, 收藏, 同款商品, 關於我)
-// 這個 ref 只存一個字串，代表「現在使用者點的是哪一個分類頁籤」。
 const activeTab = ref('works')
 
-// 穿搭作品列表
+// 貼文清單，等 fetchUserPosts() 填入
 const userPosts = ref([])
 
-// profileLoading：個人資料、貼文都還沒抓回來之前是 true，畫面用這個顯示骨架佔位畫面。
+// 個人資料、貼文都還沒抓回來之前顯示骨架畫面
 const profileLoading = ref(true)
 
-// fetchUserPosts：跟後端要「這個使用者自己發的所有貼文」，
-// 打的是 CommunityPostController.cs 裡新增的 GET api/CommunityPost/user/{userid}。
+// 抓這個使用者發的所有貼文
 const fetchUserPosts = async () => {
   try {
     const res = await api.get(`/CommunityPost/user/${viewedUserId.value}`)
-    // 後端回傳的格式（CommunityPostDTO）跟這頁 template 原本期待的格式不太一樣，
-    // 這裡把它轉成 template 需要的形狀：content、image（取第一張圖）、likesCount、
-    // commentsCount、tags（把 taggedProducts 陣列轉成 '#商品名稱' 字串陣列）。
     userPosts.value = res.data.map(post => ({
       communityPostId: post.communityPostId,
       userId: post.userId,
@@ -63,30 +56,19 @@ const fetchUserPosts = async () => {
       image: post.images && post.images.length > 0
         ? `${IMAGE_BASE}${post.images[0].imageFileName}`
         : '',
-      // images：保留完整的原始圖片清單（不是只有第一張），編輯貼文換照片時要用到，
-      // 卡片本身的縮圖顯示還是繼續用上面那個扁平的 image 欄位就好。
-      images: post.images || [],
+      images: post.images || [], // 編輯貼文換照片要用完整清單
       likesCount: post.likesCount,
       commentsCount: post.commentsCount,
       tags: post.taggedProducts.map(t => `#${t.name}`),
-      // taggedProducts：保留完整的原始標記商品清單（不是只有格式化過的 #名稱 字串），
-      // 編輯貼文改標記商品時要用到，卡片本身顯示還是繼續用上面那個 tags 就好。
-      taggedProducts: post.taggedProducts || []
+      taggedProducts: post.taggedProducts || [] // 編輯貼文改標記商品要用
     }))
-    // 貼文數：直接用剛剛抓回來的貼文數量就好，不用另外多打一支 API 算，
-    // 跟 CommunityPostController.cs 裡 LikesCount／CommentsCount 用 .Count() 算的道理一樣，
-    // 只是這裡前端已經有資料在手上了，直接拿陣列長度更省一次 API 呼叫。
     userProfile.value.postsCount = userPosts.value.length
   } catch (err) {
     console.error('讀取個人貼文失敗：', err)
   }
 }
 
-// deletePost：按下「刪除貼文」時執行。
-// 打的是 CommunityPostController.cs 裡的 DELETE api/CommunityPost/{communitypostid}。
 const deletePost = async (communityPostId) => {
-  // confirm(...)：瀏覽器內建的確認視窗，會跳出「確定／取消」讓使用者選，
-  // 按確定回傳 true，按取消回傳 false。刪除是不能復原的動作，先跟使用者確認一次比較安全。
   if (!confirm('確定要刪除這篇貼文嗎？刪除後就無法恢復。')) return
 
   try {
@@ -97,15 +79,12 @@ const deletePost = async (communityPostId) => {
     return
   }
 
-  // API 刪除成功後，把畫面上這篇貼文也從 userPosts 移除，不用整頁重新整理、重打一次 API。
   userPosts.value = userPosts.value.filter(p => p.communityPostId !== communityPostId)
 }
 
-// editingPostId：現在正在編輯哪一篇貼文，null 代表沒有任何一篇正在編輯中。
+// 目前正在編輯哪一篇貼文，null 代表沒有
 const editingPostId = ref(null)
 
-// availableProducts：可標記的商品清單，跟 CreatePostView.vue 是同一套邏輯，
-// 先給空陣列，等 fetchProducts() 打完 API 才會有真正資料庫裡的商品。
 const availableProducts = ref([])
 const fetchProducts = async () => {
   try {
@@ -119,20 +98,16 @@ const fetchProducts = async () => {
   }
 }
 
-// productSearch：編輯表單裡「標記標籤商品」搜尋框打的文字。
-// 因為同一時間只會有一張卡片在編輯模式，全頁共用一份搜尋狀態就夠了。
 const productSearch = ref('')
 const filteredProducts = computed(() => {
   const q = productSearch.value.trim().toLowerCase()
   if (!q) {
-    // 沒有搜尋文字時，只列出前 5 個當作「熱門標籤」頂著，不要把商品全部攤開，
+    // 沒搜尋時只列前 5 個熱門標籤，避免標籤區塊被拉長
     return availableProducts.value.slice(0, 5)
   }
   return availableProducts.value.filter(p => p.name.toLowerCase().includes(q))
 })
 
-// toggleEditProduct：點某個商品標籤時執行，已選就取消、未選就加入，跟
-// CreatePostView.vue 的 toggleProduct 是同一套邏輯，只是改在編輯表單上操作。
 const toggleEditProduct = (name) => {
   const list = editForm.value.taggedProducts
   const idx = list.indexOf(name)
@@ -143,20 +118,12 @@ const toggleEditProduct = (name) => {
   }
 }
 
-// editForm：編輯表單目前打的內容，對應 CommunityPostController.cs 的
-// PutCommunityPost 能改的欄位：content、status、images、taggedProducts。
-// images 陣列裡每一筆是 { imageFileName, sortOrder, url, isNew }：
-// isNew 是 false 代表這張是「本來就有」的舊照片（imageFileName 是資料庫裡真的路徑）；
-// isNew 是 true 代表這張是「這次新選的」照片（imageFileName 先用檔案原始名稱佔位，
-// 等圖片上傳功能做好再換成真正存到伺服器後的路徑，跟 CreatePostView.vue 現在的做法一樣）。
-// taggedProducts 是商品名稱的字串陣列（跟 CreatePostView.vue 的 selectedProducts 同一種格式）。
+// images 裡每筆 isNew=false 是舊照片，isNew=true 是這次新選的（還沒真正上傳）
 const editForm = ref({ content: '', status: 'public', images: [], taggedProducts: [] })
 
-// startEdit：按下「編輯貼文」時執行，把表單內容預先填成這篇貼文現在的資料，
-// 並把 editingPostId 設成這篇貼文的 id，畫面上就會展開編輯表單。
 const startEdit = (post) => {
   editingPostId.value = post.communityPostId
-  productSearch.value = '' // 每次打開編輯表單，搜尋框重設乾淨
+  productSearch.value = ''
   editForm.value = {
     content: post.content,
     status: post.status || 'public',
@@ -168,45 +135,14 @@ const startEdit = (post) => {
     })),
     taggedProducts: (post.taggedProducts || []).map(t => t.name)
   }
-  // nextTick：等 Vue 把 <textarea> 真正畫到畫面上、v-model 把 editForm.content
-  // 填進去之後，才有真正的內容高度可以量，太早呼叫的話 scrollHeight 量到的
-  // 還是空字串的高度。
-  nextTick(() => autoGrowTextarea())
 }
 
-// editTextareaEl：編輯表單裡那個 <textarea> 的 DOM 參照。
-const editTextareaEl = ref(null)
-
-// autoGrowTextarea：文字內容改變時，把輸入框的高度自動調整成剛好放得下目前的文字，
-// 取代原本靠使用者自己手動拖曳調整大小——原本的手動拖曳在這個彈出視窗裡會有問題：
-// 這個輸入框放在 .edit-form 這個「本身也會上下捲動」的容器裡（彈出視窗要讓標題列、
-// 底部按鈕固定不動，只有中間內容捲動），瀏覽器原生的拖曳調整大小控制點，
-// 放在這種巢狀捲動的容器組合裡常常會出現抓不到、拖不動的狀況。改成打字的時候
-// 自動長高，不用手動拖曳，直接繞開這個問題。
-// el.style.height = 'auto'：先把高度歸零，才能重新量出「現在的文字內容實際需要多高」
-// （scrollHeight）——不歸零的話，scrollHeight 量到的還是「上一次」的高度，
-// 文字變少的時候框框不會跟著縮小。
-const autoGrowTextarea = () => {
-  const el = editTextareaEl.value
-  if (!el) return
-  el.style.height = 'auto'
-  el.style.height = `${el.scrollHeight}px`
-}
-
-// cancelEdit：取消編輯，收起表單，不送出任何變更。
 const cancelEdit = () => {
   editingPostId.value = null
 }
 
-// ============================================================
-// 編輯貼文彈出視窗的開關動畫（Vue <Transition> 的 JS hook 搭配 anime.js）
-// ============================================================
+// ---------- 編輯彈窗開關動畫（Transition JS hook + anime.js） ----------
 
-// onEditModalEnter：彈出視窗「出現」的時候執行——el 是 Vue 傳進來的
-// .edit-modal-overlay 這個真正的 DOM 元素，done 是「動畫播完了，可以繼續」的通知函式。
-// 背景（overlay）淡入的同時，裡面的視窗本體（.edit-modal）從稍微縮小的狀態
-// 放大回原本尺寸＋淡入，兩層疊在一起有種「從畫面中間浮出來」的感覺，
-// 比單純的淡入更有彈出視窗該有的存在感。
 const onEditModalEnter = (el, done) => {
   const modalBox = el.querySelector('.edit-modal')
   animate(el, { opacity: [0, 1], duration: 200, ease: 'outQuad' })
@@ -219,10 +155,7 @@ const onEditModalEnter = (el, done) => {
   })
 }
 
-// onEditModalLeave：彈出視窗「關閉」的時候執行——跟 enter 相反，背景淡出、
-// 視窗本體縮小＋淡出。:css="false" 模式下，leave 的 done() 一定要呼叫，
-// 不然 Vue 不知道動畫什麼時候播完，會讓這個元素（連同 Teleport 出去的節點）
-// 卡在 DOM 裡拿不掉。
+// :css="false" 模式下 leave 一定要呼叫 done()，不然元素會卡在 DOM 拿不掉
 const onEditModalLeave = (el, done) => {
   const modalBox = el.querySelector('.edit-modal')
   animate(el, { opacity: [1, 0], duration: 180, ease: 'inQuad' })
@@ -235,8 +168,6 @@ const onEditModalLeave = (el, done) => {
   })
 }
 
-// lightboxImage：目前燈箱裡放大顯示的圖片網址，null 代表燈箱沒有打開。
-// openLightbox／closeLightbox：點編輯表單裡的縮圖放大看原圖、點背景或 ✕ 關閉。
 const lightboxImage = ref(null)
 const openLightbox = (url) => {
   lightboxImage.value = url
@@ -245,31 +176,26 @@ const closeLightbox = () => {
   lightboxImage.value = null
 }
 
-// handleEditFileChange：編輯表單裡選新照片時執行，邏輯跟 CreatePostView.vue 的
-// handleFileChange 是同一套，只是這裡是加進 editForm.value.images。
 const handleEditFileChange = (event) => {
   const files = Array.from(event.target.files || [])
   files.forEach(file => {
     editForm.value.images.push({
-      file, // 保留原始檔案本身，saveEdit 真正送出前要用它上傳
-      imageFileName: file.name, // 先用檔案原始名稱佔位，saveEdit 上傳成功後會換成真正的路徑
+      file,
+      imageFileName: file.name, // 佔位，saveEdit 上傳成功後換成真正路徑
       sortOrder: editForm.value.images.length + 1,
-      url: URL.createObjectURL(file), // 本地暫時預覽網址
+      url: URL.createObjectURL(file),
       isNew: true
     })
   })
   event.target.value = ''
 }
 
-// removeEditImage：移除編輯表單裡的其中一張照片（不管是舊照片還是新選的都可以移除）。
 const removeEditImage = (index) => {
   editForm.value.images.splice(index, 1)
 }
 
-// saveEdit：按下「儲存」時執行，先把「新選的照片」真正上傳，再打 PUT api/CommunityPost/{id}。
+// 儲存編輯：先上傳新照片，再打 PUT 更新貼文
 const saveEdit = async (post) => {
-  // 第一步：把 isNew 是 true 的照片（這次新選的）真正上傳到後端，
-  // 舊照片（isNew 是 false）已經在伺服器上了，不用再傳一次。
   const newImages = editForm.value.images.filter(img => img.isNew)
 
   if (newImages.length > 0) {
@@ -280,8 +206,6 @@ const saveEdit = async (post) => {
       const uploadRes = await api.post(`/CommunityPost/upload-images`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
-      // uploadRes.data 的順序跟 newImages 送出的順序是對應的，
-      // 把每一筆新照片的 imageFileName 換成後端真正回傳的路徑。
       newImages.forEach((img, idx) => {
         img.imageFileName = uploadRes.data[idx]
       })
@@ -292,16 +216,12 @@ const saveEdit = async (post) => {
     }
   }
 
-  // 送出前先把 sortOrder 依照現在畫面上的順序重新編一次號（1、2、3...），
-  // 避免使用者移除中間某張照片後，順序留下缺口（例如變成 1、3、4）。
+  // 重新編號 sortOrder，避免移除中間照片後留下缺口
   const images = editForm.value.images.map((img, idx) => ({
     imageFileName: img.imageFileName,
     sortOrder: idx + 1
   }))
 
-  // 把選中的商品名稱陣列，轉換成對應 Post_Tagged_Product 格式的物件陣列，
-  // 用 availableProducts.find(...) 找回這個名字對應的 productId，
-  // 跟 CreatePostView.vue 組 taggedProducts 的方式完全一樣。
   const taggedProducts = editForm.value.taggedProducts.map(name => {
     const matched = availableProducts.value.find(p => p.name === name)
     return {
@@ -325,13 +245,11 @@ const saveEdit = async (post) => {
     return
   }
 
-  // 成功後直接更新畫面上這篇貼文的內容，不用重新整理、重打一次 GET API。
+  // 成功後直接更新畫面，不用重打 GET
   post.content = editForm.value.content
   post.status = editForm.value.status
   post.images = images
   post.image = images.length > 0 ? `${IMAGE_BASE}${images[0].imageFileName}` : ''
-  // 標記商品也要跟著更新畫面：tags（給卡片顯示用的 #名稱 字串）跟
-  // taggedProducts（保留原始格式，下次再編輯時要用）都要同步。
   post.tags = editForm.value.taggedProducts.map(name => `#${name}`)
   post.taggedProducts = editForm.value.taggedProducts.map(name => {
     const matched = availableProducts.value.find(p => p.name === name)
@@ -341,25 +259,18 @@ const saveEdit = async (post) => {
   alert('儲存成功！')
 }
 
-// onMounted：這個元件的畫面第一次被畫出來之後，自動執行裡面的程式碼一次。
-// 跟 PostDetailView.vue 抓單篇貼文的邏輯是一樣的模式。
-// 也順便呼叫 loadSavedPosts，避免使用者是直接連進這頁（沒先經過 CommunityView.vue），
-// 導致收藏頁籤看起來是空的。
 onMounted(async () => {
   loadProfileData()
-  loadSavedPosts()
-  fetchProducts() // 編輯貼文表單要用到，只有看自己的頁面才用得上，但先載入沒關係
-  // await loadCurrentUserId()：這頁可能是使用者直接連進來的（沒先經過 CommunityView.vue），
-  // currentUserId 這時候還是 null，要先確定拿到真正的 userId，下面比對
-  // 「瀏覽的是不是自己」才會準——不然沒登入或還沒查完時，currentUserId.value 是 null，
-  // viewedUserId 不可能等於 null，會誤判成「不是自己」而多打一次不必要的查詢。
+  loadSavedPosts() // 避免直接連進這頁時收藏頁籤看起來是空的
+  fetchProducts() // 編輯表單要用，只有本人頁面用得上但先載入沒關係
+  // 先確定拿到真正的 userId，才能準確比對「是不是在看自己的頁面」
   await loadCurrentUserId()
   if (viewedUserId.value !== currentUserId.value) {
     fetchFollowStatus()
   }
 })
 
-// 決定要不要顯示骨架畫面
+// 三支 API 平行送出，全部回來才關掉骨架畫面，避免資料只到一半的破圖
 const loadProfileData = async () => {
   profileLoading.value = true
   try {
@@ -369,49 +280,31 @@ const loadProfileData = async () => {
   }
 }
 
-// watch：監看網址上的 :userId 這個參數。
-// 跟 PostDetailView.vue 換貼文時遇到的狀況一樣——從「這個人的個人頁」點連結切到
-// 「另一個人的個人頁」時，Vue Router 會重複使用同一個元件，onMounted 不會再執行第二次，
-// 所以另外監看 :userId，只要它變了（換了要看的人），就重新打一次 API。
+// 切換到別人的個人頁時 Vue Router 會重用元件，onMounted 不會再跑，靠 watch 補上
 watch(() => route.params.userId, () => {
   loadProfileData()
   if (viewedUserId.value !== currentUserId.value) {
     fetchFollowStatus()
   } else {
-    // 換到看自己的頁面時，重設狀態，避免殘留上一個人的追蹤紀錄 id
     userProfile.value.isFollowing = false
     myFollowId.value = null
   }
 })
-
 
 const tabs = [
   { key: 'works', label: '穿搭作品' },
   { key: 'saved', label: '收藏' }
 ]
 
-// myFollowId：如果目前這個測試帳號已經追蹤這個人，這裡存那筆 User_Follow 紀錄的
-// userFollowId，之後要取消追蹤（DELETE）要靠這個 id 才能刪對紀錄。還沒追蹤就是 null。
+// 目前登入者對這個人的追蹤紀錄 id，還沒追蹤是 null
 const myFollowId = ref(null)
 
-// fetchFollowStatus：問後端「這個測試帳號有沒有追蹤現在瀏覽的這個人」，
-// 打的是 UserFollowController.cs 裡的 GET api/UserFollow/follower/{followerid}/following/{followingid}。
-// fetchFollowCounts：跟後端要「這個人的粉絲數／追蹤中數」，
-// 打的是 UserFollowController.cs 裡的 GET api/UserFollow/counts/{userid}。
-// fetchPublicProfile：跟後端要「這個人的公開基本資料」（暱稱、帳號、大頭貼、風格標籤、自我介紹），
-// 打的是 PublicUserProfileController.cs 裡的 GET api/PublicUserProfile/{userid}。
 const fetchPublicProfile = async () => {
   try {
     const res = await api.get(`/PublicUserProfile/${viewedUserId.value}`)
     userProfile.value.name = res.data.username
     userProfile.value.handle = `@${res.data.account}`
-    // res.data.avatar 後端存的是相對路徑（例如 /avatars/user002.png），要接上 IMAGE_BASE
-    // 才是完整網址；沒設大頭貼的人（avatar 是 null）改成用 dicebear 產生跟這個人帳號綁定
-    // 的預設頭像——不能再像原本那樣「維持 userProfile.value.avatar 原本的值」，那個原本的值
-    // 是元件一開始寫死的預設圖（seed=Emily），不管換到哪個沒設大頭貼的人的頁面都會長一樣，
-    // 也會跟貼文卡片、留言那邊用 username 當 seed 產生出來的頭像對不起來（同一個人在不同頁面
-    // 卻顯示兩種不同的預設頭像）。這裡改成一樣用 res.data.username 當 seed，
-    // 這樣同一個帳號不管在貼文卡片、留言、還是自己的個人頁，沒設大頭貼時看到的預設圖都會是同一張。
+    // 沒設大頭貼時用 username 當 dicebear seed，跟貼文卡片、留言的預設頭像一致
     userProfile.value.avatar = res.data.avatar
       ? `${IMAGE_BASE}${res.data.avatar}`
       : `https://api.dicebear.com/7.x/avataaars/svg?seed=${res.data.username}`
@@ -447,21 +340,18 @@ const fetchFollowStatus = async () => {
   }
 }
 
-// toggleFollow：按下「追蹤」按鈕時執行。改成 async，因為裡面要 await 打 API。
 const toggleFollow = async () => {
   if (userProfile.value.isFollowing) {
-    // 目前是「已追蹤」狀態 → 這次是要取消追蹤 → 打 DELETE，刪掉 myFollowId 那筆紀錄
     try {
       await api.delete(`/UserFollow/${myFollowId.value}`)
     } catch (err) {
       console.error('取消追蹤失敗：', err)
-      return // 失敗就不要動畫面上的狀態，維持「已追蹤」原樣
+      return
     }
     userProfile.value.isFollowing = false
     myFollowId.value = null
-    userProfile.value.followersCount -= 1 // 取消追蹤，粉絲數立刻減 1，不用重新整理頁面才看得到
+    userProfile.value.followersCount -= 1
   } else {
-    // 目前是「還沒追蹤」狀態 → 這次是要追蹤 → 打 POST 新增一筆 User_Follow 紀錄
     try {
       await api.post(`/UserFollow`, {
         followerId: currentUserId.value,
@@ -471,13 +361,13 @@ const toggleFollow = async () => {
       console.error('追蹤失敗：', err)
       return
     }
-    userProfile.value.followersCount += 1 // 追蹤成功，粉絲數立刻加 1
-    // POST 只會回傳成功與否，不會回傳剛剛新增那筆紀錄的 id，
-    // 所以要重新問一次後端才知道 myFollowId 是多少（之後要取消追蹤會用到）。
+    userProfile.value.followersCount += 1
+    // POST 不回傳新紀錄的 id，重新查一次才知道 myFollowId
     await fetchFollowStatus()
   }
 }
 </script>
+
 
 <template>
   
@@ -487,7 +377,7 @@ const toggleFollow = async () => {
 
     <div class="container-fluid container-lg pb-5">
 
-      <!-- 返回社群按鈕 -->
+      <!--  返回社群按鈕 -->
       <router-link to="/community" class="back-pill">← 返回社群</router-link>
 
       <!-- profileLoading：個人資料、貼文都還沒抓回來之前顯示骨架佔位畫面 -->
@@ -521,7 +411,7 @@ const toggleFollow = async () => {
       <!-- 個人檔案卡 -->
       <div class="profile-card mb-4">
 
-        <!-- 封面橫幅：改用斜紋質感取代純色平塗 -->
+        <!-- 封面橫幅 -->
         <div class="profile-banner"></div>
 
         <div class="profile-body">
@@ -529,13 +419,6 @@ const toggleFollow = async () => {
 
             <!-- 大頭貼 -->
             <div class="avatar-wrapper">
-              <!--
-                :src="userProfile.avatar"
-                前面加冒號的屬性（例如 :src）叫做「動態綁定」，
-                意思是「這個屬性的值不是寫死的文字，而是綁定一個變數」。
-                所以這裡的圖片網址會直接抓 userProfile 裡的 avatar 值。
-                （在 template 裡面直接寫 userProfile.avatar，不用加 .value）
-              -->
               <img :src="userProfile.avatar" class="avatar-img" alt="Avatar" @error="onAvatarError($event, userProfile.name)" />
             </div>
 
@@ -543,11 +426,9 @@ const toggleFollow = async () => {
             <div class="profile-meta">
               <div class="stat-group">
                 <div class="stat-item">
-                  <!-- {{ }} 雙大括號叫做「插值」，作用是把後面的變數值印到畫面上 -->
                   <div class="stat-num">{{ userProfile.postsCount }}</div>
                   <div class="stat-label">貼文</div>
                 </div>
-                <!-- router-link 換掉了原本的彈窗按鈕：長列表切到獨立頁面比彈窗好滑、好找 -->
                 <router-link :to="`/community/profile/${viewedUserId}/followers`" class="stat-item stat-item-clickable">
                   <div class="stat-num">{{ userProfile.followersCount }}</div>
                   <div class="stat-label">粉絲</div>
@@ -558,21 +439,15 @@ const toggleFollow = async () => {
                 </router-link>
               </div>
 
-              <!-- 只有瀏覽「別人」的個人頁才顯示追蹤／訊息按鈕；瀏覽自己的頁面不會出現這排按鈕 -->
+              <!-- 只有瀏覽別人的頁面才顯示追蹤／訊息按鈕 -->
               <div class="action-group" v-if="viewedUserId !== currentUserId">
                 <button
                   class="btn-follow-main"
                   :class="{ following: userProfile.isFollowing }"
                   @click="toggleFollow"
                 >
-
                   {{ userProfile.isFollowing ? '已追蹤' : '＋ 追蹤' }}
                 </button>
-                <!--
-                  站內聊天室帶著對方的 viewedUserId，
-                  ChatView.vue 自己會判斷「這個人是不是已經聊過天」，決定要開啟現有對話
-                  還是開一段新對話。
-                -->
                 <router-link :to="`/community/messages/${viewedUserId}`" class="btn-message">✉ 訊息</router-link>
               </div>
             </div>
@@ -602,21 +477,13 @@ const toggleFollow = async () => {
         </div>
       </div>
 
-      <!--穿搭作品牆-->
+      <!-- 穿搭作品牆 -->
       <div v-if="activeTab === 'works'" class="post-grid">
-        <!-- 一樣是 v-for 迴圈，把 userPosts 陣列裡每一篇貼文都畫成一張卡片 -->
         <div v-for="post in userPosts" :key="post.communityPostId" class="post-card">
 
-          
           <router-link :to="`/community/post/${post.communityPostId}`" class="post-media d-block text-decoration-none">
-            <!--
-              這篇貼文可能有好幾個標籤，但卡片上只顯示第一個標籤（post.tags[0]），
-              這裡顯示的時候想拿掉 #。
-            -->
             <span class="tag-label" v-if="post.tags[0]">{{ post.tags[0].replace('#', '') }}</span>
-            <!--
-              狀態徽章：只有在「看自己的頁面」才顯示——因為別人看不到你 hide/check 狀態的貼文
-            -->
+            <!--  狀態徽章只給本人看  -->
             <span
               v-if="viewedUserId === currentUserId && post.status !== 'public'"
               class="post-status-badge"
@@ -631,54 +498,35 @@ const toggleFollow = async () => {
             </router-link>
 
             <div class="post-stats">
-              <!-- formatCount：把純數字轉成「1.2k」這種縮寫，跟 CommunityView.vue import 進來的是同一個函式 -->
               <span>♥ {{ formatCount(post.likesCount) }}</span>
               <span>💬 {{ formatCount(post.commentsCount) }}</span>
             </div>
 
             <div class="tag-cloud">
-              <!-- 這篇貼文可能有好幾個標籤，所以再用一次 v-for 把每個標籤都畫出來 -->
               <span v-for="tag in post.tags" :key="tag" class="tag-chip">{{ tag }}</span>
             </div>
 
-            <!--
-              編輯／刪除貼文：只有在「穿搭作品」這個頁籤（自己發的貼文）才會出現，收藏牆那邊不會有；只有自己可以編輯／刪除自己的貼文，別人看不到這兩個按鈕。 -->
+            <!-- 編輯／刪除只有本人看自己頁面才會出現 -->
             <template v-if="viewedUserId === currentUserId">
-              <!--編輯彈出視窗置中-->
+              <!-- Teleport 到 body，脫離卡片欄寬限制才能置中彈出 -->
               <Teleport to="body">
-                <!--
-                  Transition + :css="false"：v-if 原本是「一改條件，元素馬上出現／消失」，
-                  沒有中間過程。包一層 <Transition>，Vue 才會在元素真正被加進 DOM 之前
-                  呼叫 @enter，元素被拿掉之前呼叫 @leave，讓我們有機會在這兩個時間點插入
-                  anime.js 的動畫。:css="false" 是告訴 Vue「這裡的動畫由 JS（anime.js）
-                  自己控制，不用去偵測 CSS transition/animation 的結束事件」，                 
-                -->
+                <!-- :css="false"：動畫改由 anime.js 控制，v-if 要放進去才觸發得到 enter/leave -->
                 <Transition @enter="onEditModalEnter" @leave="onEditModalLeave" :css="false">
                   <div v-if="editingPostId === post.communityPostId" class="edit-modal-overlay" @click.self="cancelEdit">
                     <div class="edit-modal">
-                    <!-- 新增一個標題列：跟原本純表單比起來更有「這是一個彈出視窗」的感覺，右上角 ✕ 也能關閉 -->
                     <div class="edit-modal-header">
                       <h3 class="edit-modal-title">編輯貼文</h3>
                       <button type="button" class="edit-modal-close" @click="cancelEdit">✕</button>
                     </div>
 
                     <div class="edit-form">
-                      <textarea
-                        ref="editTextareaEl"
-                        v-model="editForm.content"
-                        class="edit-textarea"
-                        rows="3"
-                        @input="autoGrowTextarea"
-                      ></textarea>
+                      <textarea v-model="editForm.content" class="edit-textarea" rows="3"></textarea>
 
-                      <!-- 照片編輯：跟 CreatePostView.vue 的縮圖列是同一套邏輯，只是排版比較精簡 -->
                       <div class="edit-thumb-row">
                         <div class="edit-thumb-item" v-for="(img, idx) in editForm.images" :key="idx">
-                          <!-- @click="openLightbox(img.url)"：點縮圖本身放大看原圖，跟點右上角 ✕ 移除圖片是分開的兩個按鈕，不會互相誤觸 -->
                           <img :src="img.url" alt="縮圖" @click="openLightbox(img.url)" />
                           <button type="button" class="edit-thumb-remove" @click="removeEditImage(idx)">✕</button>
                         </div>
-                        <!-- 這個「＋」縮圖也是一個隱藏的檔案上傳框，讓使用者可以再加選照片 -->
                         <label class="edit-thumb-add">
                           <input
                             type="file"
@@ -694,7 +542,6 @@ const toggleFollow = async () => {
                         第一張會作為封面，點縮圖可以放大看原圖
                       </p>
 
-                      <!-- 標記標籤商品：跟 CreatePostView.vue 是同一套搜尋/選取邏輯，只是改在編輯表單上操作 -->
                       <label class="edit-field-label">標記標籤商品</label>
                       <div class="edit-search-bar">
                         <input
@@ -710,7 +557,6 @@ const toggleFollow = async () => {
                           @click="productSearch = ''"
                         >✕</button>
                       </div>
-                      <!--沒有打字搜尋的時候，只列出「熱門」的前 5 個標籤，-->
                       <p class="edit-field-hint" v-if="!productSearch.trim()">熱門標籤，想找其他商品請直接搜尋</p>
                       <div class="tag-cloud">
                         <button
@@ -738,7 +584,6 @@ const toggleFollow = async () => {
                       </div>
                     </div>
 
-                    <!-- 底部按鈕獨立在 .edit-form 外面，不會跟著上面內容一起捲動，滑到多長都找得到 -->
                     <div class="edit-modal-footer">
                       <button class="btn-cancel-edit" @click="cancelEdit">取消</button>
                       <button class="btn-save-edit" @click="saveEdit(post)">儲存</button>
@@ -758,11 +603,9 @@ const toggleFollow = async () => {
         </div>
       </div>
 
-      <!--
-        收藏牆savedPosts.length（收藏清單裡有東西，長度大於 0）→ 顯示收藏牆（卡片排版跟上面作品牆幾乎一樣）； 沒有收藏任何貼文 → 顯示一個「還沒收藏」的提示畫面。 -->
+      <!-- 收藏牆 -->
       <div v-else-if="activeTab === 'saved'">
         <div v-if="savedPosts.length" class="post-grid">
-          <!-- 這裡的卡片排版跟上面「穿搭作品牆」幾乎一模一樣，差別只是資料來源換成 savedPosts -->
           <div v-for="post in savedPosts" :key="post.communityPostId" class="post-card">
             <router-link :to="`/community/post/${post.communityPostId}`" class="post-media d-block text-decoration-none">
               <span class="tag-label" v-if="post.tags[0]">{{ post.tags[0].replace('#', '') }}</span>
@@ -786,8 +629,8 @@ const toggleFollow = async () => {
           </div>
         </div>
 
-        <!-- v-else（搭配上面裡層的 v-if）：收藏清單是空的時候，顯示這個提示，而不是一片空白 -->
-        <div v-else class="empty-state">         
+        <!-- 收藏清單是空的時候顯示這個提示 -->
+        <div v-else class="empty-state">
           <svg class="empty-icon" viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 8l2.5-4h11L20 8" />
             <path d="M4 8v10a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 18V8" />
@@ -801,7 +644,7 @@ const toggleFollow = async () => {
       </template>
     </div>
 
-    <!--圖片放大燈箱-->
+    <!--  圖片放大燈箱  -->
     <Teleport to="body" v-if="lightboxImage">
       <div class="lightbox-overlay" @click.self="closeLightbox">
         <button type="button" class="lightbox-close" @click="closeLightbox">✕</button>
@@ -812,16 +655,11 @@ const toggleFollow = async () => {
 </template>
 
 <style scoped>
-/*
-  這個 <style> 標籤有加 scoped，意思是「這裡面寫的 CSS 樣式，
-  只會套用在這個檔案自己的 HTML 上」，不會影響到其他頁面的元素。
-*/
 .community-page {
   width: 100%;
   min-height: 100vh;
   background-color: #F9F4F0 !important;
   box-sizing: border-box;
-  
   --cream:#F9F4F0;
   --paper:#FFFDFB;
   --ink:#2A2420;
@@ -1093,16 +931,7 @@ const toggleFollow = async () => {
 .btn-delete-post:hover{ background:#B4453A; color:#fff; }
 
 /*
-  edit-modal-overlay：鋪滿整個畫面的半透明黑底，蓋在其他內容上面（position:fixed + inset:0），
-  用 flex 置中把 .edit-modal 放在正中間。z-index 開高一點，確保蓋在導覽列之類的元素之上。
-  @click.self="cancelEdit"（寫在 template 裡）：點背景（不是點到裡面的表單）就等於取消編輯。
-
-  這裡重新宣告一次跟 .community-page 一樣的顏色變數（--ink、--plum...），是因為 Teleport
-  會把這個彈出視窗「搬到」<body> 底下渲染，脫離了原本 .community-page 這個父層元素——
-  CSS 變數是跟著 DOM 樹「父傳子」繼承下去的，搬出去之後就不再是 .community-page 的子元素，
-  裡面所有用 var(--plum) 之類寫法的樣式全部會抓不到值（之前選好的標籤商品變成一片空白，
-  就是因為 var(--plum) 抓不到值，背景跟文字都變不出顏色）。在這裡重新宣告一次，
-  底下所有 var(--xxx) 才能正常運作。
+  半透明黑底 + flex 編輯貼文置中彈窗
 */
 .edit-modal-overlay{
   --cream:#F9F4F0;
@@ -1157,14 +986,10 @@ const toggleFollow = async () => {
   padding:.6rem .8rem; font-size:.83rem; color:var(--ink);
   font-family:inherit;
   outline:none;
-  /* resize:none：改成自動長高（JS 控制 height），不用瀏覽器原生的手動拖曳，
-     兩者混在一起反而會打架（自動調的高度被使用者手動拖曳蓋掉，或反過來）。
-     min-height 保留當作最小高度，內容還很少的時候框框不會塌得太扁。
-     overflow:hidden：自動長高之後，內容應該剛好都裝得下，不需要再讓 textarea
-     自己出現垂直捲軸，捲軸出現反而會讓 scrollHeight 的量測不準。 */
+  /* 輸入框固定高度（不會隨內容變高），貼文內容太長的話用 overflow-y:auto，輸入框自己出現垂直捲軸 */
+  height:160px;
   resize:none;
-  overflow:hidden;
-  min-height:80px;
+  overflow-y:auto;
 }
 .edit-textarea:focus{ border-color:var(--plum); }
 .edit-visibility{ display:flex; gap:1rem; font-size:.8rem; color:var(--ink); }
@@ -1247,12 +1072,7 @@ const toggleFollow = async () => {
 }
 .btn-save-edit:hover{ background:var(--plum-deep); }
 
-/*
-  燈箱（lightbox）：點編輯表單裡的縮圖時，把原圖放大顯示在最上層。
-  一樣用 Teleport 搬到 <body> 下面，所以這裡也要重新宣告一次顏色變數，
-  理由跟上面 .edit-modal-overlay 註解講的一樣——不過燈箱本身用到的顏色不多，
-  這裡只是保險加上，之後如果燈箱樣式要用到 var(--xxx) 也不會抓空值。
-*/
+/* 縮圖放大燈箱，同樣 Teleport 到 body，補宣告 --ink 避免抓空值 */
 .lightbox-overlay{
   --ink:#2A2420;
   position:fixed; inset:0;
@@ -1291,11 +1111,7 @@ const toggleFollow = async () => {
   color:var(--ink-soft); font-size:.95rem; margin:0;
 }
 
-/*
-  @media (max-width: 991px) { ... } 這種寫法叫做「響應式設計 / RWD」，
-  意思是「當瀏覽器視窗寬度小於等於 991px 時，才套用大括號裡的樣式」。
-  這樣可以讓網頁在手機、平板、電腦上，自動切換成不同的排版方式。
-*/
+/* ---------- RWD ---------- */
 @media (max-width: 991px){
   .post-grid{ grid-template-columns:repeat(2, 1fr); }
 }
@@ -1306,11 +1122,7 @@ const toggleFollow = async () => {
 }
 </style>
 
-<!--
-  這個區塊「不加 scoped」：scoped 樣式只會作用在這個元件模板裡面的元素上，
-  body 不在模板裡，寫在 scoped 區塊不會生效。不加 scoped 的話，
-  這段 CSS 編譯出來就是全域樣式，不用改共用的 App.vue 也能讓 body 變成統一背景色。
--->
+<!--  這個區塊「不加 scoped」：scoped 樣式只會作用在這個元件模板裡面的元素上 -->
 <style>
 body {
   background-color: #F9F4F0 !important;

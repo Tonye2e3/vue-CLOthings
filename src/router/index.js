@@ -1,11 +1,17 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import {
+  createRouter,
+  createWebHistory
+} from 'vue-router'
 import HomeView from '../views/HomeView.vue'
-import { useAuthStore } from '@/stores/auth'
+import {
+  useAuthStore
+} from '@/stores/auth'
 
 import GoogleOAuthCallback from '@/views/Users/GoogleOAuthCallback.vue'
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(
+    import.meta.env.BASE_URL),
   routes: [
     //內建主頁暫不使用
     {
@@ -210,11 +216,19 @@ const router = createRouter({
       path: '/admin/community/posts',
       name: 'AdminCommunityPostList',
       component: () => import('@/views/Community/AdminCommunityPostListView.vue'),
+      meta: {
+        requiresAuth: true,
+        requiresAdmin: true,
+      },
     },
     {
       path: '/admin/community/posts/:id',
       name: 'AdminCommunityPostDetail',
       component: () => import('@/views/Community/AdminCommunityPostDetailView.vue'),
+      meta: {
+        requiresAuth: true,
+        requiresAdmin: true,
+      },
     },
 
     //User 在註解之間新增個人使用的路由 名字自行修改
@@ -229,9 +243,17 @@ const router = createRouter({
       component: () => import('../views/Users/RegisterView.vue'),
     },
     {
-      // 🟡 修改
+      path: '/forgot-password',
+      name: 'ForgotPassword',
+      component: () => import('@/views/Users/ForgotPasswordView.vue'),
+    },
+    {
+      path: '/reset-password',
+      name: 'ResetPassword',
+      component: () => import('@/views/Users/ResetPasswordView.vue'),
+    },
+    {
       path: '/user',
-
       // 🟢 新增：User.vue 本身成為會員中心 Layout
       component: () => import('@/views/Users/User.vue'),
 
@@ -239,8 +261,7 @@ const router = createRouter({
         requiresAuth: true,
       },
 
-      children: [
-        {
+      children: [{
           // /user
           path: '',
           name: 'user',
@@ -272,11 +293,52 @@ const router = createRouter({
 
         // 訊息
         {
-          path: 'messages',
+          path: 'messages/:userId?',
           name: 'UserMessages',
           component: () => import('@/views/Community/ChatView.vue'),
         },
+        // 社群後台管理（管理者用，不是給一般使用者看的）
+        {
+          path: 'admin/community/posts',
+          name: 'UserAdminCommunityPostList',
+          component: () => import('@/views/Community/AdminCommunityPostListView.vue'),
+          meta: {
+            requiresAuth: true,
+            requiresAdmin: true,
+          },
+        },
+        // 社群貼文詳情
+        {
+          path: 'admin/community/posts/:id',
+          name: 'UserAdminCommunityPostDetail',
+          component: () => import('@/views/Community/AdminCommunityPostDetailView.vue'),
+          meta: {
+            requiresAuth: true,
+            requiresAdmin: true,
+          },
+        },
 
+        // 團購商品管理
+        {
+          path: 'admin/group-products',
+          name: 'UserGroupProductAdmin',
+          component: () => import('../views/GroupShop/GroupProductAdminView.vue'),
+          meta: {
+            requiresAuth: true,
+            requiresAdmin: true,
+          },
+        },
+
+        // 團購訂單管理
+        {
+          path: 'admin/group-orders',
+          name: 'UserGroupOrderAdmin',
+          component: () => import('../views/GroupShop/GroupOrderAdminView.vue'),
+          meta: {
+            requiresAuth: true,
+            requiresAdmin: true,
+          },
+        },
       ],
     },
     {
