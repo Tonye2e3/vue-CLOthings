@@ -18,6 +18,21 @@ const api = axios.create({
 // 確保同一時間只會有一個 refresh request
 let refreshPromise = null
 
+// 🟢 統一處理登入失效
+// 原本 clearAuth、alert、跳轉登入頁的程式碼
+// 分散在不同地方，現在集中到這個 function
+// 避免 Refresh 失敗時重複 alert、重複跳轉
+// ======================================================
+function handleSessionExpired() {
+  const authStore = useAuthStore()
+
+  authStore.clearAuth()
+
+  alert('登入已過期，請重新登入')
+
+  window.location.href = '/login'
+}
+
 // ======================================================
 // Request Interceptor
 // 每次送 API 前，自動把 Access Token 放進 Header
@@ -70,14 +85,6 @@ api.interceptors.response.use(
     // 絕對不能再次呼叫 refresh，否則會無限循環
     // ==================================================
     if (status === 401 && requestUrl?.includes('/User/refresh')) {
-      const authStore = useAuthStore()
-
-      authStore.clearAuth()
-
-      alert('登入已過期，請重新登入')
-
-      window.location.href = '/login'
-
       return Promise.reject(error)
     }
 
@@ -139,24 +146,16 @@ api.interceptors.response.use(
         return api(originalRequest)
 
       } catch (refreshError) {
-        authStore.clearAuth()
-
-        alert('登入已過期，請重新登入')
-
-        window.location.href = '/login'
+        // 統一交給 handleSessionExpired()
+        handleSessionExpired()
 
         return Promise.reject(refreshError)
       }
     }
 
     // ==================================================
-    // 4. 403 Forbidden
-    // 有登入，但沒有權限
-    // ==================================================
-    if (status === 403) {
-      alert('您沒有執行此操作的權限')
-    }
-
+    
+   
     // ==================================================
     // 5. Server Error
     // ==================================================

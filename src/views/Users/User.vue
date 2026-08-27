@@ -23,6 +23,9 @@ import {
   faAddressCard,
   faMessage,
 
+  faShieldHalved,
+  faUsersGear,
+
 } from '@fortawesome/free-solid-svg-icons'
 
 const authStore = useAuthStore()
@@ -183,6 +186,53 @@ async function goToSection(sectionId) {
             </div>
           </RouterLink>
 
+
+          <!-- 🟢管理員功能 -->
+          <!-- 只有 Admin / SuperAdmin 可以看到 -->
+
+          <template v-if="authStore.isAdmin">
+
+            <div class="sidebar-header">
+              <p class="sidebar-subtitle">Admin</p>
+              <h2 class="sidebar-title">管理員</h2>
+            </div>
+
+            <!-- 社群管理 -->
+            <RouterLink :to="{ name: 'UserAdminCommunityPostList' }" class="nav-item">
+              <span class="nav-icon">
+                <font-awesome-icon :icon="faShieldHalved" />
+              </span>
+
+              <div>
+                <span class="nav-title">社群管理</span>
+                <small>Community Management</small>
+              </div>
+            </RouterLink>
+
+            <!-- 團購商品管理 -->
+            <RouterLink :to="{ name: 'UserGroupProductAdmin' }" class="nav-item">
+              <span class="nav-icon">
+                <font-awesome-icon :icon="faUsersGear" />
+              </span>
+
+              <div>
+                <span class="nav-title">團購商品管理</span>
+                <small>Group Management</small>
+              </div>
+            </RouterLink>
+
+            <!-- 團購訂單管理 -->
+            <RouterLink :to="{ name: 'UserGroupOrderAdmin' }" class="nav-item">
+              <span class="nav-icon">
+                <font-awesome-icon :icon="faUsersGear" />
+              </span>
+
+              <div>
+                <span class="nav-title">團購訂單管理</span>
+                <small>Group Management</small>
+              </div>
+            </RouterLink>
+          </template>
         </nav>
 
         <div class="sidebar-footer">
@@ -252,7 +302,7 @@ async function goToSection(sectionId) {
 .user-page {
   min-height: 100vh;
   background: #f9f4f0;
-  padding: 48px 24px 80px;
+  padding: 48px 40px 80px;
 }
 
 /* =========================
@@ -261,15 +311,15 @@ async function goToSection(sectionId) {
 
 .user-container {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1440px;
 
   margin: 0 auto;
 
   display: grid;
 
-  grid-template-columns: 200px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
 
-  gap: 10px;
+  gap: 24px;
 
   align-items: start;
 }
@@ -433,6 +483,7 @@ async function goToSection(sectionId) {
 ========================= */
 
 .content-area {
+  width: 100%;
   min-width: 0;
 }
 

@@ -7,7 +7,7 @@ import CategoryShowcase from '@/components/home/CategoryShowcase.vue'
 <template>
   <div class="uniqlo-home">
     <main>
-      <h1>2026/08/26 15:02</h1>
+      <!-- <h1>2026/08/26 15:02</h1> -->
       <HeroCarousel />
       <ProductGrid />
     </main>
@@ -21,6 +21,9 @@ import CategoryShowcase from '@/components/home/CategoryShowcase.vue'
   --home-text: #111111;
   --home-border: #e5e5e5;
   --home-accent: #e60012;
+
+  max-width: 1200px;
+  margin: 0 auto;
 
   background: var(--home-bg);
   color: var(--home-text);

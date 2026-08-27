@@ -66,18 +66,17 @@ function logout() {
       </nav>
 
       <div class="header-actions">
-
         <div class="search-box">
-  <input
-    v-model="searchKeyword"
-    @keyup.enter="doSearch"
-    placeholder="搜尋商品..."
-    class="search-input"
-  />
-  <button class="icon-btn" @click="doSearch" aria-label="搜尋">
-    <IconSearch />
-  </button>
-</div>
+          <input
+            v-model="searchKeyword"
+            @keyup.enter="doSearch"
+            placeholder="搜尋商品..."
+            class="search-input"
+          />
+          <button class="icon-btn" @click="doSearch" aria-label="搜尋">
+            <IconSearch />
+          </button>
+        </div>
         <!-- <button class="icon-btn" type="button" aria-label="搜尋">
           <IconSearch />
         </button> -->
@@ -94,12 +93,7 @@ function logout() {
         >
           <IconUser />
         </RouterLink>
-        <RouterLink
-          v-else
-          :to="{ name: 'login' }"
-          class="icon-btn"
-          aria-label="帳號"
-        >
+        <RouterLink v-else :to="{ name: 'login' }" class="icon-btn" aria-label="帳號">
           <IconUser />
         </RouterLink>
         <RouterLink
@@ -154,7 +148,7 @@ function logout() {
 <style scoped>
 .main-container {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1600px;
   /* 依照設計需求調整內容的最大寬度 */
   margin: 0 auto;
   /* 上下 0，左右自動置中 */

@@ -33,39 +33,46 @@ async function search(kw) {
 onMounted(() => search(route.query.keyword))
 
 // 關鍵字變了（在搜尋頁又搜新的）重搜
-watch(() => route.query.keyword, (kw) => search(kw))
+watch(
+  () => route.query.keyword,
+  (kw) => search(kw),
+)
 </script>
 
 <template>
-  <section class="promo">
-    <h2 class="section-title">「{{ keyword }}」的搜尋結果，共 {{ products.length }} 件</h2>
+  <div class="container">
+    <section class="promo">
+      <h2 class="section-title">「{{ keyword }}」的搜尋結果，共 {{ products.length }} 件</h2>
 
-    <div v-if="products.length === 0" class="empty">
-      找不到符合「{{ keyword }}」的商品
-    </div>
+      <div v-if="products.length === 0" class="empty">找不到符合「{{ keyword }}」的商品</div>
 
-    <div v-else class="grid">
-      <RouterLink
-        v-for="p in products"
-        :key="p.productId"
-        :to="{ name: 'product', params: { id: p.productId } }"
-        class="card"
-      >
-        <div class="card-image">
-          <span class="card-tag">{{ p.status }}</span>
-          <img :src="getImageUrl(p.productImgFile)" :alt="p.productName" class="product-img" />
-        </div>
-        <div class="card-body">
-          <h3 class="card-name">{{ p.productName }}</h3>
-          <p class="card-desc">{{ p.description }}</p>
-          <p class="card-price">TWD {{ p.price.toLocaleString() }}</p>
-        </div>
-      </RouterLink>
-    </div>
-  </section>
+      <div v-else class="grid">
+        <RouterLink
+          v-for="p in products"
+          :key="p.productId"
+          :to="{ name: 'product', params: { id: p.productId } }"
+          class="card"
+        >
+          <div class="card-image">
+            <span class="card-tag">{{ p.status }}</span>
+            <img :src="getImageUrl(p.productImgFile)" :alt="p.productName" class="product-img" />
+          </div>
+          <div class="card-body">
+            <h3 class="card-name">{{ p.productName }}</h3>
+            <p class="card-desc">{{ p.description }}</p>
+            <p class="card-price">TWD {{ p.price.toLocaleString() }}</p>
+          </div>
+        </RouterLink>
+      </div>
+    </section>
+  </div>
 </template>
 
 <style scoped>
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
 .promo {
   max-width: 1280px;
   margin: 0 auto;
@@ -88,14 +95,20 @@ watch(() => route.query.keyword, (kw) => search(kw))
   gap: 24px;
 }
 @media (max-width: 1024px) {
-  .grid { grid-template-columns: repeat(2, 1fr); }
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 @media (max-width: 768px) {
-  .grid { grid-template-columns: 1fr; }
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }
 .card {
   border: 1px solid var(--home-border);
-  transition: box-shadow 0.25s ease, transform 0.25s ease;
+  transition:
+    box-shadow 0.25s ease,
+    transform 0.25s ease;
   text-decoration: none;
   color: inherit;
   display: block;
