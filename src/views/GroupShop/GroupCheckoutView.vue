@@ -63,8 +63,8 @@ const cvsStore = reactive({
 // 申請到正式代號後，換掉這個值就好，不用改其他程式碼
 const CVS_MAP_ESHOP_ID = '870'
 // callback 網址要是超商系統真的打得到的後端網址，不能寫死 localhost，
-// 跟其他圖片網址一樣改成從 VITE_API_URL 組出來（VITE_API_URL 本身已經包含 /api）
-const CVS_MAP_CALLBACK_URL = `${import.meta.env.VITE_API_URL}/GroupLogistics/cvs-map/callback`
+// VITE_API_URL 是純主機網址，因此 callback 的 API 路徑需明確加上 /api。
+const CVS_MAP_CALLBACK_URL = `${import.meta.env.VITE_API_URL}/api/GroupLogistics/cvs-map/callback`
 
 const openCvsMap = () => {
   const mapUrl = `https://emap.presco.com.tw/c2cemap.ashx?eshopid=${CVS_MAP_ESHOP_ID}&servicetype=1&url=${encodeURIComponent(CVS_MAP_CALLBACK_URL)}`

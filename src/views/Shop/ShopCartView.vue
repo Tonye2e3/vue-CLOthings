@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useFavoriteStore } from '@/stores/ShopFavorite'
 import { onMounted } from 'vue'
 
-const API_BASE = 'https://localhost:7255'
+const API_BASE = import.meta.env.VITE_API_URL
 function getImageUrl(fileName) {
   if (!fileName) return 'https://placehold.co/80x80?text=No+Image'
   return `${API_BASE}/images/product/${fileName}`

@@ -10,7 +10,7 @@ const order = ref(null)         // 訂單資料
 const reason = ref('')          // 退貨原因
 const returnItems = ref([])     // 每筆商品的「勾選 + 退貨數量」狀態
 
-const API_BASE = 'https://localhost:7255'
+const API_BASE = import.meta.env.VITE_API_URL
 
 onMounted(async () => {
   try {

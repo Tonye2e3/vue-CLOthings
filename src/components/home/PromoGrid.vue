@@ -5,7 +5,7 @@ import { getGroupProducts } from '@/api/groupShop'
 
 // 圖片網址工具：後端上傳圖片回傳的是相對路徑（例如 /images/group-products/xxx.jpg），
 // 這裡統一組成完整網址；圖片是靜態檔案，不能直接用 baseURL（那個多了 /api）
-const API_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+const API_BASE = import.meta.env.VITE_API_URL
 const resolveImageUrl = (path) => {
   if (!path) return ''
   if (path.startsWith('http://') || path.startsWith('https://')) return path

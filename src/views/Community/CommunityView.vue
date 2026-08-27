@@ -31,9 +31,8 @@ import { useAuthStore } from '@/stores/auth'
 // 沒登入的人，currentUserId 會維持 null——發文、留言、按讚這些動作原本就會被
 // 後端 [Authorize] 擋掉，所以 null 的情況下這些按鈕本來就打不通，是預期內的。
 // IMAGE_BASE：圖片是靜態檔案（wwwroot/images/posts/xxx.jpg），走的不是 /api 這條路徑，
-// 不能直接用 api 服務的 baseURL（那個是 https://localhost:7255/api，多了 /api）。
-// 這裡把 VITE_API_URL 尾巴的 /api 拿掉，變成純網域，圖片網址才會組對。
-const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+// 不能直接用 api 服務的 baseURL（它含有 /api）；靜態資源直接使用純主機網址 VITE_API_URL。
+const IMAGE_BASE = import.meta.env.VITE_API_URL
 
 // export const：export 代表「把這個變數開放給其他檔案使用」，
 // 其他檔案只要寫 import { currentUser } from '這個檔案路徑'，就能拿到它。
