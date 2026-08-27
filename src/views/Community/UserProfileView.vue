@@ -1,29 +1,9 @@
 <script setup>
-// ============================================================
-// 這裡是「邏輯」的部分：資料存在哪裡、發生什麼事情要做什麼事
-// ============================================================
-
-// ref() 是 Vue 提供的功能，用來建立一個「會被畫面自動追蹤」的變數。
-// 白話說：只要 ref() 包起來的資料改變了，畫面上有用到這個資料的地方
-// 會自動跟著重新顯示，不用自己手動去更新 HTML。
-import { ref, onMounted, watch, computed } from 'vue'
-// useRoute：讀取網址上的動態參數，router/index.js 裡這個頁面對應的路由是
-// path: '/community/profile/:userId'，要用 useRoute() 才能拿到 :userId 那段的值。
+import { ref, onMounted, watch, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
-// api：跟其他頁面共用同一個 axios 實例（src/services/api.js），會自動把登入後的 JWT
-// token 帶進 Authorization header，跟直接 import axios from 'axios' 不一樣。
 import api from '@/services/api'
 // animate：anime.js v4 的動畫函式，這裡用來做編輯貼文彈出視窗的開關動畫，
-// 跟 CommunityView.vue、ChatView.vue 是同一個套件、同一套用法。
 import { animate } from 'animejs'
-
-// 收藏功能共用資料（跟 PostDetailView.vue 共用同一份收藏清單，直接 import 那個檔案）
-// savedPosts：使用者收藏的所有貼文，格式對照 Community_Favorite + Community_Post：
-// { communityPostId, content, image, likesCount, commentsCount, tags }。
-// formatCount：把純數字（例如 1200）轉成「1.2k」這種縮寫格式，這裡是「跨檔案 import」，
-// 跟 CommunityView.vue 自己 <template> 要另外重複宣告一份不一樣——
-// 因為這裡是「別的檔案」透過 import 拿到它，並不是同一個 SFC 裡的 <script setup>／<template>
-// 那種限制，所以可以直接在這個檔案的 <template> 裡正常使用。
 import { savedPosts, loadSavedPosts, formatCount, currentUserId, loadCurrentUserId } from '@/views/Community/CommunityView.vue'
 
 // IMAGE_BASE：圖片是靜態檔案，走的不是 /api 這條路徑，不能直接用 api 服務的
@@ -36,61 +16,36 @@ const route = useRoute()
 // 實際上還沒有的檔案），失敗時把圖片來源換成 dicebear 產生的預設頭像，
 // 跟 CommunityView.vue 的 onAvatarError 是同一套邏輯。
 const onAvatarError = (event, name) => {
-  // 用「換過的網址是不是已經是預設圖」來判斷要不要再換一次，而不是用一個存在
-  // DOM 元素上的旗標（dataset.fallback）——原因跟 CommunityView.vue 的
-  // onAvatarError 註解一樣：這種寫法在「單一、被重複使用」的欄位上會有問題
-  // （例如這個檔案自己的大頭貼欄位），舊旗標可能卡住新資料的備援。
-  // 改成比對「現在這個網址是不是已經是預設圖網址」，就不會有這種問題。
   const fallbackUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
   if (event.target.src === fallbackUrl) return
   event.target.src = fallbackUrl
 }
-
-// currentUserId：目前登入者真正的 userId，跟 CommunityView.vue 共用同一份（import 進來的）。
-// 這個是「我是誰」，跟下面的 viewedUserId（「我正在看誰的頁面」）是兩回事——
-// 只有兩者相等時，才代表「我正在看自己的頁面」，編輯／刪除貼文才該出現。
-
-// viewedUserId：現在看的是哪個使用者的個人頁，從網址上的 :userId 讀出來。
-// 網址上的參數本身是字串（例如 "3"），這裡用 Number(...) 轉成數字，
-// 因為後端 API、資料庫的 userId 都是 int，字串跟數字型別不一致，某些比對可能會出錯。
-// 用 computed 而不是普通變數：從「這個人的個人頁」點連結切到「另一個人的個人頁」時，
-// Vue Router 會重複使用同一個元件、不會重新建立，普通變數只會算一次、不會跟著網址變，
-// 這裡用 computed 才能保證 viewedUserId 隨時反映網址上「現在」的 :userId。
 const viewedUserId = computed(() => Number(route.params.userId))
 
 
 
 // 使用者個人資料
-// 這是一個「物件」（用 { } 包起來、裡面很多 key: value 的資料），
-// 存放這個使用者頁面要顯示的所有基本資訊。
-// 外面包了 ref()，代表以後如果我們改了裡面任何一個值（例如按追蹤後
-// isFollowing 從 false 變 true），畫面會自動更新，不用自己重畫。
 const userProfile = ref({
-  name: 'Emily 艾米莉',
-  handle: '@emily_style',
-  bioTag: '韓系 | 簡約 | 日常穿搭分享',
-  bio: '喜歡分享每天的穿搭靈感    點擊看板搭配同款單品，一起變美！',
-  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily', // 大頭貼圖片網址
-  bannerBg: '#EFE8E1', // 暖質感奶茶底色
-  postsCount: '1,284',    // 貼文數（純文字顯示用，不是拿來計算的數字）
-  followersCount: '58.6K',
-  followingCount: '342',
+  name: '',
+  handle: '',
+  bioTag: '',
+  bio: '',
+  avatar: '', // 大頭貼圖片網址
+  postsCount: 0,    // 貼文數（純文字顯示用，不是拿來計算的數字）
+  followersCount: 0,
+  followingCount: 0,
   isFollowing: false // 「我」有沒有追蹤這個人，true/false 這種只有兩種狀態的值叫做布林值
 })
 
 // 當前頁籤 (穿搭作品, 收藏, 同款商品, 關於我)
 // 這個 ref 只存一個字串，代表「現在使用者點的是哪一個分類頁籤」。
-// 畫面會根據這個值，決定要顯示哪一塊內容（下面 template 會用到）。
 const activeTab = ref('works')
 
 // 穿搭作品列表
-// 這是一個「陣列」（用 [ ] 包起來、裡面放很多筆資料），每一筆都是一篇貼文的資訊。
-// 之後畫面會用 v-for 把這個陣列「一筆一筆」畫成一張一張的卡片。
-// 欄位對照資料庫（Community_Post）：communityPostId、content（合併原本的 title）、
-// image（對應 Post_Images 第一張圖）、likesCount／commentsCount（純數字，顯示時再用
-// formatCount 轉成「1.2k」這種縮寫）、tags（對應 Post_Tagged_Products 的商品名稱）。
-// 先給空陣列，畫面會等 fetchUserPosts() 打完 API 才有資料，避免還沒載入完就出現假資料。
 const userPosts = ref([])
+
+// profileLoading：個人資料、貼文都還沒抓回來之前是 true，畫面用這個顯示骨架佔位畫面。
+const profileLoading = ref(true)
 
 // fetchUserPosts：跟後端要「這個使用者自己發的所有貼文」，
 // 打的是 CommunityPostController.cs 裡新增的 GET api/CommunityPost/user/{userid}。
@@ -147,8 +102,6 @@ const deletePost = async (communityPostId) => {
 }
 
 // editingPostId：現在正在編輯哪一篇貼文，null 代表沒有任何一篇正在編輯中。
-// 用「哪一篇的 id」而不是單純 true/false，是因為同一個頁面裡有好幾張貼文卡片，
-// 這樣才知道要在「哪一張」卡片底下顯示編輯表單。
 const editingPostId = ref(null)
 
 // availableProducts：可標記的商品清單，跟 CreatePostView.vue 是同一套邏輯，
@@ -173,10 +126,6 @@ const filteredProducts = computed(() => {
   const q = productSearch.value.trim().toLowerCase()
   if (!q) {
     // 沒有搜尋文字時，只列出前 5 個當作「熱門標籤」頂著，不要把商品全部攤開，
-    // 不然商品一多，標籤區塊、進而整張卡片就會被拉得越來越長（開會時提到的問題）。
-    // 這裡先用 availableProducts 原本的順序（後端 /Product 回來的順序）取前 5 個；
-    // 之後如果後端有「熱門商品」（例如依標記次數排序）的 API，把這裡換成打那支 API 就好，
-    // 前端邏輯不用變。
     return availableProducts.value.slice(0, 5)
   }
   return availableProducts.value.filter(p => p.name.toLowerCase().includes(q))
@@ -219,6 +168,29 @@ const startEdit = (post) => {
     })),
     taggedProducts: (post.taggedProducts || []).map(t => t.name)
   }
+  // nextTick：等 Vue 把 <textarea> 真正畫到畫面上、v-model 把 editForm.content
+  // 填進去之後，才有真正的內容高度可以量，太早呼叫的話 scrollHeight 量到的
+  // 還是空字串的高度。
+  nextTick(() => autoGrowTextarea())
+}
+
+// editTextareaEl：編輯表單裡那個 <textarea> 的 DOM 參照。
+const editTextareaEl = ref(null)
+
+// autoGrowTextarea：文字內容改變時，把輸入框的高度自動調整成剛好放得下目前的文字，
+// 取代原本靠使用者自己手動拖曳調整大小——原本的手動拖曳在這個彈出視窗裡會有問題：
+// 這個輸入框放在 .edit-form 這個「本身也會上下捲動」的容器裡（彈出視窗要讓標題列、
+// 底部按鈕固定不動，只有中間內容捲動），瀏覽器原生的拖曳調整大小控制點，
+// 放在這種巢狀捲動的容器組合裡常常會出現抓不到、拖不動的狀況。改成打字的時候
+// 自動長高，不用手動拖曳，直接繞開這個問題。
+// el.style.height = 'auto'：先把高度歸零，才能重新量出「現在的文字內容實際需要多高」
+// （scrollHeight）——不歸零的話，scrollHeight 量到的還是「上一次」的高度，
+// 文字變少的時候框框不會跟著縮小。
+const autoGrowTextarea = () => {
+  const el = editTextareaEl.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${el.scrollHeight}px`
 }
 
 // cancelEdit：取消編輯，收起表單，不送出任何變更。
@@ -374,10 +346,8 @@ const saveEdit = async (post) => {
 // 也順便呼叫 loadSavedPosts，避免使用者是直接連進這頁（沒先經過 CommunityView.vue），
 // 導致收藏頁籤看起來是空的。
 onMounted(async () => {
-  fetchUserPosts()
+  loadProfileData()
   loadSavedPosts()
-  fetchFollowCounts()
-  fetchPublicProfile()
   fetchProducts() // 編輯貼文表單要用到，只有看自己的頁面才用得上，但先載入沒關係
   // await loadCurrentUserId()：這頁可能是使用者直接連進來的（沒先經過 CommunityView.vue），
   // currentUserId 這時候還是 null，要先確定拿到真正的 userId，下面比對
@@ -389,14 +359,22 @@ onMounted(async () => {
   }
 })
 
+// 決定要不要顯示骨架畫面
+const loadProfileData = async () => {
+  profileLoading.value = true
+  try {
+    await Promise.all([fetchUserPosts(), fetchFollowCounts(), fetchPublicProfile()])
+  } finally {
+    profileLoading.value = false
+  }
+}
+
 // watch：監看網址上的 :userId 這個參數。
 // 跟 PostDetailView.vue 換貼文時遇到的狀況一樣——從「這個人的個人頁」點連結切到
 // 「另一個人的個人頁」時，Vue Router 會重複使用同一個元件，onMounted 不會再執行第二次，
 // 所以另外監看 :userId，只要它變了（換了要看的人），就重新打一次 API。
 watch(() => route.params.userId, () => {
-  fetchUserPosts()
-  fetchFollowCounts()
-  fetchPublicProfile()
+  loadProfileData()
   if (viewedUserId.value !== currentUserId.value) {
     fetchFollowStatus()
   } else {
@@ -406,10 +384,7 @@ watch(() => route.params.userId, () => {
   }
 })
 
-// 這是頁籤按鈕要顯示的清單：每個頁籤有一個「代號」(key，程式判斷用)
-// 跟一個「顯示文字」(label，給人看的)。
-// 這裡沒有包 ref()，因為這份清單開頭到結束都不會被改變（不會新增/刪除頁籤），
-// 只有純顯示用途，所以不需要讓 Vue 特別去「追蹤」它的變化。
+
 const tabs = [
   { key: 'works', label: '穿搭作品' },
   { key: 'saved', label: '收藏' }
@@ -512,12 +487,37 @@ const toggleFollow = async () => {
 
     <div class="container-fluid container-lg pb-5">
 
-      <!--
-        返回社群按鈕：跟 CreatePostView.vue、PostDetailView.vue 的 back-pill 是同一顆按鈕、同一套樣式，
-        統一放在頁面內容最上面，讓使用者從個人頁也能一鍵回到社群列表，不用一直靠瀏覽器的上一頁。
-      -->
+      <!-- 返回社群按鈕 -->
       <router-link to="/community" class="back-pill">← 返回社群</router-link>
 
+      <!-- profileLoading：個人資料、貼文都還沒抓回來之前顯示骨架佔位畫面 -->
+      <template v-if="profileLoading">
+        <div class="skeleton-profile-card">
+          <div class="skeleton-block skeleton-banner"></div>
+          <div class="skeleton-profile-body">
+            <div class="skeleton-block skeleton-avatar-xl"></div>
+            <div class="skeleton-stats-row">
+              <div class="skeleton-block skeleton-line skeleton-stat"></div>
+              <div class="skeleton-block skeleton-line skeleton-stat"></div>
+              <div class="skeleton-block skeleton-line skeleton-stat"></div>
+            </div>
+            <div class="skeleton-block skeleton-line skeleton-line-30" style="margin-top:1.1rem;"></div>
+            <div class="skeleton-block skeleton-line skeleton-line-60" style="margin-top:.6rem;"></div>
+            <div class="skeleton-block skeleton-line skeleton-line-90" style="margin-top:.6rem;"></div>
+          </div>
+        </div>
+        <div class="skeleton-grid">
+          <div class="skeleton-card" v-for="n in 6" :key="n">
+            <div class="skeleton-block skeleton-card-media"></div>
+            <div class="skeleton-card-body">
+              <div class="skeleton-block skeleton-line skeleton-line-50"></div>
+              <div class="skeleton-block skeleton-line skeleton-line-90"></div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <template v-else>
       <!-- 個人檔案卡 -->
       <div class="profile-card mb-4">
 
@@ -565,20 +565,13 @@ const toggleFollow = async () => {
                   :class="{ following: userProfile.isFollowing }"
                   @click="toggleFollow"
                 >
-                  <!--
-                    {{ 條件 ? A : B }} 叫做「三元運算子」，白話翻譯：
-                    「如果條件成立，顯示 A；不成立的話，顯示 B」。
-                    這裡的意思是：如果已經追蹤了，按鈕文字顯示「已追蹤」，
-                    沒追蹤的話顯示「＋ 追蹤」。
-                  -->
+
                   {{ userProfile.isFollowing ? '已追蹤' : '＋ 追蹤' }}
                 </button>
                 <!--
-                  改用站內聊天室：原本這裡是 mailto 連結（打開使用者電腦的預設信箱軟體），
-                  現在改成 router-link 跳到 ChatView.vue，帶著對方的 viewedUserId，
+                  站內聊天室帶著對方的 viewedUserId，
                   ChatView.vue 自己會判斷「這個人是不是已經聊過天」，決定要開啟現有對話
-                  還是開一段新對話。class="btn-message" 還是套用原本的按鈕樣式，
-                  外觀不會變，只是從 <a mailto> 換成站內的 <router-link>。
+                  還是開一段新對話。
                 -->
                 <router-link :to="`/community/messages/${viewedUserId}`" class="btn-message">✉ 訊息</router-link>
               </div>
@@ -598,29 +591,6 @@ const toggleFollow = async () => {
 
           <!-- 頁籤 -->
           <div class="tab-row">
-            <!--
-              v-for="t in tabs"：這是「迴圈」，意思是「把 tabs 這個陣列
-              裡的每一筆資料拿出來，重複畫一次下面這個 <button>」。
-              t 就是「這一輪迴圈拿到的那一筆資料」，你可以想像成
-              tabs 陣列裡有 4 筆，這個 <button> 就會被畫出 4 次，
-              每一次的 t 分別是 tabs[0]、tabs[1]、tabs[2]、tabs[3]。
-
-              :key="t.key"：Vue 規定用 v-for 畫重複元素時，
-              一定要給每一個元素一個獨一無二的「身分證字號」(key)，
-              這樣 Vue 才能準確知道「哪一個元素改變了、要更新哪一個」，
-              不然畫面更新可能會出現奇怪的錯亂。
-
-              :class="{ active: activeTab === t.key }"：
-              這是「條件式加 class」的寫法。意思是：
-              如果 activeTab（目前選的頁籤）等於這顆按鈕的 t.key，
-              就幫這顆按鈕加上 class="active"（讓它顯示成「被選中」的樣子）；
-              不符合的話就不加。
-
-              @click="activeTab = t.key"：
-              @click 代表「監聽點擊事件」，也就是「使用者點這個按鈕的時候要做什麼」。
-              這裡點下去，就把 activeTab 改成這顆按鈕代表的 key，
-              畫面下面就會跟著切換顯示對應的內容。
-            -->
             <button
               v-for="t in tabs"
               :key="t.key"
@@ -632,37 +602,20 @@ const toggleFollow = async () => {
         </div>
       </div>
 
-      <!--
-        穿搭作品牆
-        v-if="activeTab === 'works'"：「條件式顯示」，意思是
-        「只有當 activeTab 剛好等於 'works' 的時候，才把這一整塊畫出來」，
-        不符合條件的話，這塊 HTML 根本不會出現在畫面上（不是隱藏，是完全不畫）。
-      -->
+      <!--穿搭作品牆-->
       <div v-if="activeTab === 'works'" class="post-grid">
         <!-- 一樣是 v-for 迴圈，把 userPosts 陣列裡每一篇貼文都畫成一張卡片 -->
         <div v-for="post in userPosts" :key="post.communityPostId" class="post-card">
 
-          <!--
-            <router-link> 是 Vue Router（負責網址切換的套件）提供的元件，
-            功能跟 HTML 原生的 <a> 連結很像，差別是點下去不會整頁重新整理，
-            而是在同一個網頁內「偷偷換內容」，速度比較快。
-            :to="`/community/post/${post.communityPostId}`" 這種寫法叫做「樣板字串」，
-            用反引號 ` ` 包起來，裡面的 ${...} 會被換成實際的變數值，
-            例如 post.communityPostId 是 1，網址就會變成 /community/post/1。
-          -->
+          
           <router-link :to="`/community/post/${post.communityPostId}`" class="post-media d-block text-decoration-none">
             <!--
-              v-if="post.tags[0]"：如果這篇貼文的標籤陣列第一筆存在（不是空的），
-              才顯示這個標籤小方塊。
-              .replace('#', '')：把字串裡的 '#' 符號換成空字串（也就是刪掉它），
-              因為原始資料裡標籤是 "#法式碎花洋裝" 這樣帶 # 的格式，
+              這篇貼文可能有好幾個標籤，但卡片上只顯示第一個標籤（post.tags[0]），
               這裡顯示的時候想拿掉 #。
             -->
             <span class="tag-label" v-if="post.tags[0]">{{ post.tags[0].replace('#', '') }}</span>
             <!--
               狀態徽章：只有在「看自己的頁面」才顯示——因為別人看不到你 hide/check 狀態的貼文
-              （後端已經擋掉了，別人的 userPosts 裡本來就不會有這些），所以這個徽章對別人來說
-              永遠不會出現，只有本人才看得到自己貼文目前是公開／隱藏／審核中。
             -->
             <span
               v-if="viewedUserId === currentUserId && post.status !== 'public'"
@@ -689,29 +642,16 @@ const toggleFollow = async () => {
             </div>
 
             <!--
-              編輯／刪除貼文：只有在「穿搭作品」這個頁籤（自己發的貼文）才會出現，收藏牆那邊不會有；
-              另外還要 viewedUserId === currentUserId 才顯示——也就是「現在瀏覽的這個人」
-              跟「目前登入的我」是同一個人，才代表這是「我自己的」貼文，才能編輯／刪除。
-              瀏覽別人的個人頁時，這整塊（包含編輯表單本身）完全不會出現。
-            -->
+              編輯／刪除貼文：只有在「穿搭作品」這個頁籤（自己發的貼文）才會出現，收藏牆那邊不會有；只有自己可以編輯／刪除自己的貼文，別人看不到這兩個按鈕。 -->
             <template v-if="viewedUserId === currentUserId">
-              <!--
-                Teleport to="body"：把編輯表單「傳送」到 <body> 底下渲染，脫離原本這張
-                貼文卡片狹窄的欄寬限制，這樣才能做成置中的彈出視窗，而不是被卡片撐得
-                又窄又長。同一時間只會有一篇貼文在編輯（editingPostId 是單一值），
-                所以就算表單搬到 <body> 下面，也不會跟其他卡片衝突。
-              -->
+              <!--編輯彈出視窗置中-->
               <Teleport to="body">
                 <!--
                   Transition + :css="false"：v-if 原本是「一改條件，元素馬上出現／消失」，
                   沒有中間過程。包一層 <Transition>，Vue 才會在元素真正被加進 DOM 之前
                   呼叫 @enter，元素被拿掉之前呼叫 @leave，讓我們有機會在這兩個時間點插入
                   anime.js 的動畫。:css="false" 是告訴 Vue「這裡的動畫由 JS（anime.js）
-                  自己控制，不用去偵測 CSS transition/animation 的結束事件」，
-                  不然 Vue 預設會等 CSS transitionend 事件，但這裡根本沒有寫 CSS transition。
-                  v-if 從原本放在 <Teleport> 上，改成放在裡面這個真正的元素上——
-                  Transition 是靠偵測「包住的這個元素」被插入/移除來觸發 enter/leave，
-                  v-if 要跟著移到這裡才抓得到。
+                  自己控制，不用去偵測 CSS transition/animation 的結束事件」，                 
                 -->
                 <Transition @enter="onEditModalEnter" @leave="onEditModalLeave" :css="false">
                   <div v-if="editingPostId === post.communityPostId" class="edit-modal-overlay" @click.self="cancelEdit">
@@ -723,7 +663,13 @@ const toggleFollow = async () => {
                     </div>
 
                     <div class="edit-form">
-                      <textarea v-model="editForm.content" class="edit-textarea" rows="3"></textarea>
+                      <textarea
+                        ref="editTextareaEl"
+                        v-model="editForm.content"
+                        class="edit-textarea"
+                        rows="3"
+                        @input="autoGrowTextarea"
+                      ></textarea>
 
                       <!-- 照片編輯：跟 CreatePostView.vue 的縮圖列是同一套邏輯，只是排版比較精簡 -->
                       <div class="edit-thumb-row">
@@ -764,12 +710,7 @@ const toggleFollow = async () => {
                           @click="productSearch = ''"
                         >✕</button>
                       </div>
-                      <!--
-                        沒有打字搜尋的時候，只列出「熱門」的前 5 個標籤，
-                        而不是把資料庫裡所有商品全部攤開——不然商品一多，
-                        這個標籤區塊、進而整張卡片就會被拉得越來越長。
-                        想標記其他商品的話，直接在上面搜尋框打名字就找得到。
-                      -->
+                      <!--沒有打字搜尋的時候，只列出「熱門」的前 5 個標籤，-->
                       <p class="edit-field-hint" v-if="!productSearch.trim()">熱門標籤，想找其他商品請直接搜尋</p>
                       <div class="tag-cloud">
                         <button
@@ -818,14 +759,7 @@ const toggleFollow = async () => {
       </div>
 
       <!--
-        收藏牆
-        v-else-if="activeTab === 'saved'"：接在上面 v-if 後面的「再一個條件」，
-        意思是「如果上面 works 那個條件不成立，再檢查看看是不是 'saved'，
-        是的話就換畫這一塊」。
-        裡面又分兩種情況：
-        savedPosts.length（收藏清單裡有東西，長度大於 0）→ 顯示收藏牆（卡片排版跟上面作品牆幾乎一樣）；
-        沒有收藏任何貼文 → 顯示一個「還沒收藏」的提示畫面。
-      -->
+        收藏牆savedPosts.length（收藏清單裡有東西，長度大於 0）→ 顯示收藏牆（卡片排版跟上面作品牆幾乎一樣）； 沒有收藏任何貼文 → 顯示一個「還沒收藏」的提示畫面。 -->
       <div v-else-if="activeTab === 'saved'">
         <div v-if="savedPosts.length" class="post-grid">
           <!-- 這裡的卡片排版跟上面「穿搭作品牆」幾乎一模一樣，差別只是資料來源換成 savedPosts -->
@@ -853,13 +787,7 @@ const toggleFollow = async () => {
         </div>
 
         <!-- v-else（搭配上面裡層的 v-if）：收藏清單是空的時候，顯示這個提示，而不是一片空白 -->
-        <div v-else class="empty-state">
-          <!--
-            原本這裡是用 emoji（📁）當圖示，跟之前 ChatView.vue 的相機按鈕圖示消失
-            是同一類風險：emoji 靠字型渲染，換一台電腦、換個瀏覽器字型設定就可能跑掉或消失；
-            這裡也還沒踩到問題，但既然已經在處理圖示一致性，先換成 SVG 畫的線條圖示——
-            不吃字型，風格上也比較貼近網站其他地方（搜尋圖示、輪播箭頭）用的線條風。
-          -->
+        <div v-else class="empty-state">         
           <svg class="empty-icon" viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 8l2.5-4h11L20 8" />
             <path d="M4 8v10a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 18V8" />
@@ -870,14 +798,10 @@ const toggleFollow = async () => {
         </div>
       </div>
 
+      </template>
     </div>
 
-    <!--
-      圖片放大燈箱：跟編輯視窗一樣 Teleport 到 <body>，蓋在最上面。
-      放在整個頁面最外層（不是放在某張貼文卡片裡面），這樣不管是哪張卡片、
-      哪張縮圖被點開，都共用同一個燈箱，不用每張卡片各自複製一份。
-      lightboxImage 有值才顯示；點背景（不是點到圖片本身）就關閉。
-    -->
+    <!--圖片放大燈箱-->
     <Teleport to="body" v-if="lightboxImage">
       <div class="lightbox-overlay" @click.self="closeLightbox">
         <button type="button" class="lightbox-close" @click="closeLightbox">✕</button>
@@ -890,23 +814,14 @@ const toggleFollow = async () => {
 <style scoped>
 /*
   這個 <style> 標籤有加 scoped，意思是「這裡面寫的 CSS 樣式，
-  只會套用在這個檔案自己的 HTML 上」，不會不小心影響到其他頁面的元素。
-  Vue 是怎麼做到的？它會偷偷幫這個檔案裡的每個 HTML 元素加上一個
-  獨一無二的隱藏屬性（例如 data-v-xxxxx），
-  然後把下面每一條 CSS 規則也自動加上同樣的屬性選擇器，
-  這樣瀏覽器比對的時候就只會匹配到「這個檔案畫出來的元素」。
+  只會套用在這個檔案自己的 HTML 上」，不會影響到其他頁面的元素。
 */
 .community-page {
   width: 100%;
   min-height: 100vh;
   background-color: #F9F4F0 !important;
   box-sizing: border-box;
-  /*
-    --cream、--paper 這種用兩個減號開頭的名稱，叫做「CSS 變數」。
-    可以把它想成幫顏色取一個好記的名字，之後在其他樣式規則裡
-    只要寫 var(--cream) 就能重複使用同一個顏色，
-    以後想換色系，只要改這裡一個地方，全部套用到它的樣式都會一起變。
-  */
+  
   --cream:#F9F4F0;
   --paper:#FFFDFB;
   --ink:#2A2420;
@@ -935,6 +850,52 @@ const toggleFollow = async () => {
   border:1px solid var(--hairline);
   border-radius:22px;
   overflow:hidden;
+}
+
+/* ---------- 骨架載入畫面 ---------- */
+@keyframes skeleton-shimmer {
+  0% { background-position: -300px 0; }
+  100% { background-position: 300px 0; }
+}
+.skeleton-block{
+  background-color: var(--hairline);
+  background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,.55) 50%, rgba(255,255,255,0) 100%);
+  background-size: 300px 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+/* 骨架版的個人檔案卡 */
+.skeleton-profile-card{
+  background:var(--paper); border:1px solid var(--hairline); border-radius:22px;
+  overflow:hidden; margin-bottom:1.6rem;
+}
+.skeleton-banner{ height:150px; border-radius:0; }
+.skeleton-profile-body{ padding:0 2.2rem 1.6rem; position:relative; }
+.skeleton-avatar-xl{
+  width:112px; height:112px; border-radius:50%;
+  margin-top:-58px; border:5px solid var(--paper);
+}
+.skeleton-stats-row{ display:flex; gap:2rem; margin-top:1rem; }
+.skeleton-stat{ width:48px; height:14px; }
+.skeleton-line{ height:14px; }
+.skeleton-line-30{ width:30%; }
+.skeleton-line-60{ width:60%; }
+.skeleton-line-90{ width:90%; }
+.skeleton-line-50{ width:50%; }
+
+/* 骨架版的貼文網格：跟 .post-grid／.post-card 同一組欄數、圓角、間距。 */
+.skeleton-grid{
+  display:grid; grid-template-columns:repeat(4, 1fr); gap:1.4rem; margin-top:2rem;
+}
+.skeleton-card{
+  background:var(--paper); border:1px solid var(--hairline); border-radius:16px; overflow:hidden;
+}
+.skeleton-card-media{ aspect-ratio:4/5; border-radius:0; }
+.skeleton-card-body{ padding:1rem; display:flex; flex-direction:column; gap:.6rem; }
+
+@media (max-width: 767px){
+  .skeleton-grid{ grid-template-columns:repeat(2, 1fr); }
 }
 
 .profile-banner{
@@ -1194,8 +1155,16 @@ const toggleFollow = async () => {
   width:100%;
   border:1px solid var(--hairline); border-radius:4px;
   padding:.6rem .8rem; font-size:.83rem; color:var(--ink);
-  font-family:inherit; resize:vertical;
+  font-family:inherit;
   outline:none;
+  /* resize:none：改成自動長高（JS 控制 height），不用瀏覽器原生的手動拖曳，
+     兩者混在一起反而會打架（自動調的高度被使用者手動拖曳蓋掉，或反過來）。
+     min-height 保留當作最小高度，內容還很少的時候框框不會塌得太扁。
+     overflow:hidden：自動長高之後，內容應該剛好都裝得下，不需要再讓 textarea
+     自己出現垂直捲軸，捲軸出現反而會讓 scrollHeight 的量測不準。 */
+  resize:none;
+  overflow:hidden;
+  min-height:80px;
 }
 .edit-textarea:focus{ border-color:var(--plum); }
 .edit-visibility{ display:flex; gap:1rem; font-size:.8rem; color:var(--ink); }
