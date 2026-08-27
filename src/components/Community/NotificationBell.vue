@@ -117,11 +117,8 @@ const goToNotification = (n) => {
   }
 }
 
-// pollTimer：每隔一段時間重新問一次未讀數量，不用使用者自己重新整理頁面
-// 才會看到「有新通知」的紅點——跟聊天室用 WebSocket 即時推播比起來陽春一點，
-// 但通知這種「不用馬上跳出來、晚個幾十秒看到也沒差」的場景，定時輪詢就夠用，
-// 不需要為了這個再另外接一條 WebSocket 通道。
-const POLL_INTERVAL = 30000
+// pollTimer：每 15 秒重新問一次未讀數量，不用使用者自己重新整理頁面，才會看到「有新通知」的紅點 // 
+const POLL_INTERVAL = 15000
 let pollTimer = null
 
 onMounted(async () => {
