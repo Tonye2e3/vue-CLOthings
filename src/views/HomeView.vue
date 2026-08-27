@@ -26,6 +26,9 @@ import CategoryShowcase from '@/components/home/CategoryShowcase.vue'
   --home-border: #e5e5e5;
   --home-accent: #e60012;
 
+  max-width: 1200px;
+  margin: 0 auto;
+
   background: var(--home-bg);
   color: var(--home-text);
   font-family: 'Noto Sans TC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
