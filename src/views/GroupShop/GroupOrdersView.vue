@@ -199,8 +199,6 @@ const formatCurrency = (amount) => new Intl.NumberFormat('zh-TW').format(amount)
                   <td>{{ order.shipName }}</td>
                   <td>
                     <div class="action-buttons">
-                      <button class="edit-btn go-btn-tap" :disabled="order.status.includes('已取消') || isReadOnly"
-                        @click="openEditModal(order.id)">編輯</button>
                       <button class="cancel-btn go-btn-tap" :disabled="order.status.includes('已取消') || isReadOnly"
                         @click="cancelOrder(order.id)">取消</button>
                     </div>
