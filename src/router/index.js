@@ -293,7 +293,7 @@ const router = createRouter({
 
         // 訊息
         {
-          path: 'messages',
+          path: 'messages/:userId?',
           name: 'UserMessages',
           component: () => import('@/views/Community/ChatView.vue'),
         },
