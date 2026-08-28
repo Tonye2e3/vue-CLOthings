@@ -850,23 +850,7 @@ const toggleFollow = async (creator) => {
           >追蹤中</button>
         </div>
 
-        <div class="d-flex align-items-center gap-2">
-          <!-- 管理後台入口：只有登入者是管理員才會出現。放在這裡（社群首頁）是因為
-               管理員帳號沒有自己的個人頁可以放這顆按鈕，但每個登入的人本來就會經過這頁。
-               原本這裡是用 emoji（🛠）當圖示，跟之前 ChatView.vue 相機按鈕、
-               UserProfileView.vue 收藏空狀態圖示消失是同一類風險：emoji 靠字型渲染，
-               換一台電腦、換個瀏覽器字型設定就可能跑掉或消失。這裡也一起換成 SVG
-               扳手圖示，統一整個 Community 的圖示風格。 -->
-          <router-link
-            v-if="authStore.isAdmin"
-            to="/admin/community/posts"
-            class="btn-admin-entry text-decoration-none"
-          >
-            <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.8 2.8-2-2 2.8-2.8z" />
-            </svg>
-            管理後台
-          </router-link>
+        <div class="d-flex align-items-center gap-2">         
           <router-link to="/community/create" class="btn-share text-decoration-none">
             ＋ 分享我的穿搭
           </router-link>

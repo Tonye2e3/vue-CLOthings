@@ -29,7 +29,7 @@ function goDetail(orderId) {
 </script>
 
 <template>
-  <div class="orders-view">
+  <div class="orders-view container">
     <h1 class="page-title">我的訂單</h1>
 
     <!-- 沒有訂單 -->
@@ -59,6 +59,11 @@ function goDetail(orderId) {
 </template>
 
 <style scoped>
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
 .orders-view {
   max-width: 960px;
   margin: 0 auto;
