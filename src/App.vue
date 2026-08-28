@@ -6,8 +6,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { RouterLink } from 'vue-router'
 import IconSearch from '@/components/icons/IconSearch.vue'
 import IconHeart from '@/components/icons/IconHeart.vue'
+import NotificationBell from '@/components/Community/NotificationBell.vue'
 import IconUser from '@/components/icons/IconUser.vue'
 import IconCart from '@/components/icons/IconCart.vue'
+import { ref } from 'vue'
 //======== Sitefooter.vue 開始==========
 import IconFacebook from '@/components/icons/IconFacebook.vue'
 import IconInstagram from '@/components/icons/IconInstagram.vue'
@@ -29,6 +31,14 @@ const navItems = [
 // 判斷目前是不是在「團購 Group」相關頁面：在這些頁面時，導覽列自己的購物車圖示要隱藏
 // （團購頁面有自己的購物車機制，避免使用者混淆是哪一個購物車）
 const isGroupSection = computed(() => route.path.startsWith('/GroupShop'))
+
+const searchKeyword = ref('')
+
+function doSearch() {
+  if (!searchKeyword.value.trim()) return
+  router.push({ name: 'search', query: { keyword: searchKeyword.value } })
+  searchKeyword.value = ''
+}
 //======== Sitefooter.vue 開始==========
 const footerLinks = [
   { label: '客服中心', routeName: 'service' },
@@ -56,13 +66,25 @@ function logout() {
       </nav>
 
       <div class="header-actions">
-        <button class="icon-btn" type="button" aria-label="搜尋">
+        <div class="search-box">
+          <input
+            v-model="searchKeyword"
+            @keyup.enter="doSearch"
+            placeholder="搜尋商品..."
+            class="search-input"
+          />
+          <button class="icon-btn" @click="doSearch" aria-label="搜尋">
+            <IconSearch />
+          </button>
+        </div>
+        <!-- <button class="icon-btn" type="button" aria-label="搜尋">
           <IconSearch />
-        </button>
+        </button> -->
 
         <RouterLink :to="{ name: 'favorite' }" class="icon-btn" aria-label="收藏">
           <IconHeart />
         </RouterLink>
+        <NotificationBell v-if="authStore.isLoggedIn" />
         <RouterLink
           v-if="authStore.isLoggedIn"
           :to="{ name: 'user' }"
@@ -71,12 +93,7 @@ function logout() {
         >
           <IconUser />
         </RouterLink>
-        <RouterLink
-          v-else
-          :to="{ name: 'login' }"
-          class="icon-btn"
-          aria-label="帳號"
-        >
+        <RouterLink v-else :to="{ name: 'login' }" class="icon-btn" aria-label="帳號">
           <IconUser />
         </RouterLink>
         <RouterLink
@@ -131,7 +148,7 @@ function logout() {
 <style scoped>
 .main-container {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1600px;
   /* 依照設計需求調整內容的最大寬度 */
   margin: 0 auto;
   /* 上下 0，左右自動置中 */

@@ -1,8 +1,11 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import api from '@/services/api'
+// 圖片裁切套件
+import { Cropper, CircleStencil } from 'vue-advanced-cropper'
+import 'vue-advanced-cropper/dist/style.css'
 
-const apiBaseUrl = 'https://localhost:7255'
+const apiBaseUrl = import.meta.env.VITE_API_URL
 
 const profileData = reactive({
   firstName: '',
@@ -19,6 +22,10 @@ const isEditing = ref(false)
 
 const selectedAvatarFile = ref(null)
 const avatarPreviewUrl = ref('')
+// 裁切視窗
+const showAvatarCropper = ref(false)
+// 裁切器
+const cropper = ref(null)
 
 function getAvatarUrl() {
   if (!profileData.avatar) {
@@ -54,6 +61,7 @@ const toggleEdit = () => {
   isEditing.value = true
 }
 
+// 🟡【修改】選擇圖片後先進入裁切模式
 const handleAvatarChange = (event) => {
   const file = event.target.files[0]
 
@@ -61,13 +69,111 @@ const handleAvatarChange = (event) => {
     return
   }
 
-  selectedAvatarFile.value = file
+  // 限制 5MB
+  if (file.size > 5 * 1024 * 1024) {
+    alert('圖片大小不能超過 5 MB')
+    event.target.value = ''
+    return
+  }
 
+  // 限制圖片格式
+  const allowedTypes = [
+    'image/jpeg',
+    'image/png',
+    'image/webp'
+  ]
+
+  if (!allowedTypes.includes(file.type)) {
+    alert('只允許 JPG、PNG、WEBP')
+    event.target.value = ''
+    return
+  }
+
+  // 清除上一張預覽圖
   if (avatarPreviewUrl.value) {
     URL.revokeObjectURL(avatarPreviewUrl.value)
   }
 
+  // 原始圖片先拿來給裁切器使用
   avatarPreviewUrl.value = URL.createObjectURL(file)
+
+  // 開啟裁切視窗
+  showAvatarCropper.value = true
+
+  // 允許再次選擇同一張圖片
+  event.target.value = ''
+}
+
+// 🟢【新增】套用裁切結果
+const applyAvatarCrop = () => {
+  if (!cropper.value) {
+    return
+  }
+
+  const { canvas } = cropper.value.getResult()
+
+  if (!canvas) {
+    return
+  }
+
+  // 統一輸出 512 × 512
+  const outputCanvas = document.createElement('canvas')
+  outputCanvas.width = 512
+  outputCanvas.height = 512
+
+  const context = outputCanvas.getContext('2d')
+
+  context.drawImage(
+    canvas,
+    0,
+    0,
+    512,
+    512
+  )
+
+  // Canvas → Blob
+  outputCanvas.toBlob(
+    (blob) => {
+      if (!blob) {
+        return
+      }
+
+      // Blob → File
+      const file = new File(
+        [blob],
+        'avatar.webp',
+        {
+          type: 'image/webp'
+        }
+      )
+
+      // 這才是真正準備上傳的圖片
+      selectedAvatarFile.value = file
+
+      // 清除原始圖片網址
+      if (avatarPreviewUrl.value) {
+        URL.revokeObjectURL(avatarPreviewUrl.value)
+      }
+
+      // 使用裁切完成的圖片當預覽
+      avatarPreviewUrl.value = URL.createObjectURL(file)
+
+      // 關閉裁切器
+      showAvatarCropper.value = false
+    },
+    'image/webp',
+    0.9
+  )
+}
+
+// 🟢【新增】取消裁切
+const cancelAvatarCrop = () => {
+  if (avatarPreviewUrl.value) {
+    URL.revokeObjectURL(avatarPreviewUrl.value)
+    avatarPreviewUrl.value = ''
+  }
+
+  showAvatarCropper.value = false
 }
 
 const save = async () => {
@@ -145,7 +251,7 @@ const cancel = () => {
     <div v-if="!isEditing">
       <div class="profile-summary">
         <div class="avatar-wrapper">
-          <img v-if="profileData.avatar" :src="getAvatarUrl()" alt="會員頭像" class="avatar" />
+          <img v-if="profileData.avatar" :src="getAvatarUrl()" alt="會員頭像" class="profile-avatar" />
 
           <div v-else class="profile-avatar avatar-placeholder">
             {{ profileData.lastName?.charAt(0) || 'U' }}
@@ -203,7 +309,7 @@ const cancel = () => {
     <div v-else>
       <div class="avatar-edit-area">
         <img v-if="profileData.avatar || avatarPreviewUrl" :src="getEditingAvatarUrl()" alt="會員頭像"
-          class="avatar avatar-large" />
+          class="profile-avatar avatar-large" />
 
         <div v-else class="avatar avatar-large avatar-placeholder">U</div>
 
@@ -265,6 +371,43 @@ const cancel = () => {
       </div>
     </div>
   </div>
+
+  <!-- 🟢【新增】頭像裁切視窗 -->
+  <div v-if="showAvatarCropper" class="cropper-overlay">
+    <div class="cropper-modal">
+
+      <div class="cropper-header">
+        <h3>調整頭像</h3>
+
+        <button type="button" class="cropper-close" @click="cancelAvatarCrop">
+          ×
+        </button>
+      </div>
+
+      <p class="cropper-description">
+        拖曳圖片調整位置，滾輪或手勢可以調整大小。
+      </p>
+
+      <div class="cropper-container">
+        <Cropper ref="cropper" :src="avatarPreviewUrl" :stencil-component="CircleStencil" :stencil-props="{
+          aspectRatio: 1
+        }" :resize-image="{
+          adjustStencil: false
+        }" image-restriction="stencil" />
+      </div>
+
+      <div class="cropper-actions">
+        <button type="button" class="user-btn user-btn-secondary" @click="cancelAvatarCrop">
+          取消
+        </button>
+
+        <button type="button" class="user-btn user-btn-primary" @click="applyAvatarCrop">
+          套用頭像
+        </button>
+      </div>
+
+    </div>
+  </div>
 </template>
 
 <style scoped>
@@ -280,9 +423,26 @@ const cancel = () => {
 .profile-avatar {
   width: 110px;
   height: 110px;
+
+  /* 圓形 */
   border-radius: 50%;
+
+  /* 圖片維持比例並裁切 */
   object-fit: cover;
+
+  /* 防止 flex 把頭像壓縮 */
+  flex-shrink: 0;
+
+  display: block;
+
   border: 4px solid #f3f3f3;
+}
+
+/* 🟢編輯模式使用稍大的頭像 */
+.avatar-large {
+  width: 200px;
+  height: 200px;
+  flex-shrink: 0;
 }
 
 .avatar-placeholder {
@@ -339,6 +499,93 @@ const cancel = () => {
   align-self: flex-end;
   color: #aaaaaa;
   font-size: 11px;
+}
+
+/* ============================= */
+/* 頭像裁切器 */
+/* ============================= */
+
+.cropper-overlay {
+  position: fixed;
+  inset: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 20px;
+
+  background: rgba(0, 0, 0, 0.55);
+
+  z-index: 9999;
+}
+
+.cropper-modal {
+  width: 100%;
+  max-width: 520px;
+
+  padding: 24px;
+
+  background: #ffffff;
+  border-radius: 16px;
+
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.cropper-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 6px;
+}
+
+.cropper-header h3 {
+  margin: 0;
+
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.cropper-close {
+  border: 0;
+  background: transparent;
+
+  font-size: 28px;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+.cropper-description {
+  margin: 0 0 18px;
+
+  color: #888888;
+  font-size: 13px;
+}
+
+.cropper-container {
+  width: 100%;
+  height: 400px;
+
+  overflow: hidden;
+
+  background: #111111;
+  border-radius: 12px;
+}
+
+.cropper-container :deep(.vue-advanced-cropper) {
+  width: 100%;
+  height: 100%;
+}
+
+.cropper-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+
+  margin-top: 20px;
 }
 
 @media (max-width: 700px) {

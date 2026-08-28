@@ -17,7 +17,7 @@ const route = useRoute()
 const router = useRouter()
 
 // IMAGE_BASE：大頭貼是靜態檔案，走的不是 /api 這條路徑，邏輯跟其他頁面一樣。
-const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+const IMAGE_BASE = import.meta.env.VITE_API_URL
 
 const conversations = ref([])
 const loadingConversations = ref(true)
@@ -112,12 +112,22 @@ const fetchMessages = async (otherUserId) => {
 }
 
 // openConversation：點左側某個對話、或從個人頁「訊息」按鈕跳轉過來時執行。
+//
+// 修正：這支元件現在被兩種路由共用——獨立的 /community/messages/:userId，
+// 跟掛在會員中心裡的 /user/messages/:userId（User.vue 用 <RouterView> 包這個元件）。
+// 原本這裡不管三七二十一都用絕對路徑 router.replace('/community/messages/...')，
+// 如果現在是在會員中心裡點對話，就會被導去獨立的社群聊天頁，等於離開了會員中心版面
+// （側邊欄不見了），使用者感覺起來就像「點了又跳轉」。改成看「目前是哪個路由名稱」，
+// 用同一個名稱、只換 userId 參數，這樣不管在哪個版面點對話，都留在原本那個版面裡，
+// 只有網址列的 userId 換掉。
+const targetRouteName = () => (route.name === 'UserMessages' ? 'UserMessages' : 'CommunityMessagesWith')
+
 const openConversation = async (otherUserId, username, avatar) => {
   activeOtherUserId.value = otherUserId
   activeOtherUsername.value = username
   activeOtherAvatar.value = avatar
-  // 網址也跟著換成 /community/messages/:userId，重新整理頁面時才會記得剛剛開的是哪個對話。
-  router.replace(`/community/messages/${otherUserId}`)
+  // 網址也跟著換成 .../messages/:userId，重新整理頁面時才會記得剛剛開的是哪個對話。
+  router.replace({ name: targetRouteName(), params: { userId: otherUserId } })
   await fetchMessages(otherUserId)
 }
 

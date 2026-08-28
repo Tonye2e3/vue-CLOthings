@@ -8,7 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 
 // HUB_BASE：ChatHub 掛在後端網域的 /hub/chat，不是走 /api 這條路徑
 // （跟圖片、跟短網址 /s/{code} 是同樣的道理——這些都是後端網域上「/api 以外」的路徑）。
-const HUB_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+const HUB_BASE = import.meta.env.VITE_API_URL
 
 // connection：整個 App 共用同一條 WebSocket 連線（不是每個元件各開一條），
 // 模組頂層宣告的變數在整個前端專案裡是「唯一一份」，重複 import 這個檔案拿到的都是同一個。

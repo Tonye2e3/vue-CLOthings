@@ -7,7 +7,7 @@ import { useRouter } from 'vue-router'
 const authStore = useAuthStore()
 const router = useRouter()
 
-const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+const IMAGE_BASE = import.meta.env.VITE_API_URL
 
 // posts：後台要管理的全部貼文，不管 status 是 public、hide 還是 check 都要看得到
 // （跟前台 CommunityView.vue 不一樣，前台通常只給使用者看 public 的）。
@@ -22,13 +22,34 @@ const fetchPosts = async () => {
     // 這支整個 Controller 都加了 [Authorize(Roles = "Admin,SuperAdmin")]，配合這個檔案自己
     // onMounted 裡的 authStore.isAdmin 檢查，前後端都有擋。
     const res = await api.get(`/AdminCommunityPost`)
-    posts.value = res.data
+    // 依發布時間「新到舊」排序，最新發的貼文會排在第一頁最上面——後端 AdminCommunityPostController
+    // 沒有特別排序（預設照資料庫的主鍵順序回傳，等於是「舊到新」），這裡在前端補排一次。
+    posts.value = [...res.data].sort((a, b) => new Date(b.postDate) - new Date(a.postDate))
   } catch (err) {
     console.error('讀取貼文列表失敗：', err)
   } finally {
     loading.value = false
   }
 }
+
+// ============================================================
+// 檢舉次數：之前做檢舉功能時，PostReportController.cs 就已經有一支
+// GET api/PostReport/summary 可以查「每篇貼文各被檢舉幾次」，但一直沒有接進這個列表——
+// 導致檢舉紀錄其實有存進資料庫，管理員卻完全看不到任何提示。這裡補上。
+// ============================================================
+
+// reportCounts：用 Map 存「communityPostId → 被檢舉次數」，畫面上用 getReportCount(id)
+// 查某一篇貼文的檢舉次數，查不到（表示這篇沒人檢舉過）就當作 0。
+const reportCounts = ref(new Map())
+const fetchReportCounts = async () => {
+  try {
+    const res = await api.get('/PostReport/summary')
+    reportCounts.value = new Map(res.data.map(s => [s.communityPostId, s.reportCount]))
+  } catch (err) {
+    console.error('讀取檢舉次數失敗：', err)
+  }
+}
+const getReportCount = (communityPostId) => reportCounts.value.get(communityPostId) || 0
 
 // 只有登入者是管理員才能看這頁，這個檢查完全寫在這個檔案自己裡面，
 // 不用改共用的 router-index.js（那個全域守衛之後要不要加，等問過隊友再說）。
@@ -39,6 +60,7 @@ onMounted(() => {
     return
   }
   fetchPosts()
+  fetchReportCounts()
 })
 
 // searchQuery：搜尋框打的文字，同時比對「貼文內容」「發布者ID」「發布者帳號」，
@@ -155,6 +177,7 @@ const deletePost = async (post) => {
               <th>貼文圖片</th>
               <th>按讚數</th>
               <th>留言數</th>
+              <th>檢舉次數</th>
               <th>標籤商品</th>
               <th>操作</th>
             </tr>
@@ -179,6 +202,18 @@ const deletePost = async (post) => {
               </td>
               <td>♥ {{ post.likesCount }}</td>
               <td>💬 {{ post.commentsCount }}</td>
+              <td>
+                <!--
+                  getReportCount(post.communityPostId) > 0：只有真的被檢舉過才顯示紅色警示樣式，
+                  沒被檢舉過就是普通灰色的「0」，不會讓整排列表看起來每筆都在警告什麼。
+                  這裡故意不做成連結——檢舉明細（誰檢舉的、原因是什麼）可以之後
+                  在貼文詳情頁（AdminCommunityPostDetailView.vue）用 GET api/PostReport/post/{id}
+                  另外顯示，這裡先只做「有沒有被檢舉過、幾次」的提示就好。
+                -->
+                <span class="report-count" :class="{ 'report-count-flagged': getReportCount(post.communityPostId) > 0 }">
+                  {{ getReportCount(post.communityPostId) > 0 ? `⚠ ${getReportCount(post.communityPostId)}` : '0' }}
+                </span>
+              </td>
               <td>
                 <span
                   v-for="tag in post.taggedProducts"
@@ -289,6 +324,12 @@ const deletePost = async (post) => {
 .badge-public{ background:#5E8C61; }
 .badge-hide{ background:var(--ink-soft); }
 .badge-check{ background:var(--ochre); }
+
+/* report-count：預設是普通灰色文字（沒被檢舉過的貼文，大多數情況）；
+   真的被檢舉過（次數 > 0）才切成紅棕色警示字，跟按讚愛心的紅色是不同色階，
+   避免管理員一眼掃過去分不清楚「這是讚數還是警告」。 */
+.report-count{ color:var(--ink-soft); font-weight:600; }
+.report-count-flagged{ color:#B4453A; }
 
 .tag-chip{
   display:inline-block; background:var(--cream); color:var(--plum);

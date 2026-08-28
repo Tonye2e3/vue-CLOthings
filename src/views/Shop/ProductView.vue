@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute,useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/api'
 import Review from '@/components/Shop/ProductReview.vue'
 import Post from '@/components/Shop/ProductPost.vue'
@@ -12,9 +12,8 @@ const cartStore = useCartStore()
 const favoriteStore = useFavoriteStore()
 const route = useRoute()
 const router = useRouter()
-const API_BASE = 'https://localhost:7255'
+const API_BASE = import.meta.env.VITE_API_URL
 const buyNowStore = useBuyNowStore()
-
 
 function getImageUrl(fileName) {
   if (!fileName) {
@@ -128,108 +127,108 @@ const selectedSpec = computed(() => {
     (spec) => spec.color === selectedColor.value && spec.size === selectedSize.value,
   )
 })
-
-
 </script>
 
 <!-- =========================================================== -->
 <template>
-  <!-- 資料還沒來 → 顯示載入中 -->
-  <div v-if="!product" class="loading">載入中...</div>
-  <!-- 資料來了 → 才顯示商品內容 -->
-  <div v-else>
-    <div class="product-page">
-      <!-- 預覽圖區 -->
-      <div class="product-gallery">
-        <!-- 大圖 -->
-        <div class="gallery-main">
-          <img :src="currentImage" alt="商品圖片" />
+  <div class="container">
+    <!-- 資料還沒來 → 顯示載入中 -->
+    <div v-if="!product" class="loading">載入中...</div>
+    <!-- 資料來了 → 才顯示商品內容 -->
+    <div v-else>
+      <div class="product-page">
+        <!-- 預覽圖區 -->
+        <div class="product-gallery">
+          <!-- 大圖 -->
+          <div class="gallery-main">
+            <img :src="currentImage" alt="商品圖片" />
+          </div>
+
+          <!-- 小圖列表，點擊切換大圖 -->
+          <div class="gallery-smallpics">
+            <button
+              v-for="(img, index) in product.images"
+              :key="index"
+              class="smallpic-btn"
+              :class="{ active: currentImage === getImageUrl(img) }"
+              @click="currentImage = getImageUrl(img)"
+            >
+              <img :src="getImageUrl(img)" alt="商品縮圖" />
+            </button>
+          </div>
         </div>
+        <!-- 商品資訊區 -->
+        <div class="product-info">
+          <h1 class="info-title">商品資訊</h1>
 
-        <!-- 小圖列表，點擊切換大圖 -->
-        <div class="gallery-smallpics">
-          <button
-            v-for="(img, index) in product.images"
-            :key="index"
-            class="smallpic-btn"
-            :class="{ active: currentImage === getImageUrl(img) }"
-            @click="currentImage = getImageUrl(img)"
-          >
-            <img :src="getImageUrl(img)" alt="商品縮圖" />
-          </button>
-        </div>
-      </div>
-      <!-- 商品資訊區 -->
-      <div class="product-info">
-        <h1 class="info-title">商品資訊</h1>
+          <h2 class="info-name">{{ product.productName }}</h2>
 
-        <h2 class="info-name">{{ product.productName }}</h2>
+          <p class="info-meta">
+            顏色：{{ selectedColor ?? '尚未選擇' }} / 尺寸：{{ selectedSize ?? '尚未選擇' }}
+          </p>
 
-        <p class="info-meta">
-          顏色：{{ selectedColor ?? '尚未選擇' }} / 尺寸：{{ selectedSize ?? '尚未選擇' }}
-        </p>
-
-        <!-- <div class="info-tags">
+          <!-- <div class="info-tags">
           <span v-for="tag in product.tags" :key="tag" class="tag-badge">
             {{ tag }}
           </span>
         </div> -->
-        <p class="info-price">價格：NT$ {{ product.price.toLocaleString() }}</p>
+          <p class="info-price">價格：NT$ {{ product.price.toLocaleString() }}</p>
 
-        <!-- 按鈕區域，選顏色 -->
-        <div class="option-group">
-          <p class="option-label">顏色</p>
-          <div class="option-list">
-            <button
-              v-for="color in colorOptions"
-              :key="color"
-              class="option-btn"
-              :class="{ selected: selectedColor === color }"
-              @click="selectedColor = color"
-            >
-              {{ color }}
-            </button>
+          <!-- 按鈕區域，選顏色 -->
+          <div class="option-group">
+            <p class="option-label">顏色</p>
+            <div class="option-list">
+              <button
+                v-for="color in colorOptions"
+                :key="color"
+                class="option-btn"
+                :class="{ selected: selectedColor === color }"
+                @click="selectedColor = color"
+              >
+                {{ color }}
+              </button>
+            </div>
           </div>
-        </div>
 
-        <!-- 按鈕區域，選尺寸 -->
-        <div class="option-group">
-          <p class="option-label">尺寸</p>
-          <div class="option-list">
-            <button
-              v-for="size in sizeOptions"
-              :key="size"
-              class="option-btn"
-              :class="{ selected: selectedSize === size }"
-              @click="selectedSize = size"
-            >
-              {{ size }}
-            </button>
+          <!-- 按鈕區域，選尺寸 -->
+          <div class="option-group">
+            <p class="option-label">尺寸</p>
+            <div class="option-list">
+              <button
+                v-for="size in sizeOptions"
+                :key="size"
+                class="option-btn"
+                :class="{ selected: selectedSize === size }"
+                @click="selectedSize = size"
+              >
+                {{ size }}
+              </button>
+            </div>
+            <p class="option-hint">建議尺寸：M（依版型微修身）</p>
           </div>
-          <p class="option-hint">建議尺寸：M（依版型微修身）</p>
-        </div>
 
-        <!-- 按鈕區域，收藏、立即購買、加入購物車 -->
-        <div class="action-buttons">
-          <button class="btn-favorite" @click="toggleFavorite">
-            收藏 <span v-if="isCurrentFavorite">❤️</span><span v-else>🤍</span>
-          </button>
+          <!-- 按鈕區域，收藏、立即購買、加入購物車 -->
+          <div class="action-buttons">
+            <button class="btn-favorite" @click="toggleFavorite">
+              收藏 <span v-if="isCurrentFavorite">❤️</span><span v-else>🤍</span>
+            </button>
 
-          <button class="btn-buy-now" @click="buyNow">立即購買</button>
+            <button class="btn-buy-now" @click="buyNow">立即購買</button>
 
-          <button class="btn-add-cart" @click="addToCart">加入購物車</button>
+            <button class="btn-add-cart" @click="addToCart">加入購物車</button>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- 使用者評價 -->
-    <div>
-      <Review />
-    </div>
+      <!-- 使用者評價 -->
+      <div>
+        <Review v-if="product" :product-id="product.productId" />
+      </div>
 
-    <!-- 跟商品有關的穿搭靈感 -->
-    <div>
-      <Post />
+      <!-- 跟商品有關的穿搭靈感 -->
+      <div>
+        <Post :product-id="product?.productId" />
+      </div>
     </div>
   </div>
 </template>
@@ -237,6 +236,11 @@ const selectedSpec = computed(() => {
 <!-- =========================================================== -->
 
 <style scoped>
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
 /* 左側商品照片的樣式 */
 .product-gallery {
   display: flex;
@@ -247,7 +251,8 @@ const selectedSpec = computed(() => {
 /* 大圖容器 */
 .gallery-main {
   width: 100%;
-  aspect-ratio: 1 / 1; /* 保持正方形比例，不管圖片原始比例是什麼 */
+  aspect-ratio: 1 / 1;
+  /* 保持正方形比例，不管圖片原始比例是什麼 */
   overflow: hidden;
   background: #f5f5f5;
 }
@@ -255,13 +260,15 @@ const selectedSpec = computed(() => {
 .gallery-main img {
   width: 100%;
   height: 100%;
-  object-fit: cover; /* 讓圖片填滿容器，多餘部分裁掉，不會變形 */
+  object-fit: cover;
+  /* 讓圖片填滿容器，多餘部分裁掉，不會變形 */
 }
 
 /* 小圖列表容器 */
 .gallery-smallpics {
   display: grid;
-  grid-template-columns: repeat(6, 1fr); /* 固定 6 欄，符合您的設計稿 */
+  grid-template-columns: repeat(6, 1fr);
+  /* 固定 6 欄，符合您的設計稿 */
   gap: 8px;
 }
 
@@ -278,18 +285,21 @@ const selectedSpec = computed(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block; /* 消除 img 預設的行內元素間隙 */
+  display: block;
+  /* 消除 img 預設的行內元素間隙 */
 }
 
 .smallpic-btn.active {
-  border-color: #111111; /* 選中時邊框變深色，符合高對比風格 */
+  border-color: #111111;
+  /* 選中時邊框變深色，符合高對比風格 */
   border-width: 2px;
 }
 
 /* 右側商品資訊的樣式 */
 .product-page {
   display: grid;
-  grid-template-columns: 1fr 1fr; /* 左右各佔一半 */
+  grid-template-columns: 1fr 1fr;
+  /* 左右各佔一半 */
   gap: 48px;
   max-width: 1200px;
   margin: 0 auto;
@@ -350,7 +360,8 @@ const selectedSpec = computed(() => {
 .option-list {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap; /* 選項太多時自動換行 */
+  flex-wrap: wrap;
+  /* 選項太多時自動換行 */
 }
 
 .option-btn {
@@ -378,6 +389,7 @@ const selectedSpec = computed(() => {
   color: #999999;
   margin-top: 8px;
 }
+
 /* 按鈕區域，收藏、立即購買、加入購物車 */
 .action-buttons {
   display: flex;
@@ -410,7 +422,8 @@ const selectedSpec = computed(() => {
 .btn-add-cart {
   background: #111111;
   color: #ffffff;
-  flex: 1; /* 讓這個按鈕佔用剩餘空間，視覺上更主要 */
+  flex: 1;
+  /* 讓這個按鈕佔用剩餘空間，視覺上更主要 */
 }
 
 .btn-favorite:hover,

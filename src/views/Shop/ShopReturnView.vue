@@ -6,11 +6,11 @@ import api from '@/services/api'
 const route = useRoute()
 const router = useRouter()
 
-const order = ref(null)         // 訂單資料
-const reason = ref('')          // 退貨原因
-const returnItems = ref([])     // 每筆商品的「勾選 + 退貨數量」狀態
+const order = ref(null) // 訂單資料
+const reason = ref('') // 退貨原因
+const returnItems = ref([]) // 每筆商品的「勾選 + 退貨數量」狀態
 
-const API_BASE = 'https://localhost:7255'
+const API_BASE = import.meta.env.VITE_API_URL
 
 onMounted(async () => {
   try {
@@ -24,9 +24,9 @@ onMounted(async () => {
       productName: item.productName,
       color: item.color,
       size: item.size,
-      maxQuantity: item.quantity,   // 最多能退幾件（買的數量）
-      selected: false,               // 有沒有勾選要退
-      returnQuantity: 1,             // 要退幾件（預設 1）
+      maxQuantity: item.quantity, // 最多能退幾件（買的數量）
+      selected: false, // 有沒有勾選要退
+      returnQuantity: 1, // 要退幾件（預設 1）
     }))
   } catch (error) {
     console.error('載入訂單失敗：', error)
@@ -70,55 +70,66 @@ async function submitReturn() {
 </script>
 
 <template>
-  <div v-if="!order" class="return-view">載入中...</div>
+  <div class="container">
+    <div v-if="!order" class="return-view">載入中...</div>
 
-  <div v-else class="return-view">
-    <h1 class="page-title">申請退貨 - 訂單 #{{ order.orderId }}</h1>
+    <div v-else class="return-view">
+      <h1 class="page-title">申請退貨 - 訂單 #{{ order.orderId }}</h1>
 
-    <!-- 選擇要退的商品 -->
-    <section class="block">
-      <h2 class="block-title">選擇退貨商品</h2>
-      <div v-for="item in returnItems" :key="item.orderDetailId" class="return-item">
-        <input type="checkbox" v-model="item.selected" class="item-check" />
-        <div class="item-info">
-          <div class="item-name">{{ item.productName }}</div>
-          <div class="item-spec">{{ item.color }} / {{ item.size }}（購買 {{ item.maxQuantity }} 件）</div>
+      <!-- 選擇要退的商品 -->
+      <section class="block">
+        <h2 class="block-title">選擇退貨商品</h2>
+        <div v-for="item in returnItems" :key="item.orderDetailId" class="return-item">
+          <input type="checkbox" v-model="item.selected" class="item-check" />
+          <div class="item-info">
+            <div class="item-name">{{ item.productName }}</div>
+            <div class="item-spec">
+              {{ item.color }} / {{ item.size }}（購買 {{ item.maxQuantity }} 件）
+            </div>
+          </div>
+          <div class="item-qty" v-if="item.selected">
+            退貨數量：
+            <input
+              type="number"
+              v-model.number="item.returnQuantity"
+              :min="1"
+              :max="item.maxQuantity"
+              class="qty-input"
+            />
+          </div>
         </div>
-        <div class="item-qty" v-if="item.selected">
-          退貨數量：
-          <input
-            type="number"
-            v-model.number="item.returnQuantity"
-            :min="1"
-            :max="item.maxQuantity"
-            class="qty-input"
-          />
-        </div>
+      </section>
+
+      <!-- 退貨原因 -->
+      <section class="block">
+        <h2 class="block-title">退貨原因</h2>
+        <textarea
+          v-model="reason"
+          rows="3"
+          placeholder="請說明退貨原因..."
+          class="reason-input"
+        ></textarea>
+      </section>
+
+      <!-- 送出 -->
+      <div class="actions">
+        <button
+          class="btn-cancel"
+          @click="router.push({ name: 'orderDetail', params: { id: order.orderId } })"
+        >
+          取消
+        </button>
+        <button class="btn-submit" @click="submitReturn">送出退貨申請</button>
       </div>
-    </section>
-
-    <!-- 退貨原因 -->
-    <section class="block">
-      <h2 class="block-title">退貨原因</h2>
-      <textarea
-        v-model="reason"
-        rows="3"
-        placeholder="請說明退貨原因..."
-        class="reason-input"
-      ></textarea>
-    </section>
-
-    <!-- 送出 -->
-    <div class="actions">
-      <button class="btn-cancel" @click="router.push({ name: 'orderDetail', params: { id: order.orderId } })">
-        取消
-      </button>
-      <button class="btn-submit" @click="submitReturn">送出退貨申請</button>
     </div>
   </div>
 </template>
 
 <style scoped>
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
 .return-view {
   max-width: 960px;
   margin: 0 auto;
@@ -134,7 +145,9 @@ async function submitReturn() {
   padding: 16px;
   margin-bottom: 16px;
 }
-.block { margin-bottom: 32px; }
+.block {
+  margin-bottom: 32px;
+}
 .block-title {
   font-size: 1.1rem;
   font-weight: 700;
@@ -149,9 +162,16 @@ async function submitReturn() {
   padding: 12px 0;
   border-bottom: 1px solid #eee;
 }
-.item-info { flex: 1; }
-.item-name { font-weight: 600; }
-.item-spec { color: #888; font-size: 0.85rem; }
+.item-info {
+  flex: 1;
+}
+.item-name {
+  font-weight: 600;
+}
+.item-spec {
+  color: #888;
+  font-size: 0.85rem;
+}
 .qty-input {
   width: 60px;
   padding: 4px 8px;
@@ -169,11 +189,19 @@ async function submitReturn() {
   gap: 12px;
   justify-content: flex-end;
 }
-.btn-cancel, .btn-submit {
+.btn-cancel,
+.btn-submit {
   padding: 10px 24px;
   border-radius: 6px;
   cursor: pointer;
 }
-.btn-cancel { border: 1px solid #ccc; background: #fff; }
-.btn-submit { border: none; background: #111; color: #fff; }
+.btn-cancel {
+  border: 1px solid #ccc;
+  background: #fff;
+}
+.btn-submit {
+  border: none;
+  background: #111;
+  color: #fff;
+}
 </style>
