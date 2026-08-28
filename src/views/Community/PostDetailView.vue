@@ -163,14 +163,19 @@ const fetchLikeStatus = async () => {
   }
 }
 
-// scrollToCommentsIfNeeded：網址如果帶著 #comments（從 CommunityView.vue 的貼文卡片
-// 點「留言」數字過來就是這樣），資料抓回來、畫面渲染完之後自動捲到留言區塊，
-// 不用使用者自己往下滑找。用 nextTick 是因為留言區塊要等 fetchPost/fetchComments
-// 的資料回來、v-if 那些條件渲染完成之後，id="comments" 那個元素才真的存在於畫面上。
-const scrollToCommentsIfNeeded = async () => {
-  if (route.hash !== '#comments') return
+// scrollToComments：捲動到留言區塊，不管是從外部帶 #comments 網址進來，
+// 還是直接點這頁自己動作列上的留言圖示，都共用同一個函式。
+const scrollToComments = async () => {
   await nextTick()
   document.getElementById('comments')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+// scrollToCommentsIfNeeded：網址如果帶著 #comments（從 CommunityView.vue 的貼文卡片
+// 點「留言」數字過來就是這樣），資料抓回來、畫面渲染完之後自動捲到留言區塊，
+// 不用使用者自己往下滑找。
+const scrollToCommentsIfNeeded = () => {
+  if (route.hash !== '#comments') return
+  scrollToComments()
 }
 
 onMounted(async () => {
@@ -633,7 +638,7 @@ const addComment = async () => {
                   </svg>
                   {{ likesDisplay }}
                 </button>
-                <button class="action-btn">
+                <button class="action-btn" @click="scrollToComments">
                   <svg class="icon-inline" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" />
                   </svg>
