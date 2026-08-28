@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '@/services/api'
 
@@ -163,25 +163,33 @@ const fetchLikeStatus = async () => {
   }
 }
 
+// scrollToCommentsIfNeeded：網址如果帶著 #comments（從 CommunityView.vue 的貼文卡片
+// 點「留言」數字過來就是這樣），資料抓回來、畫面渲染完之後自動捲到留言區塊，
+// 不用使用者自己往下滑找。用 nextTick 是因為留言區塊要等 fetchPost/fetchComments
+// 的資料回來、v-if 那些條件渲染完成之後，id="comments" 那個元素才真的存在於畫面上。
+const scrollToCommentsIfNeeded = async () => {
+  if (route.hash !== '#comments') return
+  await nextTick()
+  document.getElementById('comments')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
 onMounted(async () => {
   // 先確定拿到真正的 userId，fetchPost（追蹤狀態）、fetchLikeStatus 才查得到對的人
   await loadCurrentUserId()
-  fetchPost()
-  fetchComments()
-  fetchSimilarPosts()
+  await Promise.all([fetchPost(), fetchComments(), fetchSimilarPosts()])
+  scrollToCommentsIfNeeded()
 })
 
 // 切換到別篇貼文時 Vue Router 會重用元件，onMounted 不會再跑，靠 watch 補上
-watch(() => route.params.id, () => {
+watch(() => route.params.id, async () => {
   notFound.value = false
   newComment.value = ''
   replyingTo.value = null
   currentImageIndex.value = 0
   stopAutoplay()
   visibleCommentCount.value = COMMENTS_PAGE_SIZE
-  fetchPost()
-  fetchComments()
-  fetchSimilarPosts()
+  await Promise.all([fetchPost(), fetchComments(), fetchSimilarPosts()])
+  scrollToCommentsIfNeeded()
 })
 
 onUnmounted(() => {
@@ -718,8 +726,9 @@ const addComment = async () => {
               </div>
             </div>
 
-            <!-- 留言區塊 -->
-            <div class="comment-block">
+            <!-- 留言區塊：id="comments" 讓外面（CommunityView.vue 的貼文卡片）可以用網址加
+                 #comments 直接連過來，進頁面後自動捲到這裡，不用使用者自己往下滑找留言 -->
+            <div class="comment-block" id="comments">
               <div class="comment-title">
                 <span class="dot"></span>留言
               </div>
