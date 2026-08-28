@@ -746,9 +746,11 @@ const addComment = async () => {
                 <!-- 只跑目前願意顯示的主留言（分頁），每則底下再跑 c.replies 畫回覆 -->
                 <div v-for="c in visibleGroupedComments" :key="c.postCommentId" class="comment-thread">
                   <div class="comment-row">
-                    <img :src="c.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, c.user)" />
+                    <router-link :to="`/community/profile/${c.userId}`">
+                      <img :src="c.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, c.user)" />
+                    </router-link>
                     <div class="comment-bubble">
-                      <span class="comment-user">{{ c.user }}</span>
+                      <router-link :to="`/community/profile/${c.userId}`" class="comment-user">{{ c.user }}</router-link>
                       <span>{{ c.commentText }}</span>
                       <div class="comment-meta">
                         <span class="comment-time">{{ formatDateTime(c.commentDate) }}</span>
@@ -760,9 +762,11 @@ const addComment = async () => {
 
                   <!-- 回覆往內縮排，跟 IG 呈現方式一樣 -->
                   <div v-for="r in c.replies" :key="r.postCommentId" class="comment-row comment-reply">
-                    <img :src="r.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, r.user)" />
+                    <router-link :to="`/community/profile/${r.userId}`">
+                      <img :src="r.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, r.user)" />
+                    </router-link>
                     <div class="comment-bubble">
-                      <span class="comment-user">{{ r.user }}</span>
+                      <router-link :to="`/community/profile/${r.userId}`" class="comment-user">{{ r.user }}</router-link>
                       <span>{{ r.commentText }}</span>
                       <div class="comment-meta">
                         <span class="comment-time">{{ formatDateTime(r.commentDate) }}</span>
@@ -1116,6 +1120,7 @@ const addComment = async () => {
 .comment-row{ display:flex; align-items:flex-start; gap:.6rem; }
 .comment-row.comment-reply{ margin-left:2.4rem; } /* 往內縮排，跟 IG 的回覆呈現方式一樣 */
 .comment-avatar{ width:28px; height:28px; border-radius:50%; object-fit:cover; flex-shrink:0; }
+.comment-row > a{ flex-shrink:0; line-height:0; } /* 留言大頭貼外面包的連結：跟原本純 <img> 時視覺一樣，不要有底線、不要被 flex 壓縮 */
 .comment-bubble{
   background:var(--paper);
   border:1px solid var(--hairline);
@@ -1125,7 +1130,11 @@ const addComment = async () => {
   width:100%;
   display:flex; align-items:baseline; flex-wrap:wrap; gap:.4rem;
 }
-.comment-user{ font-weight:700; margin-right:.1rem; }
+.comment-user{
+  font-weight:700; margin-right:.1rem;
+  color:var(--ink); text-decoration:none; /* 原本是純文字，現在改成連結，要蓋掉瀏覽器預設的藍字加底線 */
+}
+.comment-user:hover{ text-decoration:underline; } /* 保留一點「可以點」的提示，不用整段都變色 */
 .comment-meta{ display:flex; align-items:center; gap:.6rem; margin-left:auto; flex-shrink:0; }
 .comment-time{ font-size:.72rem; color:var(--ink-soft); white-space:nowrap; }
 .btn-reply{
