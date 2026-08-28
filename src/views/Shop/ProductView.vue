@@ -7,6 +7,8 @@ import Post from '@/components/Shop/ProductPost.vue'
 import { useCartStore } from '@/stores/ShopCart'
 import { useFavoriteStore } from '@/stores/ShopFavorite'
 import { useBuyNowStore } from '@/stores/ShopBuyNow'
+import { useAuthStore } from '@/stores/auth'
+
 
 const cartStore = useCartStore()
 const favoriteStore = useFavoriteStore()
@@ -14,6 +16,7 @@ const route = useRoute()
 const router = useRouter()
 const API_BASE = import.meta.env.VITE_API_URL
 const buyNowStore = useBuyNowStore()
+const authStore = useAuthStore()
 
 function getImageUrl(fileName) {
   if (!fileName) {
@@ -54,6 +57,10 @@ onMounted(async () => {
 
 //切換收藏狀態
 async function toggleFavorite() {
+    if (!authStore.isLoggedIn) {
+    router.push({ name: 'login' })
+    return
+  }
   const productId = product.value.productId
 
   if (favoriteStore.isFavorite(productId)) {
@@ -70,6 +77,10 @@ async function toggleFavorite() {
 
 // 加入購物車
 async function addToCart() {
+  if (!authStore.isLoggedIn) {
+    router.push({ name: 'login' })
+    return
+  }
   if (!selectedColor.value || !selectedSize.value) {
     alert('請選擇顏色和尺寸')
     return
@@ -84,6 +95,10 @@ async function addToCart() {
 
 //立即購買
 function buyNow() {
+  if (!authStore.isLoggedIn) {
+    router.push({ name: 'login' })
+    return
+  }
   if (!selectedColor.value || !selectedSize.value) {
     alert('請選擇顏色和尺寸')
     return
