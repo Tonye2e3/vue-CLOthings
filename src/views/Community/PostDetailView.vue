@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '@/services/api'
 
@@ -163,25 +163,38 @@ const fetchLikeStatus = async () => {
   }
 }
 
+// scrollToComments：捲動到留言區塊，不管是從外部帶 #comments 網址進來，
+// 還是直接點這頁自己動作列上的留言圖示，都共用同一個函式。
+const scrollToComments = async () => {
+  await nextTick()
+  document.getElementById('comments')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+// scrollToCommentsIfNeeded：網址如果帶著 #comments（從 CommunityView.vue 的貼文卡片
+// 點「留言」數字過來就是這樣），資料抓回來、畫面渲染完之後自動捲到留言區塊，
+// 不用使用者自己往下滑找。
+const scrollToCommentsIfNeeded = () => {
+  if (route.hash !== '#comments') return
+  scrollToComments()
+}
+
 onMounted(async () => {
   // 先確定拿到真正的 userId，fetchPost（追蹤狀態）、fetchLikeStatus 才查得到對的人
   await loadCurrentUserId()
-  fetchPost()
-  fetchComments()
-  fetchSimilarPosts()
+  await Promise.all([fetchPost(), fetchComments(), fetchSimilarPosts()])
+  scrollToCommentsIfNeeded()
 })
 
 // 切換到別篇貼文時 Vue Router 會重用元件，onMounted 不會再跑，靠 watch 補上
-watch(() => route.params.id, () => {
+watch(() => route.params.id, async () => {
   notFound.value = false
   newComment.value = ''
   replyingTo.value = null
   currentImageIndex.value = 0
   stopAutoplay()
   visibleCommentCount.value = COMMENTS_PAGE_SIZE
-  fetchPost()
-  fetchComments()
-  fetchSimilarPosts()
+  await Promise.all([fetchPost(), fetchComments(), fetchSimilarPosts()])
+  scrollToCommentsIfNeeded()
 })
 
 onUnmounted(() => {
@@ -625,7 +638,7 @@ const addComment = async () => {
                   </svg>
                   {{ likesDisplay }}
                 </button>
-                <button class="action-btn">
+                <button class="action-btn" @click="scrollToComments">
                   <svg class="icon-inline" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" />
                   </svg>
@@ -718,8 +731,9 @@ const addComment = async () => {
               </div>
             </div>
 
-            <!-- 留言區塊 -->
-            <div class="comment-block">
+            <!-- 留言區塊：id="comments" 讓外面（CommunityView.vue 的貼文卡片）可以用網址加
+                 #comments 直接連過來，進頁面後自動捲到這裡，不用使用者自己往下滑找留言 -->
+            <div class="comment-block" id="comments">
               <div class="comment-title">
                 <span class="dot"></span>留言
               </div>
@@ -746,9 +760,11 @@ const addComment = async () => {
                 <!-- 只跑目前願意顯示的主留言（分頁），每則底下再跑 c.replies 畫回覆 -->
                 <div v-for="c in visibleGroupedComments" :key="c.postCommentId" class="comment-thread">
                   <div class="comment-row">
-                    <img :src="c.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, c.user)" />
+                    <router-link :to="`/community/profile/${c.userId}`">
+                      <img :src="c.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, c.user)" />
+                    </router-link>
                     <div class="comment-bubble">
-                      <span class="comment-user">{{ c.user }}</span>
+                      <router-link :to="`/community/profile/${c.userId}`" class="comment-user">{{ c.user }}</router-link>
                       <span>{{ c.commentText }}</span>
                       <div class="comment-meta">
                         <span class="comment-time">{{ formatDateTime(c.commentDate) }}</span>
@@ -760,9 +776,11 @@ const addComment = async () => {
 
                   <!-- 回覆往內縮排，跟 IG 呈現方式一樣 -->
                   <div v-for="r in c.replies" :key="r.postCommentId" class="comment-row comment-reply">
-                    <img :src="r.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, r.user)" />
+                    <router-link :to="`/community/profile/${r.userId}`">
+                      <img :src="r.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, r.user)" />
+                    </router-link>
                     <div class="comment-bubble">
-                      <span class="comment-user">{{ r.user }}</span>
+                      <router-link :to="`/community/profile/${r.userId}`" class="comment-user">{{ r.user }}</router-link>
                       <span>{{ r.commentText }}</span>
                       <div class="comment-meta">
                         <span class="comment-time">{{ formatDateTime(r.commentDate) }}</span>
@@ -1116,6 +1134,7 @@ const addComment = async () => {
 .comment-row{ display:flex; align-items:flex-start; gap:.6rem; }
 .comment-row.comment-reply{ margin-left:2.4rem; } /* 往內縮排，跟 IG 的回覆呈現方式一樣 */
 .comment-avatar{ width:28px; height:28px; border-radius:50%; object-fit:cover; flex-shrink:0; }
+.comment-row > a{ flex-shrink:0; line-height:0; } /* 留言大頭貼外面包的連結：跟原本純 <img> 時視覺一樣，不要有底線、不要被 flex 壓縮 */
 .comment-bubble{
   background:var(--paper);
   border:1px solid var(--hairline);
@@ -1125,7 +1144,11 @@ const addComment = async () => {
   width:100%;
   display:flex; align-items:baseline; flex-wrap:wrap; gap:.4rem;
 }
-.comment-user{ font-weight:700; margin-right:.1rem; }
+.comment-user{
+  font-weight:700; margin-right:.1rem;
+  color:var(--ink); text-decoration:none; /* 原本是純文字，現在改成連結，要蓋掉瀏覽器預設的藍字加底線 */
+}
+.comment-user:hover{ text-decoration:underline; } /* 保留一點「可以點」的提示，不用整段都變色 */
 .comment-meta{ display:flex; align-items:center; gap:.6rem; margin-left:auto; flex-shrink:0; }
 .comment-time{ font-size:.72rem; color:var(--ink-soft); white-space:nowrap; }
 .btn-reply{

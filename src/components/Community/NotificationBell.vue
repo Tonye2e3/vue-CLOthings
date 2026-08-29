@@ -92,6 +92,7 @@ const formatNotificationText = (n) => {
   if (n.type === 'follow') return `${n.fromUsername} 追蹤了你`
   if (n.type === 'like') return `${n.fromUsername} 對你的貼文按了讚`
   if (n.type === 'comment') return `${n.fromUsername} 在你的貼文留言了`
+  if (n.type === 'message') return `${n.fromUsername} 傳了訊息給你`
   return `${n.fromUsername} 有新的動態`
 }
 
@@ -107,17 +108,21 @@ const formatTime = (dateStr) => {
 }
 
 // goToNotification：點某一則通知時執行——追蹤類型帶去對方的個人頁，
-// 按讚／留言類型帶去那篇貼文的詳情頁。
+// 訊息類型帶去跟對方的聊天室，按讚／留言類型帶去那篇貼文的詳情頁。
 const goToNotification = (n) => {
   closePanel()
   if (n.type === 'follow') {
     router.push(`/community/profile/${n.fromUserId}`)
+  } else if (n.type === 'message') {
+    router.push(`/community/messages/${n.fromUserId}`)
   } else if (n.communityPostId) {
     router.push(`/community/post/${n.communityPostId}`)
   }
 }
 
-// pollTimer：每 15 秒重新問一次未讀數量，不用使用者自己重新整理頁面，才會看到「有新通知」的紅點 // 
+// pollTimer：每 15 秒重新問一次未讀數量，不用使用者自己重新整理頁面
+// 才會看到「有新通知」的紅點——跟聊天室用 WebSocket 即時推播比起來陽春一點，
+// 但通知這種場景，定時輪詢就夠用，不需要為了這個再另外接一條 WebSocket 通道。
 const POLL_INTERVAL = 15000
 let pollTimer = null
 

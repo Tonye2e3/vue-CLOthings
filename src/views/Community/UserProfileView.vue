@@ -72,7 +72,16 @@ const deletePost = async (communityPostId) => {
   if (!confirm('確定要刪除這篇貼文嗎？刪除後就無法恢復。')) return
 
   try {
-    await api.delete(`/CommunityPost/${communityPostId}`)
+    const res = await api.delete(`/CommunityPost/${communityPostId}`)
+    // 修正：後端就算刪除失敗，也是回傳 HTTP 200（body 裡用 ok:false 表示失敗，
+    // 不是用 HTTP 狀態碼），所以這裡一定要自己檢查 res.data.ok，不能只看 API
+    // 有沒有丟出例外——不然刪除失敗時（例如貼文底下還有關聯資料造成資料庫擋下來）
+    // 畫面上完全不會有任何提示，貼文卻其實還在資料庫裡。
+    if (!res.data.ok) {
+      console.error('刪除貼文失敗，後端回傳：', res.data)
+      alert('刪除失敗，請稍後再試一次！')
+      return
+    }
   } catch (err) {
     console.error('刪除貼文失敗：', err)
     alert('刪除失敗，請稍後再試一次！')

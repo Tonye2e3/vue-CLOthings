@@ -317,8 +317,14 @@ const deletePost = async (post) => {
 .cell-nowrap{ white-space:nowrap; color:var(--ink-soft); }
 .cell-thumb{ width:56px; height:56px; object-fit:cover; border-radius:6px; display:block; }
 
+/* status-badge：改成固定寬高的正圓形容器（原本沒有固定寬高，圓圈大小是靠文字內容
+   撐出來的，文字幾乎把圓圈撐滿、沒有多餘空間可以置中，才會看起來偏一邊）。
+   固定寬高之後用 flex 把文字置中擺進這個圓裡，不管文字要不要換行都能穩定置中，
+   字體大小、字型都沒有變動，只調整外層圓圈容器本身。 */
 .status-badge{
-  display:inline-block; padding:.25rem .7rem; border-radius:999px;
+  display:inline-flex; align-items:center; justify-content:center;
+  width:2.4rem; height:2.4rem; border-radius:999px;
+  line-height:1.15; text-align:center;
   font-size:.76rem; font-weight:700; color:#fff;
 }
 .badge-public{ background:#5E8C61; }
