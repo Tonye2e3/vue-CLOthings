@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import api from '@/services/api'
+import api from '@/api/api'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 
@@ -44,7 +44,7 @@ const reportCounts = ref(new Map())
 const fetchReportCounts = async () => {
   try {
     const res = await api.get('/PostReport/summary')
-    reportCounts.value = new Map(res.data.map(s => [s.communityPostId, s.reportCount]))
+    reportCounts.value = new Map(res.data.map((s) => [s.communityPostId, s.reportCount]))
   } catch (err) {
     console.error('讀取檢舉次數失敗：', err)
   }
@@ -72,10 +72,11 @@ const searchQuery = ref('')
 const filteredPosts = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   if (!q) return posts.value
-  return posts.value.filter(p =>
-    p.content?.toLowerCase().includes(q) ||
-    String(p.userId).includes(q) ||
-    p.user?.name?.toLowerCase().includes(q)
+  return posts.value.filter(
+    (p) =>
+      p.content?.toLowerCase().includes(q) ||
+      String(p.userId).includes(q) ||
+      p.user?.name?.toLowerCase().includes(q),
   )
 })
 
@@ -118,7 +119,12 @@ const statusClass = (status) => {
 // deletePost：列表頁直接刪除，跟 UserProfileView.vue 的 deletePost 是同一套做法，
 // 用瀏覽器內建的 confirm() 跳出確認視窗，不用另外做一個「刪除確認」頁面。
 const deletePost = async (post) => {
-  if (!confirm(`確定要刪除貼文編號 #${post.communityPostId} 嗎？刪除後資料無法復原，圖片、標記商品、留言等關聯紀錄都會一併刪除。`)) return
+  if (
+    !confirm(
+      `確定要刪除貼文編號 #${post.communityPostId} 嗎？刪除後資料無法復原，圖片、標記商品、留言等關聯紀錄都會一併刪除。`,
+    )
+  )
+    return
 
   try {
     await api.delete(`/CommunityPost/${post.communityPostId}`)
@@ -128,14 +134,13 @@ const deletePost = async (post) => {
     return
   }
 
-  posts.value = posts.value.filter(p => p.communityPostId !== post.communityPostId)
+  posts.value = posts.value.filter((p) => p.communityPostId !== post.communityPostId)
 }
 </script>
 
 <template>
   <div class="admin-page">
     <div class="admin-container">
-
       <!--
         admin-header-row：標題跟搜尋框排在同一排，靠 justify-content:space-between
         一個貼左邊、一個貼右邊，對應畫面上紅框那個位置。
@@ -147,8 +152,13 @@ const deletePost = async (post) => {
         </div>
         <div class="admin-search-bar">
           <svg class="admin-search-icon" viewBox="0 0 24 24" fill="none">
-            <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
-            <path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" />
+            <path
+              d="M21 21l-4.3-4.3"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
           </svg>
           <input
             type="text"
@@ -156,7 +166,14 @@ const deletePost = async (post) => {
             class="admin-search-input"
             placeholder="搜尋貼文內容、發布者ID或帳號"
           />
-          <button v-if="searchQuery" type="button" class="admin-search-clear" @click="searchQuery = ''">✕</button>
+          <button
+            v-if="searchQuery"
+            type="button"
+            class="admin-search-clear"
+            @click="searchQuery = ''"
+          >
+            ✕
+          </button>
         </div>
       </div>
 
@@ -185,12 +202,16 @@ const deletePost = async (post) => {
           <tbody>
             <tr v-for="post in pagedPosts" :key="post.communityPostId">
               <td>
-                <router-link :to="`/community/profile/${post.userId}`">{{ post.userId }}</router-link>
+                <router-link :to="`/community/profile/${post.userId}`">{{
+                  post.userId
+                }}</router-link>
               </td>
               <td class="cell-content">{{ post.content }}</td>
               <td class="cell-nowrap">{{ new Date(post.postDate).toLocaleString('zh-TW') }}</td>
               <td>
-                <span class="status-badge" :class="statusClass(post.status)">{{ statusLabel(post.status) }}</span>
+                <span class="status-badge" :class="statusClass(post.status)">{{
+                  statusLabel(post.status)
+                }}</span>
               </td>
               <td>
                 <img
@@ -210,8 +231,15 @@ const deletePost = async (post) => {
                   在貼文詳情頁（AdminCommunityPostDetailView.vue）用 GET api/PostReport/post/{id}
                   另外顯示，這裡先只做「有沒有被檢舉過、幾次」的提示就好。
                 -->
-                <span class="report-count" :class="{ 'report-count-flagged': getReportCount(post.communityPostId) > 0 }">
-                  {{ getReportCount(post.communityPostId) > 0 ? `⚠ ${getReportCount(post.communityPostId)}` : '0' }}
+                <span
+                  class="report-count"
+                  :class="{ 'report-count-flagged': getReportCount(post.communityPostId) > 0 }"
+                >
+                  {{
+                    getReportCount(post.communityPostId) > 0
+                      ? `⚠ ${getReportCount(post.communityPostId)}`
+                      : '0'
+                  }}
                 </span>
               </td>
               <td>
@@ -219,11 +247,16 @@ const deletePost = async (post) => {
                   v-for="tag in post.taggedProducts"
                   :key="tag.postTaggedProductId"
                   class="tag-chip"
-                >{{ tag.name }}</span>
+                  >{{ tag.name }}</span
+                >
               </td>
               <td>
                 <div class="cell-actions">
-                  <router-link :to="`/admin/community/posts/${post.communityPostId}`" class="btn-admin-detail">詳情</router-link>
+                  <router-link
+                    :to="`/admin/community/posts/${post.communityPostId}`"
+                    class="btn-admin-detail"
+                    >詳情</router-link
+                  >
                   <button class="btn-admin-delete" @click="deletePost(post)">刪除</button>
                 </div>
               </td>
@@ -232,137 +265,296 @@ const deletePost = async (post) => {
         </table>
 
         <div class="admin-pagination">
-          <span class="pagination-info">共 {{ posts.length }} 筆貼文（第 {{ currentPage }} / {{ totalPages }} 頁）</span>
+          <span class="pagination-info"
+            >共 {{ posts.length }} 筆貼文（第 {{ currentPage }} / {{ totalPages }} 頁）</span
+          >
           <div class="pagination-buttons">
-            <button class="btn-page" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">上一頁</button>
+            <button
+              class="btn-page"
+              :disabled="currentPage === 1"
+              @click="goToPage(currentPage - 1)"
+            >
+              上一頁
+            </button>
             <button
               v-for="p in totalPages"
               :key="p"
               class="btn-page"
               :class="{ active: p === currentPage }"
               @click="goToPage(p)"
-            >{{ p }}</button>
-            <button class="btn-page" :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)">下一頁</button>
+            >
+              {{ p }}
+            </button>
+            <button
+              class="btn-page"
+              :disabled="currentPage === totalPages"
+              @click="goToPage(currentPage + 1)"
+            >
+              下一頁
+            </button>
           </div>
         </div>
       </div>
-
     </div>
   </div>
 </template>
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
-.admin-page{
-  width:100%; min-height:100vh;
-  background-color:#F9F4F0 !important;
-  padding:2rem 0;
-  --cream:#F9F4F0; --paper:#FFFDFB; --ink:#2A2420; --ink-soft:#7A6E63;
-  --plum:#7A4B54; --plum-deep:#5E3941; --ochre:#B8862E; --hairline:#E4D8CC;
-  font-family:'Noto Sans TC', sans-serif;
-  color:var(--ink);
+.admin-page {
+  width: 100%;
+  min-height: 100vh;
+  background-color: #f9f4f0 !important;
+  padding: 2rem 0;
+  --cream: #f9f4f0;
+  --paper: #fffdfb;
+  --ink: #2a2420;
+  --ink-soft: #7a6e63;
+  --plum: #7a4b54;
+  --plum-deep: #5e3941;
+  --ochre: #b8862e;
+  --hairline: #e4d8cc;
+  font-family: 'Noto Sans TC', sans-serif;
+  color: var(--ink);
 }
-.admin-container{ max-width:1200px; margin:0 auto; padding:0 1.5rem; }
-.admin-breadcrumb{ font-size:.8rem; color:var(--ink-soft); margin-bottom:.3rem; }
-.admin-title{ font-family:'Noto Serif TC', serif; font-weight:900; font-size:1.6rem; margin:0; color:var(--ink); }
-.admin-loading{ padding:2rem; text-align:center; color:var(--ink-soft); }
+.admin-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+.admin-breadcrumb {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin-bottom: 0.3rem;
+}
+.admin-title {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 900;
+  font-size: 1.6rem;
+  margin: 0;
+  color: var(--ink);
+}
+.admin-loading {
+  padding: 2rem;
+  text-align: center;
+  color: var(--ink-soft);
+}
 
-.admin-header-row{
-  display:flex; align-items:flex-end; justify-content:space-between;
-  gap:1rem; flex-wrap:wrap;
-  margin-bottom:1.4rem;
+.admin-header-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.4rem;
 }
-.admin-search-bar{
-  position:relative;
-  display:flex; align-items:center;
-  width:100%; max-width:320px;
-  background:var(--paper);
-  border:1px solid var(--hairline);
-  border-radius:999px;
-  padding:.55rem 1rem;
-  transition:border-color .18s ease, box-shadow .18s ease;
+.admin-search-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 320px;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
 }
-.admin-search-bar:focus-within{
-  border-color:var(--plum);
-  box-shadow:0 0 0 3px rgba(122,75,84,.12);
+.admin-search-bar:focus-within {
+  border-color: var(--plum);
+  box-shadow: 0 0 0 3px rgba(122, 75, 84, 0.12);
 }
-.admin-search-icon{ width:16px; height:16px; color:var(--ink-soft); flex-shrink:0; }
-.admin-search-input{
-  border:none; outline:none; background:transparent;
-  flex:1; margin-left:.6rem; font-family:'Noto Sans TC', sans-serif;
-  font-size:.86rem; color:var(--ink);
+.admin-search-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--ink-soft);
+  flex-shrink: 0;
 }
-.admin-search-input::placeholder{ color:var(--ink-soft); }
-.admin-search-clear{
-  border:none; background:var(--hairline); color:var(--ink-soft);
-  width:18px; height:18px; border-radius:50%; font-size:.65rem;
-  display:flex; align-items:center; justify-content:center; flex-shrink:0;
-  cursor:pointer; margin-left:.4rem;
+.admin-search-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  flex: 1;
+  margin-left: 0.6rem;
+  font-family: 'Noto Sans TC', sans-serif;
+  font-size: 0.86rem;
+  color: var(--ink);
 }
-.admin-search-clear:hover{ background:var(--plum); color:#fff; }
+.admin-search-input::placeholder {
+  color: var(--ink-soft);
+}
+.admin-search-clear {
+  border: none;
+  background: var(--hairline);
+  color: var(--ink-soft);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 0.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  margin-left: 0.4rem;
+}
+.admin-search-clear:hover {
+  background: var(--plum);
+  color: #fff;
+}
 
-.admin-card{
-  background:var(--paper); border:1px solid var(--hairline); border-radius:16px;
-  padding:1.2rem; overflow-x:auto;
+.admin-card {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  padding: 1.2rem;
+  overflow-x: auto;
 }
-.admin-table{ width:auto; border-collapse:collapse; font-size:.86rem; }
-.admin-table th{
-  text-align:left; padding:.7rem .6rem; border-bottom:2px solid var(--hairline);
-  color:var(--ink-soft); font-weight:700; white-space:nowrap;
-  font-family:'Noto Serif TC', serif;
+.admin-table {
+  width: auto;
+  border-collapse: collapse;
+  font-size: 0.86rem;
 }
-.admin-table td{ padding:.7rem .6rem; border-bottom:1px solid var(--hairline); vertical-align:middle; }
-.admin-table tbody tr:hover{ background:var(--cream); }
-.cell-content{ max-width:220px; }
-.cell-nowrap{ white-space:nowrap; color:var(--ink-soft); }
-.cell-thumb{ width:56px; height:56px; object-fit:cover; border-radius:6px; display:block; }
+.admin-table th {
+  text-align: left;
+  padding: 0.7rem 0.6rem;
+  border-bottom: 2px solid var(--hairline);
+  color: var(--ink-soft);
+  font-weight: 700;
+  white-space: nowrap;
+  font-family: 'Noto Serif TC', serif;
+}
+.admin-table td {
+  padding: 0.7rem 0.6rem;
+  border-bottom: 1px solid var(--hairline);
+  vertical-align: middle;
+}
+.admin-table tbody tr:hover {
+  background: var(--cream);
+}
+.cell-content {
+  max-width: 220px;
+}
+.cell-nowrap {
+  white-space: nowrap;
+  color: var(--ink-soft);
+}
+.cell-thumb {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 6px;
+  display: block;
+}
 
-.status-badge{
-  display:inline-block; padding:.25rem .7rem; border-radius:999px;
-  font-size:.76rem; font-weight:700; color:#fff;
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #fff;
 }
-.badge-public{ background:#5E8C61; }
-.badge-hide{ background:var(--ink-soft); }
-.badge-check{ background:var(--ochre); }
+.badge-public {
+  background: #5e8c61;
+}
+.badge-hide {
+  background: var(--ink-soft);
+}
+.badge-check {
+  background: var(--ochre);
+}
 
 /* report-count：預設是普通灰色文字（沒被檢舉過的貼文，大多數情況）；
    真的被檢舉過（次數 > 0）才切成紅棕色警示字，跟按讚愛心的紅色是不同色階，
    避免管理員一眼掃過去分不清楚「這是讚數還是警告」。 */
-.report-count{ color:var(--ink-soft); font-weight:600; }
-.report-count-flagged{ color:#B4453A; }
-
-.tag-chip{
-  display:inline-block; background:var(--cream); color:var(--plum);
-  border:1px solid var(--hairline);
-  font-size:.72rem; padding:.2rem .55rem; border-radius:999px;
-  margin:.1rem .2rem .1rem 0;
+.report-count {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.report-count-flagged {
+  color: #b4453a;
 }
 
-.cell-actions{ display:inline-flex; gap:.4rem; white-space:nowrap; }
-.btn-admin-detail{
-  display:inline-block; background:var(--ink); color:var(--paper);
-  border:none; border-radius:4px; padding:.35rem .7rem; font-size:.78rem;
-  text-decoration:none; transition:background .18s ease;
+.tag-chip {
+  display: inline-block;
+  background: var(--cream);
+  color: var(--plum);
+  border: 1px solid var(--hairline);
+  font-size: 0.72rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  margin: 0.1rem 0.2rem 0.1rem 0;
 }
-.btn-admin-detail:hover{ background:var(--plum-deep); }
-.btn-admin-delete{
-  background:transparent; color:#B4453A;
-  border:1px solid #B4453A; border-radius:4px; padding:.35rem .7rem; font-size:.78rem;
-  transition:all .18s ease;
-}
-.btn-admin-delete:hover{ background:#B4453A; color:#fff; }
 
-.admin-pagination{
-  display:flex; align-items:center; justify-content:space-between;
-  margin-top:1rem; padding-top:1rem; border-top:1px dashed var(--hairline);
-  font-size:.82rem; color:var(--ink-soft);
+.cell-actions {
+  display: inline-flex;
+  gap: 0.4rem;
+  white-space: nowrap;
 }
-.pagination-buttons{ display:flex; gap:.3rem; }
-.btn-page{
-  border:1px solid var(--hairline); background:var(--paper); color:var(--ink);
-  border-radius:4px; padding:.3rem .7rem; font-size:.8rem; transition:all .18s ease;
+.btn-admin-detail {
+  display: inline-block;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 4px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+  text-decoration: none;
+  transition: background 0.18s ease;
 }
-.btn-page:hover:not(:disabled){ border-color:var(--plum); color:var(--plum); }
-.btn-page.active{ background:var(--plum); border-color:var(--plum); color:#fff; }
-.btn-page:disabled{ opacity:.4; }
+.btn-admin-detail:hover {
+  background: var(--plum-deep);
+}
+.btn-admin-delete {
+  background: transparent;
+  color: #b4453a;
+  border: 1px solid #b4453a;
+  border-radius: 4px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+  transition: all 0.18s ease;
+}
+.btn-admin-delete:hover {
+  background: #b4453a;
+  color: #fff;
+}
+
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--hairline);
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+.pagination-buttons {
+  display: flex;
+  gap: 0.3rem;
+}
+.btn-page {
+  border: 1px solid var(--hairline);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 4px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  transition: all 0.18s ease;
+}
+.btn-page:hover:not(:disabled) {
+  border-color: var(--plum);
+  color: var(--plum);
+}
+.btn-page.active {
+  background: var(--plum);
+  border-color: var(--plum);
+  color: #fff;
+}
+.btn-page:disabled {
+  opacity: 0.4;
+}
 </style>

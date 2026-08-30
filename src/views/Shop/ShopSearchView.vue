@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import api from '@/services/api'
+import api from '@/api/api'
 import { RouterLink } from 'vue-router'
 
 const route = useRoute()
@@ -33,16 +33,17 @@ async function search(kw) {
 onMounted(() => search(route.query.keyword))
 
 // 關鍵字變了（在搜尋頁又搜新的）重搜
-watch(() => route.query.keyword, (kw) => search(kw))
+watch(
+  () => route.query.keyword,
+  (kw) => search(kw),
+)
 </script>
 
 <template>
   <section class="promo">
     <h2 class="section-title">「{{ keyword }}」的搜尋結果，共 {{ products.length }} 件</h2>
 
-    <div v-if="products.length === 0" class="empty">
-      找不到符合「{{ keyword }}」的商品
-    </div>
+    <div v-if="products.length === 0" class="empty">找不到符合「{{ keyword }}」的商品</div>
 
     <div v-else class="grid">
       <RouterLink
@@ -88,14 +89,20 @@ watch(() => route.query.keyword, (kw) => search(kw))
   gap: 24px;
 }
 @media (max-width: 1024px) {
-  .grid { grid-template-columns: repeat(2, 1fr); }
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 @media (max-width: 768px) {
-  .grid { grid-template-columns: 1fr; }
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }
 .card {
   border: 1px solid var(--home-border);
-  transition: box-shadow 0.25s ease, transform 0.25s ease;
+  transition:
+    box-shadow 0.25s ease,
+    transform 0.25s ease;
   text-decoration: none;
   color: inherit;
   display: block;

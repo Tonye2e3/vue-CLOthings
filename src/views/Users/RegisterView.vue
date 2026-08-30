@@ -1,7 +1,7 @@
 <script setup>
 import { isValidAccount, isValidPassword, isValidPhone, isValidEmail } from '@/utils/UserValidator'
 import { ref, reactive } from 'vue'
-import api from '@/services/api'
+import api from '@/api/api'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()

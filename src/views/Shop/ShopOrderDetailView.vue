@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import api from '@/services/api'
+import api from '@/api/api'
 
 const route = useRoute()
 const order = ref(null) // 訂單詳情，先空的
@@ -34,7 +34,7 @@ async function goPay() {
 async function confirmReceipt() {
   try {
     await api.put(`/order/${order.value.orderId}/complete`)
-    order.value.status = '已完成'   // 更新畫面
+    order.value.status = '已完成' // 更新畫面
     alert('已確認收貨！')
   } catch (error) {
     console.error('確認收貨失敗：', error)
@@ -44,7 +44,7 @@ async function confirmReceipt() {
 
 // 評價彈窗狀態
 const showReviewModal = ref(false)
-const reviewTarget = ref(null)   // 要評價哪筆明細
+const reviewTarget = ref(null) // 要評價哪筆明細
 const reviewRating = ref(5)
 const reviewComment = ref('')
 
@@ -106,7 +106,6 @@ async function submitReview() {
     <section class="info-block">
       <h2 class="section-title">商品明細</h2>
       <div v-for="(item, index) in order.items" :key="index" class="item-row">
-            
         <div class="item-name">
           {{ item.productName }}
           <span class="item-spec">{{ item.color }} / {{ item.size }}</span>
@@ -114,7 +113,7 @@ async function submitReview() {
         <div class="item-qty">× {{ item.quantity }}</div>
         <div class="item-price">NT$ {{ (item.price * item.quantity).toLocaleString() }}</div>
         <p>　</p>
-    <button v-if="order.status === '已完成'" @click="openReview(item)" class="btn-review">
+        <button v-if="order.status === '已完成'" @click="openReview(item)" class="btn-review">
           評價
         </button>
       </div>
@@ -133,29 +132,85 @@ async function submitReview() {
       確認收貨
     </button>
 
-    <button class="btn-back" @click="$router.push({ name: 'return', params: { id: order.orderId } })">
+    <button
+      class="btn-back"
+      @click="$router.push({ name: 'return', params: { id: order.orderId } })"
+    >
       申請退貨
     </button>
     <Teleport to="body">
-  <div
-    v-if="showReviewModal"
-    @click.self="showReviewModal = false"
-    style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;"
-  >
-    <div style="background: #fff; padding: 24px; border-radius: 8px; width: 90%; max-width: 400px;">
-      <h3>評價 - {{ reviewTarget.productName }}</h3>
-      <div class="rating-row">
-        <span>評分：</span>
-        <span v-for="n in 5" :key="n" class="star" :class="{ active: n <= reviewRating }" @click="reviewRating = n" style="font-size: 1.5rem; cursor: pointer;" :style="{ color: n <= reviewRating ? '#e6a817' : '#ddd' }">★</span>
+      <div
+        v-if="showReviewModal"
+        @click.self="showReviewModal = false"
+        style="
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+        "
+      >
+        <div
+          style="background: #fff; padding: 24px; border-radius: 8px; width: 90%; max-width: 400px"
+        >
+          <h3>評價 - {{ reviewTarget.productName }}</h3>
+          <div class="rating-row">
+            <span>評分：</span>
+            <span
+              v-for="n in 5"
+              :key="n"
+              class="star"
+              :class="{ active: n <= reviewRating }"
+              @click="reviewRating = n"
+              style="font-size: 1.5rem; cursor: pointer"
+              :style="{ color: n <= reviewRating ? '#e6a817' : '#ddd' }"
+              >★</span
+            >
+          </div>
+          <textarea
+            v-model="reviewComment"
+            rows="4"
+            placeholder="分享您的使用心得..."
+            style="
+              width: 100%;
+              padding: 12px;
+              border: 1px solid #ccc;
+              border-radius: 6px;
+              margin: 12px 0;
+            "
+          ></textarea>
+          <div style="display: flex; gap: 12px; justify-content: flex-end">
+            <button
+              @click="showReviewModal = false"
+              style="
+                padding: 8px 20px;
+                border: 1px solid #ccc;
+                background: #fff;
+                border-radius: 6px;
+                cursor: pointer;
+              "
+            >
+              取消
+            </button>
+            <button
+              @click="submitReview"
+              style="
+                padding: 8px 20px;
+                border: none;
+                background: #111;
+                color: #fff;
+                border-radius: 6px;
+                cursor: pointer;
+              "
+            >
+              送出評價
+            </button>
+          </div>
+        </div>
       </div>
-      <textarea v-model="reviewComment" rows="4" placeholder="分享您的使用心得..." style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; margin: 12px 0;"></textarea>
-      <div style="display: flex; gap: 12px; justify-content: flex-end;">
-        <button @click="showReviewModal = false" style="padding: 8px 20px; border: 1px solid #ccc; background: #fff; border-radius: 6px; cursor: pointer;">取消</button>
-        <button @click="submitReview" style="padding: 8px 20px; border: none; background: #111; color: #fff; border-radius: 6px; cursor: pointer;">送出評價</button>
-      </div>
-    </div>
-  </div>
-</Teleport>
+    </Teleport>
   </div>
 </template>
 
@@ -215,8 +270,8 @@ async function submitReview() {
   border-radius: 8px;
   width: 90%;
   max-width: 400px;
-  position: relative;   /* 加這行 */
-  z-index: 1001;        /* 加這行，比 overlay 高 */
+  position: relative; /* 加這行 */
+  z-index: 1001; /* 加這行，比 overlay 高 */
 }
 
 .rating-row {
@@ -345,4 +400,3 @@ async function submitReview() {
   color: #e60012;
 }
 </style>
-

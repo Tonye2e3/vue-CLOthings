@@ -1,6 +1,6 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import api from '@/services/api'
+import api from '@/api/api'
 
 // 從 API 取得的地址
 const addresses = ref([])

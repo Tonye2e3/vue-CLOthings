@@ -1,6 +1,6 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import api from '@/services/api'
+import api from '@/api/api'
 import { isValidPassword, isValidPhone, isValidEmail } from '@/utils/UserValidator'
 
 const userData = reactive({

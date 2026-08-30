@@ -7,7 +7,7 @@ import { ref } from 'vue'
 const account = ref('')
 const password = ref('')
 
-import api from '@/services/api'
+import api from '@/api/api'
 import { useAuthStore } from '@/stores/auth'
 const authStore = useAuthStore()
 
@@ -61,7 +61,13 @@ function googleLogin() {
       <div class="form-group">
         <label>帳號或電子郵件</label>
 
-        <input v-model="account" type="text" class="form-input" placeholder="請輸入帳號或電子郵件" @keyup.enter="login" />
+        <input
+          v-model="account"
+          type="text"
+          class="form-input"
+          placeholder="請輸入帳號或電子郵件"
+          @keyup.enter="login"
+        />
 
         <span class="error-text">
           {{ isValidLoginAccount(account) }}
@@ -73,12 +79,16 @@ function googleLogin() {
         <div class="password-label">
           <label>密碼</label>
 
-          <RouterLink to="/forgot-password" class="forgot-password">
-            忘記密碼？
-          </RouterLink>
+          <RouterLink to="/forgot-password" class="forgot-password"> 忘記密碼？ </RouterLink>
         </div>
 
-        <input v-model="password" type="password" class="form-input" placeholder="請輸入密碼" @keyup.enter="login" />
+        <input
+          v-model="password"
+          type="password"
+          class="form-input"
+          placeholder="請輸入密碼"
+          @keyup.enter="login"
+        />
 
         <span class="error-text">
           {{ isValidPassword(password) }}
@@ -86,9 +96,7 @@ function googleLogin() {
       </div>
 
       <!-- 登入 -->
-      <button type="button" class="login-btn" @click="login">
-        登入
-      </button>
+      <button type="button" class="login-btn" @click="login">登入</button>
 
       <!-- 註冊 -->
       <div class="register-area">
@@ -148,7 +156,6 @@ function googleLogin() {
     0 16px 40px rgba(0, 0, 0, 0.05);
 }
 
-
 /* =========================
    Header
 ========================= */
@@ -185,7 +192,6 @@ function googleLogin() {
 
   font-size: 13px;
 }
-
 
 /* =========================
    Form
@@ -238,7 +244,6 @@ function googleLogin() {
   box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
 }
 
-
 /* =========================
    Password
 ========================= */
@@ -269,7 +274,6 @@ function googleLogin() {
   text-decoration: underline;
 }
 
-
 /* =========================
    Validation
 ========================= */
@@ -285,7 +289,6 @@ function googleLogin() {
 
   font-size: 11px;
 }
-
 
 /* =========================
    Login Button
@@ -319,7 +322,6 @@ function googleLogin() {
 .login-btn:active {
   transform: scale(0.99);
 }
-
 
 /* =========================
    Register
@@ -358,7 +360,6 @@ function googleLogin() {
   text-decoration: underline;
 }
 
-
 /* =========================
    Divider
 ========================= */
@@ -378,7 +379,7 @@ function googleLogin() {
 
 .divider::before,
 .divider::after {
-  content: "";
+  content: '';
 
   flex: 1;
 
@@ -390,7 +391,6 @@ function googleLogin() {
 .divider span {
   white-space: nowrap;
 }
-
 
 /* =========================
    Social Login
@@ -440,7 +440,6 @@ function googleLogin() {
   width: 20px;
   height: 20px;
 }
-
 
 /* =========================
    RWD

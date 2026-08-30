@@ -9,7 +9,7 @@ import '@/assets/styles/user-common.css'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import { useRoute } from 'vue-router'
-import api from '@/services/api'
+import api from '@/api/api.js'
 
 import {
   faUser,
@@ -17,15 +17,12 @@ import {
   faHouse,
   faLink,
   faRightFromBracket,
-
   faBagShopping,
   faUsers,
   faAddressCard,
   faMessage,
-
   faShieldHalved,
   faUsersGear,
-
 } from '@fortawesome/free-solid-svg-icons'
 
 const authStore = useAuthStore()
@@ -93,7 +90,11 @@ async function goToSection(sectionId) {
             </div>
           </button>
 
-          <!-- 個人資料 --><button type="button" class="nav-item nav-button" @click="goToSection('profile')">
+          <!-- 個人資料 --><button
+            type="button"
+            class="nav-item nav-button"
+            @click="goToSection('profile')"
+          >
             <span class="nav-icon">
               <FontAwesomeIcon :icon="faIdCard" />
             </span>
@@ -103,7 +104,11 @@ async function goToSection(sectionId) {
               <small>Profile</small>
             </div>
           </button>
-          <!-- 收件資料 --><button type="button" class="nav-item nav-button" @click="goToSection('address')">
+          <!-- 收件資料 --><button
+            type="button"
+            class="nav-item nav-button"
+            @click="goToSection('address')"
+          >
             <span class="nav-icon">
               <FontAwesomeIcon :icon="faHouse" />
             </span>
@@ -114,7 +119,11 @@ async function goToSection(sectionId) {
             </div>
           </button>
 
-          <!-- 第三方登入 --><button type="button" class="nav-item nav-button" @click="goToSection('oauth')">
+          <!-- 第三方登入 --><button
+            type="button"
+            class="nav-item nav-button"
+            @click="goToSection('oauth')"
+          >
             <span class="nav-icon">
               <FontAwesomeIcon :icon="faLink" />
             </span>
@@ -160,10 +169,14 @@ async function goToSection(sectionId) {
           </div>
 
           <!--  個人頁 -->
-          <RouterLink v-if="authStore.userId" :to="{
-            name: 'UserCommunityProfile', params: { userId: authStore.userId }
-          }" class="nav-item">
-
+          <RouterLink
+            v-if="authStore.userId"
+            :to="{
+              name: 'UserCommunityProfile',
+              params: { userId: authStore.userId },
+            }"
+            class="nav-item"
+          >
             <span class="nav-icon">
               <font-awesome-icon :icon="faAddressCard" />
             </span>
@@ -186,12 +199,10 @@ async function goToSection(sectionId) {
             </div>
           </RouterLink>
 
-
           <!-- 🟢管理員功能 -->
           <!-- 只有 Admin / SuperAdmin 可以看到 -->
 
           <template v-if="authStore.isAdmin">
-
             <div class="sidebar-header">
               <p class="sidebar-subtitle">Admin</p>
               <h2 class="sidebar-title">管理員</h2>
@@ -247,21 +258,17 @@ async function goToSection(sectionId) {
       <!-- 右側會員內容 -->
       <!-- ============================= -->
       <main class="content-area">
-
         <!-- ========================================== -->
         <!-- 🟡 修改：會員中心首頁才顯示原本四張 Card -->
         <!-- ========================================== -->
 
         <template v-if="route.name === 'user'">
-
           <div class="page-header">
             <p class="page-subtitle">MY ACCOUNT</p>
 
             <h1>帳戶設定</h1>
 
-            <p class="page-description">
-              管理你的會員資料、個人資訊與收件地址。
-            </p>
+            <p class="page-description">管理你的會員資料、個人資訊與收件地址。</p>
           </div>
 
           <section id="account" class="content-section">
@@ -279,16 +286,13 @@ async function goToSection(sectionId) {
           <section id="oauth" class="content-section">
             <oAuthCard />
           </section>
-
         </template>
-
 
         <!-- ========================================== -->
         <!-- 🟢 新增：其他會員功能顯示在右側 -->
         <!-- ========================================== -->
 
         <RouterView v-else />
-
       </main>
     </div>
   </div>

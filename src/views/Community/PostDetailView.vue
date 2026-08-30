@@ -7,7 +7,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 // api：跟其他頁面共用同一個 axios 實例（src/services/api.js），會自動把登入後的 JWT
 // token 帶進 Authorization header，跟直接 import axios from 'axios' 不一樣。
-import api from '@/services/api'
+import api from '@/api/api'
 
 // IconFacebook、IconLine：分享選單裡「分享到 Facebook／LINE」原本是用 Font Awesome
 // 的品牌圖示（<i class="fa-brands fa-facebook">），改成專案裡自己準備的 SVG 圖示元件
@@ -24,8 +24,12 @@ import { animate } from 'animejs'
 // 但 isPostSaved 內部會去讀它，所以還是要 import 進來）
 // isPostSaved：檢查某篇貼文有沒有被收藏
 // toggleSavePost：切換某篇貼文的收藏狀態（收藏／取消收藏）
-import { isPostSaved, toggleSavePost, currentUserId, loadCurrentUserId } from '@/views/Community/CommunityView.vue'
-
+import {
+  isPostSaved,
+  toggleSavePost,
+  currentUserId,
+  loadCurrentUserId,
+} from '@/views/Community/CommunityView.vue'
 
 // 使用 import 引入本地 src/assets 下的圖片
 // 這種寫法叫做「靜態資源引入」：因為圖片放在專案的 src 資料夾裡面，
@@ -69,18 +73,16 @@ const post = ref({
   user: {
     name: '載入中...',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily',
-    location: ''
+    location: '',
   },
   isFollowing: false,
   postDate: new Date().toISOString(),
   status: 'published',
-  images: [
-    { postImageId: null, imageFileName: null, sortOrder: 1, url: postImage }
-  ],
+  images: [{ postImageId: null, imageFileName: null, sortOrder: 1, url: postImage }],
   content: '',
   commentsCount: 0,
   isLiked: false,
-  taggedProducts: []
+  taggedProducts: [],
 })
 
 // notFound：如果這個 id 在資料庫裡根本找不到對應的貼文，用這個來控制畫面顯示「找不到這篇貼文」。
@@ -167,25 +169,31 @@ const fetchPost = async () => {
       // 才是瀏覽器看得懂的完整網址，跟貼文圖片、商品圖片是同一種處理方式。
       // 沒有設大頭貼的人（avatar 是 null）就用預設的頭像頂著，不要顯示破圖。
       user: p.user
-        ? { ...p.user, avatar: p.user.avatar ? `${IMAGE_BASE}${p.user.avatar}` : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + p.user.name }
+        ? {
+            ...p.user,
+            avatar: p.user.avatar
+              ? `${IMAGE_BASE}${p.user.avatar}`
+              : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + p.user.name,
+          }
         : { name: '未知使用者', avatar: '', location: '' },
       isFollowing: false, // 先給預設值，實際有沒有追蹤過由下面 fetchFollowStatus() 另外去問後端才知道
       postDate: p.postDate,
       status: p.status,
-      images: (p.images && p.images.length)
-        ? p.images.map(img => ({
-            postImageId: img.postImageId,
-            imageFileName: img.imageFileName,
-            sortOrder: img.sortOrder,
-            // imageFileName 本身已經帶路徑了（例如 "/images/posts/post01_1.jpg"），
-            // 直接接在 IMAGE_BASE 後面組成完整網址，跟 CommunityView.vue 的做法一樣。
-            url: `${IMAGE_BASE}${img.imageFileName}`
-          }))
-        : [{ postImageId: null, imageFileName: null, sortOrder: 1, url: postImage }], // 完全沒有圖片時的保底畫面
+      images:
+        p.images && p.images.length
+          ? p.images.map((img) => ({
+              postImageId: img.postImageId,
+              imageFileName: img.imageFileName,
+              sortOrder: img.sortOrder,
+              // imageFileName 本身已經帶路徑了（例如 "/images/posts/post01_1.jpg"），
+              // 直接接在 IMAGE_BASE 後面組成完整網址，跟 CommunityView.vue 的做法一樣。
+              url: `${IMAGE_BASE}${img.imageFileName}`,
+            }))
+          : [{ postImageId: null, imageFileName: null, sortOrder: 1, url: postImage }], // 完全沒有圖片時的保底畫面
       content: p.content,
       commentsCount: p.commentsCount ?? 0,
       isLiked: false, // 先給預設值，實際有沒有按過讚由下面 fetchLikeStatus() 另外去問後端才知道
-      taggedProducts: p.taggedProducts || []
+      taggedProducts: p.taggedProducts || [],
     }
     // 讚數也要跟著這篇貼文真正的數字重設，不能繼續用寫死的 1248。
     // ?? 0：如果 p.likesCount 是 undefined 或 null，就用 0 代替，
@@ -253,17 +261,20 @@ onMounted(async () => {
 // 所以 onMounted 不會再執行第二次，畫面資料就不會跟著新的 id 換。
 // 這裡另外監看 route.params.id，只要它變了（換了一篇貼文），
 // 就重新打一次全部的 API，資料才會真的換成新那篇的內容。
-watch(() => route.params.id, () => {
-  notFound.value = false
-  newComment.value = '' // 清空還沒送出的留言草稿，避免帶到別篇貼文底下去
-  replyingTo.value = null // 取消原本在回覆的狀態，避免對新貼文的留言用到舊貼文的 parentCommentId
-  currentImageIndex.value = 0 // 換到新貼文時輪播歸零，從第一張開始顯示
-  stopAutoplay() // 換貼文了，先把舊貼文的自動輪播計時器停掉，fetchPost 拿到新資料後會重新啟動
-  visibleCommentCount.value = COMMENTS_PAGE_SIZE // 換貼文了，留言分頁也重設回第一頁
-  fetchPost()
-  fetchComments()
-  fetchSimilarPosts()
-})
+watch(
+  () => route.params.id,
+  () => {
+    notFound.value = false
+    newComment.value = '' // 清空還沒送出的留言草稿，避免帶到別篇貼文底下去
+    replyingTo.value = null // 取消原本在回覆的狀態，避免對新貼文的留言用到舊貼文的 parentCommentId
+    currentImageIndex.value = 0 // 換到新貼文時輪播歸零，從第一張開始顯示
+    stopAutoplay() // 換貼文了，先把舊貼文的自動輪播計時器停掉，fetchPost 拿到新資料後會重新啟動
+    visibleCommentCount.value = COMMENTS_PAGE_SIZE // 換貼文了，留言分頁也重設回第一頁
+    fetchPost()
+    fetchComments()
+    fetchSimilarPosts()
+  },
+)
 
 // onUnmounted：離開這個頁面時，把自動輪播的計時器停掉，
 // 不然使用者已經離開頁面了，計時器還留在背景繼續跑，是不必要的資源浪費。
@@ -320,7 +331,7 @@ const animateLikeIcon = () => {
   animate(likeIconEl.value, {
     scale: [1, 1.4, 1],
     duration: 380,
-    ease: 'outBack'
+    ease: 'outBack',
   })
 }
 
@@ -343,7 +354,7 @@ const toggleLike = async () => {
     try {
       await api.post(`/PostLike`, {
         communityPostId: post.value.communityPostId,
-        userId: currentUserId.value
+        userId: currentUserId.value,
       })
     } catch (err) {
       console.error('按讚失敗：', err)
@@ -374,7 +385,7 @@ const toggleSave = () => {
     likesCount: likesNumber.value,
     commentsCount: post.value.commentsCount,
     // .map(...)：把 taggedProducts 陣列裡每個標記物件，轉換成 "#商品名" 這種字串格式
-    tags: post.value.taggedProducts.map(t => `#${t.name}`)
+    tags: post.value.taggedProducts.map((t) => `#${t.name}`),
   })
 }
 
@@ -453,7 +464,7 @@ const submitReport = async () => {
     const res = await api.post('/PostReport', {
       communityPostId: post.value.communityPostId,
       reporterId: currentUserId.value,
-      reason
+      reason,
     })
     if (res.data.ok) {
       alert('已送出檢舉，謝謝你的回報！')
@@ -481,7 +492,9 @@ const copyLink = async () => {
   try {
     await navigator.clipboard.writeText(shareUrl.value)
     linkCopied.value = true
-    setTimeout(() => { linkCopied.value = false }, 1500)
+    setTimeout(() => {
+      linkCopied.value = false
+    }, 1500)
   } catch (err) {
     console.error('複製連結失敗：', err)
   }
@@ -493,12 +506,18 @@ const copyLink = async () => {
 // 走各平台自己提供的「分享連結」網址格式（不需要串接對方的 API 金鑰）。
 const shareToLine = async () => {
   await ensureShortUrl()
-  window.open(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(shareUrl.value)}`, '_blank')
+  window.open(
+    `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(shareUrl.value)}`,
+    '_blank',
+  )
   closeShareMenu()
 }
 const shareToFacebook = async () => {
   await ensureShortUrl()
-  window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl.value)}`, '_blank')
+  window.open(
+    `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl.value)}`,
+    '_blank',
+  )
   closeShareMenu()
 }
 
@@ -529,9 +548,9 @@ const similarPosts = ref([])
 const fetchSimilarPosts = async () => {
   try {
     const res = await api.get(`/CommunityPost/similar/${route.params.id}`)
-    similarPosts.value = res.data.map(p => ({
+    similarPosts.value = res.data.map((p) => ({
       communityPostId: p.communityPostId,
-      image: (p.images && p.images.length) ? `${IMAGE_BASE}${p.images[0].imageFileName}` : postImage
+      image: p.images && p.images.length ? `${IMAGE_BASE}${p.images[0].imageFileName}` : postImage,
     }))
   } catch (err) {
     console.error('讀取相似穿搭推薦失敗：', err)
@@ -549,15 +568,15 @@ const comments = ref([])
 // 就代表這則是在回覆那一則留言。
 const groupedComments = computed(() => {
   const topLevel = comments.value
-    .filter(c => !c.parentCommentId)
+    .filter((c) => !c.parentCommentId)
     // 主留言照留言時間「新到舊」排，最新留的言會排在最上面
     .sort((a, b) => new Date(b.commentDate) - new Date(a.commentDate))
-  return topLevel.map(c => ({
+  return topLevel.map((c) => ({
     ...c,
     replies: comments.value
-      .filter(r => r.parentCommentId === c.postCommentId)
+      .filter((r) => r.parentCommentId === c.postCommentId)
       // 回覆本身照留言時間「舊到新」排，符合對話的閱讀順序（跟主留言新到舊的排序方向相反）
-      .sort((a, b) => new Date(a.commentDate) - new Date(b.commentDate))
+      .sort((a, b) => new Date(a.commentDate) - new Date(b.commentDate)),
   }))
 })
 
@@ -573,7 +592,9 @@ const visibleCommentCount = ref(COMMENTS_PAGE_SIZE)
 
 // visibleGroupedComments：真正給 template 用 v-for 畫出來的清單，是 groupedComments
 // 裡「前 visibleCommentCount 則」。.slice(0, n)：從陣列開頭取到第 n 筆（不含第 n 筆）。
-const visibleGroupedComments = computed(() => groupedComments.value.slice(0, visibleCommentCount.value))
+const visibleGroupedComments = computed(() =>
+  groupedComments.value.slice(0, visibleCommentCount.value),
+)
 
 // hasMoreComments：判斷還有沒有更多沒顯示出來的主留言，用來決定「查看更多留言」
 // 按鈕要不要出現，全部顯示完就不用再讓使用者看到一顆按下去沒有反應的按鈕。
@@ -605,9 +626,11 @@ const fetchComments = async () => {
     const res = await api.get(`/PostComment/post/${route.params.id}`)
     // c.avatar 後端存的是相對路徑（例如 /avatars/user002.png），要接上 IMAGE_BASE
     // 才是完整網址；沒設大頭貼的人（avatar 是 null）用預設頭像頂著。
-    comments.value = res.data.map(c => ({
+    comments.value = res.data.map((c) => ({
       ...c,
-      avatar: c.avatar ? `${IMAGE_BASE}${c.avatar}` : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + c.user
+      avatar: c.avatar
+        ? `${IMAGE_BASE}${c.avatar}`
+        : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + c.user,
     }))
   } catch (err) {
     console.error('讀取留言失敗：', err)
@@ -625,7 +648,9 @@ const myFollowId = ref(null)
 // 打的是 UserFollowController.cs 裡的 GET api/UserFollow/follower/{followerid}/following/{followingid}。
 const fetchFollowStatus = async () => {
   try {
-    const res = await api.get(`/UserFollow/follower/${currentUserId.value}/following/${post.value.userId}`)
+    const res = await api.get(
+      `/UserFollow/follower/${currentUserId.value}/following/${post.value.userId}`,
+    )
     if (res.data) {
       post.value.isFollowing = true
       myFollowId.value = res.data.userFollowId
@@ -655,7 +680,7 @@ const toggleFollow = async () => {
     try {
       await api.post(`/UserFollow`, {
         followerId: currentUserId.value,
-        followingId: post.value.userId
+        followingId: post.value.userId,
       })
     } catch (err) {
       console.error('追蹤失敗：', err)
@@ -681,7 +706,7 @@ const addComment = async () => {
       parentCommentId: replyingTo.value ? replyingTo.value.postCommentId : null,
       communityPostId: post.value.communityPostId,
       userId: currentUserId.value,
-      commentText: newComment.value
+      commentText: newComment.value,
     })
   } catch (err) {
     console.error('送出留言失敗：', err)
@@ -697,13 +722,8 @@ const addComment = async () => {
 </script>
 
 <template>
-  
-
   <div class="community-page min-vh-100 w-100">
-    
-
     <div class="container-fluid container-lg pb-5 pt-4">
-
       <!--
         返回社群按鈕：跟 CreatePostView.vue 的 back-pill 是同一顆按鈕、同一套樣式，
         統一放在頁面內容最上面，讓使用者不管是從「發文頁」還是「貼文詳細頁」，
@@ -726,8 +746,14 @@ const addComment = async () => {
               </div>
             </div>
             <div class="skeleton-block skeleton-main-media"></div>
-            <div class="skeleton-block skeleton-line skeleton-line-90" style="margin-top:1.2rem;"></div>
-            <div class="skeleton-block skeleton-line skeleton-line-60" style="margin-top:.6rem;"></div>
+            <div
+              class="skeleton-block skeleton-line skeleton-line-90"
+              style="margin-top: 1.2rem"
+            ></div>
+            <div
+              class="skeleton-block skeleton-line skeleton-line-60"
+              style="margin-top: 0.6rem"
+            ></div>
           </div>
         </div>
         <div class="col-12 col-lg-4">
@@ -745,12 +771,10 @@ const addComment = async () => {
       </div>
 
       <div class="row g-4" v-else>
-
         <!-- 左側：貼文主體區 (大圖、內文、互動、留言) -->
         <div class="col-12 col-lg-8">
           <div class="post-main-card">
-
-           <!-- 發文者資訊列 -->
+            <!-- 發文者資訊列 -->
             <div class="author-bar">
               <!--
                 把大頭貼跟名字包進 <router-link>，讓它可以點擊跳轉。
@@ -758,12 +782,22 @@ const addComment = async () => {
                 點下去會跳到那個人的個人檔案頁（UserProfileView.vue），不同貼文的作者會連到不同網址。
                 class="text-decoration-none"：Bootstrap 的工具 class，把 <a> 連結預設的底線拿掉。
               -->
-              <router-link :to="`/community/profile/${post.userId}`" class="author-info text-decoration-none">
-                <img :src="post.user.avatar" class="author-avatar" alt="avatar" @error="onAvatarError($event, post.user.name)" />
+              <router-link
+                :to="`/community/profile/${post.userId}`"
+                class="author-info text-decoration-none"
+              >
+                <img
+                  :src="post.user.avatar"
+                  class="author-avatar"
+                  alt="avatar"
+                  @error="onAvatarError($event, post.user.name)"
+                />
                 <div>
                   <h6 class="author-name">{{ post.user.name }}</h6>
                   <!-- postTimeDisplay：上面 script 用 postDate 算出來的「2026-06-06 12:00」固定日期時間文字 -->
-                  <small class="author-meta">{{ postTimeDisplay }} · {{ post.user.location }}</small>
+                  <small class="author-meta"
+                    >{{ postTimeDisplay }} · {{ post.user.location }}</small
+                  >
                 </div>
               </router-link>
               <button
@@ -794,12 +828,30 @@ const addComment = async () => {
                   就能真正置中在灰色圓形按鈕正中間，不受字型影響。
                 -->
                 <button class="media-arrow media-arrow-prev" @click="prevImage" aria-label="上一張">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="18"
+                    height="18"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
                     <polyline points="15 18 9 12 15 6"></polyline>
                   </svg>
                 </button>
                 <button class="media-arrow media-arrow-next" @click="nextImage" aria-label="下一張">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="18"
+                    height="18"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
                     <polyline points="9 18 15 12 9 6"></polyline>
                   </svg>
                 </button>
@@ -810,7 +862,10 @@ const addComment = async () => {
                     :key="idx"
                     class="media-dot"
                     :class="{ active: idx === currentImageIndex }"
-                    @click="currentImageIndex = idx; restartAutoplay()"
+                    @click="
+                      currentImageIndex = idx
+                      restartAutoplay()
+                    "
                   ></button>
                 </div>
               </template>
@@ -823,7 +878,10 @@ const addComment = async () => {
                 :key="idx"
                 class="post-thumb-item"
                 :class="{ active: idx === currentImageIndex }"
-                @click="currentImageIndex = idx; restartAutoplay()"
+                @click="
+                  currentImageIndex = idx
+                  restartAutoplay()
+                "
               >
                 <img :src="img.url" alt="縮圖" />
               </button>
@@ -840,14 +898,39 @@ const addComment = async () => {
                 <button class="action-btn" :class="{ liked: post.isLiked }" @click="toggleLike">
                   <!-- fill="currentColor" 只有 isLiked 是 true 時才套用：已按讚時整顆心是實心的紅色，
                        跟大部分社群 App「按讚＝實心愛心」的視覺習慣一致；還沒按讚時維持空心線條。 -->
-                  <svg ref="likeIconEl" class="icon-inline" viewBox="0 0 24 24" width="16" height="16" :fill="post.isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  <svg
+                    ref="likeIconEl"
+                    class="icon-inline"
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    :fill="post.isLiked ? 'currentColor' : 'none'"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+                    />
                   </svg>
                   {{ likesDisplay }}
                 </button>
                 <button class="action-btn">
-                  <svg class="icon-inline" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" />
+                  <svg
+                    class="icon-inline"
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z"
+                    />
                   </svg>
                   {{ post.commentsCount }}
                 </button>
@@ -856,9 +939,7 @@ const addComment = async () => {
                   這樣選單（position:absolute）才會是「相對這個按鈕」定位，而不是整個頁面。
                 -->
                 <div class="share-wrapper">
-                  <button class="action-btn" @click="toggleShareMenu">
-                    ↗ 分享
-                  </button>
+                  <button class="action-btn" @click="toggleShareMenu">↗ 分享</button>
 
                   <!--
                     分享選單：showShareMenu 是 true 才顯示。
@@ -866,7 +947,11 @@ const addComment = async () => {
                     點選單以外的任何地方都算點到這層背景，直接關閉選單——
                     這是不用額外寫「偵測點擊選單外面」邏輯的簡單做法。
                   -->
-                  <div v-if="showShareMenu" class="share-menu-backdrop" @click="closeShareMenu"></div>
+                  <div
+                    v-if="showShareMenu"
+                    class="share-menu-backdrop"
+                    @click="closeShareMenu"
+                  ></div>
                   <div v-if="showShareMenu" class="share-menu">
                     <!--
                       這兩顆原本用 Font Awesome 的 fa-share-nodes、fa-link，這次也一起換成
@@ -874,8 +959,22 @@ const addComment = async () => {
                       不用擔心某些網路環境擋掉外部字型 CDN 導致圖示變成空白方框），
                       現在整個 Community 已經沒有任何地方在用 Font Awesome 了。
                     -->
-                    <button v-if="canNativeShare" type="button" class="share-menu-item" @click="nativeShare">
-                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <button
+                      v-if="canNativeShare"
+                      type="button"
+                      class="share-menu-item"
+                      @click="nativeShare"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="14"
+                        height="14"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
                         <circle cx="18" cy="5" r="3" />
                         <circle cx="6" cy="12" r="3" />
                         <circle cx="18" cy="19" r="3" />
@@ -885,7 +984,16 @@ const addComment = async () => {
                       系統分享
                     </button>
                     <button type="button" class="share-menu-item" @click="copyLink">
-                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="14"
+                        height="14"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
                         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
                         <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                       </svg>
@@ -907,13 +1015,27 @@ const addComment = async () => {
                 -->
                 <div class="report-wrapper">
                   <button class="action-btn" @click="toggleReportMenu">
-                    <svg class="icon-inline" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg
+                      class="icon-inline"
+                      viewBox="0 0 24 24"
+                      width="15"
+                      height="15"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
                       <path d="M5 3v18" />
                       <path d="M5 4h13l-3 4 3 4H5" />
                     </svg>
                     檢舉
                   </button>
-                  <div v-if="showReportMenu" class="share-menu-backdrop" @click="closeReportMenu"></div>
+                  <div
+                    v-if="showReportMenu"
+                    class="share-menu-backdrop"
+                    @click="closeReportMenu"
+                  ></div>
                   <div v-if="showReportMenu" class="report-panel">
                     <p class="report-panel-title">檢舉這篇貼文</p>
                     <textarea
@@ -923,8 +1045,15 @@ const addComment = async () => {
                       placeholder="請簡短說明檢舉原因（例如：不實廣告、冒犯言論...）"
                     ></textarea>
                     <div class="report-panel-actions">
-                      <button type="button" class="report-btn-cancel" @click="closeReportMenu">取消</button>
-                      <button type="button" class="report-btn-submit" :disabled="!reportReason.trim() || reportSubmitting" @click="submitReport">
+                      <button type="button" class="report-btn-cancel" @click="closeReportMenu">
+                        取消
+                      </button>
+                      <button
+                        type="button"
+                        class="report-btn-submit"
+                        :disabled="!reportReason.trim() || reportSubmitting"
+                        @click="submitReport"
+                      >
                         {{ reportSubmitting ? '送出中...' : '送出檢舉' }}
                       </button>
                     </div>
@@ -941,7 +1070,17 @@ const addComment = async () => {
                 跟按讚愛心「已讚=實心」是同一套做法。
               -->
               <button class="action-btn" :class="{ saved: isSaved }" @click="toggleSave">
-                <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" :fill="isSaved ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg
+                  class="icon-inline"
+                  viewBox="0 0 24 24"
+                  width="14"
+                  height="14"
+                  :fill="isSaved ? 'currentColor' : 'none'"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
                   <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
                 </svg>
                 {{ isSaved ? '已收藏' : '收藏' }}
@@ -968,15 +1107,14 @@ const addComment = async () => {
                   :key="tag.postTaggedProductId"
                   :to="`/community?tag=${encodeURIComponent(tag.name)}`"
                   class="tag-chip"
-                >#{{ tag.name }}</router-link>
+                  >#{{ tag.name }}</router-link
+                >
               </div>
             </div>
 
             <!-- 留言區塊 -->
             <div class="comment-block">
-              <div class="comment-title">
-                <span class="dot"></span>留言
-              </div>
+              <div class="comment-title"><span class="dot"></span>留言</div>
 
               <!-- 正在回覆某則留言時的提示：顯示「回覆 @xxx」，可以按 ✕ 取消、切回發新留言 -->
               <div v-if="replyingTo" class="replying-to-row">
@@ -1007,9 +1145,18 @@ const addComment = async () => {
                      不是把 groupedComments 全部畫出來——跟 CommunityView.vue 網格區的
                      「載入更多穿搭」是同一種做法，一開始只看得到前 5 則，按「查看更多留言」
                      才會再多顯示幾則。每則主留言底下再跑一次 c.replies 畫出它的回覆。 -->
-                <div v-for="c in visibleGroupedComments" :key="c.postCommentId" class="comment-thread">
+                <div
+                  v-for="c in visibleGroupedComments"
+                  :key="c.postCommentId"
+                  class="comment-thread"
+                >
                   <div class="comment-row">
-                    <img :src="c.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, c.user)" />
+                    <img
+                      :src="c.avatar"
+                      class="comment-avatar"
+                      alt="avatar"
+                      @error="onAvatarError($event, c.user)"
+                    />
                     <div class="comment-bubble">
                       <span class="comment-user">{{ c.user }}</span>
                       <span>{{ c.commentText }}</span>
@@ -1019,13 +1166,24 @@ const addComment = async () => {
                         <button class="btn-reply" @click="startReply(c)">回覆</button>
                       </div>
                       <!-- 有人回覆過這則留言時，顯示「已回覆 N 則」，跟 IG 一樣讓人知道底下有討論 -->
-                      <span v-if="c.replies.length" class="reply-count">已回覆 {{ c.replies.length }} 則</span>
+                      <span v-if="c.replies.length" class="reply-count"
+                        >已回覆 {{ c.replies.length }} 則</span
+                      >
                     </div>
                   </div>
 
                   <!-- 回覆列表：往內縮排（class="comment-reply"），跟 IG 留言底下的回覆呈現方式一樣 -->
-                  <div v-for="r in c.replies" :key="r.postCommentId" class="comment-row comment-reply">
-                    <img :src="r.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, r.user)" />
+                  <div
+                    v-for="r in c.replies"
+                    :key="r.postCommentId"
+                    class="comment-row comment-reply"
+                  >
+                    <img
+                      :src="r.avatar"
+                      class="comment-avatar"
+                      alt="avatar"
+                      @error="onAvatarError($event, r.user)"
+                    />
                     <div class="comment-bubble">
                       <span class="comment-user">{{ r.user }}</span>
                       <span>{{ r.commentText }}</span>
@@ -1043,19 +1201,21 @@ const addComment = async () => {
                 <button class="btn-load-comments" @click="loadMoreComments">查看更多留言 ▾</button>
               </div>
             </div>
-
           </div>
         </div>
 
         <!-- 右側：這套穿搭的商品與推薦區 -->
         <div class="col-12 col-lg-4">
-
           <!-- 穿搭商品清單：只顯示這篇貼文作者真的標記過的商品，沒有標記任何商品的貼文，這整張卡片不會出現 -->
           <div class="side-card" v-if="post.taggedProducts.length">
             <div class="side-title"><span class="dot"></span>這套穿搭的商品</div>
 
             <div class="product-list">
-              <div v-for="item in post.taggedProducts" :key="item.postTaggedProductId" class="product-row">
+              <div
+                v-for="item in post.taggedProducts"
+                :key="item.postTaggedProductId"
+                class="product-row"
+              >
                 <!--
                   product-link：現在商品詳情頁路由確定是 /shop/product/:id 了，
                   改回真正的 router-link，點圖片或名稱都會跳過去那件商品的頁面。
@@ -1093,9 +1253,7 @@ const addComment = async () => {
               </router-link>
             </div>
           </div>
-
         </div>
-
       </div>
     </div>
   </div>
@@ -1105,181 +1263,350 @@ const addComment = async () => {
 .community-page {
   width: 100%;
   min-height: 100vh;
-  background-color: #F9F4F0 !important;
+  background-color: #f9f4f0 !important;
   box-sizing: border-box;
-  --cream:#F9F4F0;
-  --paper:#FFFDFB;
-  --ink:#2A2420;
-  --ink-soft:#7A6E63;
-  --plum:#7A4B54;
-  --plum-deep:#5E3941;
-  --ochre:#B8862E;
-  --hairline:#E4D8CC;
+  --cream: #f9f4f0;
+  --paper: #fffdfb;
+  --ink: #2a2420;
+  --ink-soft: #7a6e63;
+  --plum: #7a4b54;
+  --plum-deep: #5e3941;
+  --ochre: #b8862e;
+  --hairline: #e4d8cc;
   color: var(--ink);
   font-family: 'Noto Sans TC', sans-serif;
 }
 
 /* ---------- 返回社群按鈕 ---------- */
-.back-pill{
-  display:inline-flex; align-items:center; gap:.3rem;
-  border:1px solid var(--ink); border-radius:999px;
-  padding:.35rem 1rem; font-size:.82rem; color:var(--ink);
-  text-decoration:none; margin-bottom:1.2rem;
-  transition:all .18s ease;
+.back-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  padding: 0.35rem 1rem;
+  font-size: 0.82rem;
+  color: var(--ink);
+  text-decoration: none;
+  margin-bottom: 1.2rem;
+  transition: all 0.18s ease;
 }
-.back-pill:hover{ background:var(--ink); color:var(--cream); }
+.back-pill:hover {
+  background: var(--ink);
+  color: var(--cream);
+}
 
 /* ---------- 骨架載入畫面 ---------- */
 /* 跟 CommunityView.vue 的骨架畫面是同一套「光斑掃過」效果，各自獨立的 <style scoped>
    沒辦法共用，這裡複製一份對應這個頁面的版面形狀（發文者列＋大圖＋內文＋側欄）。 */
 @keyframes skeleton-shimmer {
-  0% { background-position: -300px 0; }
-  100% { background-position: 300px 0; }
+  0% {
+    background-position: -300px 0;
+  }
+  100% {
+    background-position: 300px 0;
+  }
 }
-.skeleton-block{
+.skeleton-block {
   background-color: var(--hairline);
-  background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,.55) 50%, rgba(255,255,255,0) 100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
   background-size: 300px 100%;
   background-repeat: no-repeat;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
   border-radius: 6px;
 }
-.skeleton-author-bar{ display:flex; align-items:center; gap:.7rem; margin-bottom:1.1rem; }
-.skeleton-avatar-lg{ width:44px; height:44px; border-radius:50%; flex-shrink:0; }
-.skeleton-author-lines{ display:flex; flex-direction:column; gap:.5rem; flex:1; }
-.skeleton-line{ height:14px; }
-.skeleton-line-40{ width:40%; }
-.skeleton-line-30{ width:30%; }
-.skeleton-line-90{ width:90%; }
-.skeleton-line-60{ width:60%; }
-.skeleton-main-media{ width:100%; height:550px; border-radius:8px; }
-.skeleton-side-card{ width:100%; height:320px; border-radius:16px; }
-@media (max-width: 767px){
-  .skeleton-main-media{ height:340px; }
+.skeleton-author-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 1.1rem;
+}
+.skeleton-avatar-lg {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.skeleton-author-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+}
+.skeleton-line {
+  height: 14px;
+}
+.skeleton-line-40 {
+  width: 40%;
+}
+.skeleton-line-30 {
+  width: 30%;
+}
+.skeleton-line-90 {
+  width: 90%;
+}
+.skeleton-line-60 {
+  width: 60%;
+}
+.skeleton-main-media {
+  width: 100%;
+  height: 550px;
+  border-radius: 8px;
+}
+.skeleton-side-card {
+  width: 100%;
+  height: 320px;
+  border-radius: 16px;
+}
+@media (max-width: 767px) {
+  .skeleton-main-media {
+    height: 340px;
+  }
 }
 
 /* ---------- 找不到貼文 ---------- */
-.not-found-state{
-  background:var(--paper); border:1px dashed var(--hairline); border-radius:16px;
-  padding:3rem 2rem; text-align:center; color:var(--ink-soft);
+.not-found-state {
+  background: var(--paper);
+  border: 1px dashed var(--hairline);
+  border-radius: 16px;
+  padding: 3rem 2rem;
+  text-align: center;
+  color: var(--ink-soft);
 }
-.not-found-state p{ margin-bottom:1rem; }
+.not-found-state p {
+  margin-bottom: 1rem;
+}
 
 /* ---------- 主卡片 ---------- */
-.post-main-card{
-  background:var(--paper);
-  border:1px solid var(--hairline);
-  border-radius:16px;
-  padding:1.6rem;
+.post-main-card {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  padding: 1.6rem;
 }
 
 /* ---------- 發文者列 ---------- */
-.author-bar{
-  display:flex; align-items:center; justify-content:space-between;
-  margin-bottom:1.2rem;
+.author-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.2rem;
 }
-.author-info{ display:flex; align-items:center; gap:.8rem; }
-.author-avatar{
-  width:48px; height:48px; border-radius:50%; object-fit:cover;
-  box-shadow:0 0 0 2px var(--plum);
+.author-info {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
 }
-.author-name{
-  font-family:'Noto Serif TC', serif; font-weight:700; font-size:.98rem;
-  margin:0; color:var(--ink);
+.author-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 2px var(--plum);
 }
-.author-meta{ font-size:.78rem; color:var(--ink-soft); }
+.author-name {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 700;
+  font-size: 0.98rem;
+  margin: 0;
+  color: var(--ink);
+}
+.author-meta {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
 
-.btn-follow-main{
-  background:var(--ink); color:var(--paper);
-  border:none; border-radius:4px;
-  padding:.5rem 1.3rem; font-size:.84rem; font-weight:600;
-  transition:background .18s ease, transform .18s ease;
+.btn-follow-main {
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1.3rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  transition:
+    background 0.18s ease,
+    transform 0.18s ease;
 }
-.btn-follow-main:hover{ background:var(--plum-deep); transform:translateY(-1px); }
-.btn-follow-main.following{ background:var(--hairline); color:var(--ink-soft); }
-.btn-follow-main.following:hover{ background:var(--hairline); transform:none; }
+.btn-follow-main:hover {
+  background: var(--plum-deep);
+  transform: translateY(-1px);
+}
+.btn-follow-main.following {
+  background: var(--hairline);
+  color: var(--ink-soft);
+}
+.btn-follow-main.following:hover {
+  background: var(--hairline);
+  transform: none;
+}
 
 /* ---------- 主圖 ---------- */
-.post-media{
-  position:relative;
-  border-radius:8px;
-  overflow:hidden;
-  background:var(--cream);
-  margin-bottom:1.1rem;
+.post-media {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--cream);
+  margin-bottom: 1.1rem;
 }
-.post-image{
-  width:100%; height:550px; object-fit:contain;
-  display:block; background:var(--paper);
+.post-image {
+  width: 100%;
+  height: 550px;
+  object-fit: contain;
+  display: block;
+  background: var(--paper);
 }
 
-.tag-label{
-  position:absolute; top:16px; left:-6px; z-index:2;
-  background:var(--plum); color:#fff;
-  font-size:.7rem; letter-spacing:.05em; font-weight:600;
-  padding:.3rem .75rem .3rem 1rem;
-  box-shadow:0 4px 10px rgba(0,0,0,.18);
+.tag-label {
+  position: absolute;
+  top: 16px;
+  left: -6px;
+  z-index: 2;
+  background: var(--plum);
+  color: #fff;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  padding: 0.3rem 0.75rem 0.3rem 1rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
 }
-.tag-label::after{
-  content:""; position:absolute; left:0; bottom:-6px;
-  border-width:0 6px 6px 0; border-style:solid;
-  border-color:transparent var(--plum-deep) transparent transparent;
+.tag-label::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -6px;
+  border-width: 0 6px 6px 0;
+  border-style: solid;
+  border-color: transparent var(--plum-deep) transparent transparent;
 }
 
 /* ---------- 主圖輪播：箭頭、圓點 ---------- */
-.media-arrow{
-  position:absolute; top:50%; transform:translateY(-50%); z-index:3;
-  width:36px; height:36px; border-radius:50%;
-  background:rgba(0,0,0,.45); color:#fff; border:none; padding:0;
-  display:flex; align-items:center; justify-content:center;
-  transition:background .18s ease;
+.media-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.18s ease;
 }
-.media-arrow:hover{ background:rgba(0,0,0,.7); }
-.media-arrow-prev{ left:12px; }
-.media-arrow-next{ right:12px; }
+.media-arrow:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+.media-arrow-prev {
+  left: 12px;
+}
+.media-arrow-next {
+  right: 12px;
+}
 
-.media-dots{
-  position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:3;
-  display:flex; gap:.4rem;
+.media-dots {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  gap: 0.4rem;
 }
-.media-dot{
-  width:7px; height:7px; border-radius:50%;
-  background:rgba(255,255,255,.55); border:none; padding:0;
-  transition:background .18s ease, transform .18s ease;
+.media-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  border: none;
+  padding: 0;
+  transition:
+    background 0.18s ease,
+    transform 0.18s ease;
 }
-.media-dot.active{ background:#fff; transform:scale(1.25); }
+.media-dot.active {
+  background: #fff;
+  transform: scale(1.25);
+}
 
 /* ---------- 縮圖列 ---------- */
-.post-thumb-row{ display:flex; gap:.5rem; margin-bottom:1.1rem; }
-.post-thumb-item{
-  width:56px; height:56px; border-radius:6px; overflow:hidden; flex-shrink:0;
-  border:2px solid transparent; padding:0; background:none;
-  transition:border-color .18s ease;
+.post-thumb-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.1rem;
 }
-.post-thumb-item.active{ border-color:var(--plum); }
-.post-thumb-item img{ width:100%; height:100%; object-fit:cover; display:block; }
+.post-thumb-item {
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 2px solid transparent;
+  padding: 0;
+  background: none;
+  transition: border-color 0.18s ease;
+}
+.post-thumb-item.active {
+  border-color: var(--plum);
+}
+.post-thumb-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 
 /* ---------- 互動列 ---------- */
-.action-bar{
-  display:flex; align-items:center; justify-content:space-between;
-  padding:.7rem 0;
-  border-top:1px solid var(--hairline);
-  border-bottom:1px solid var(--hairline);
-  margin-bottom:1.2rem;
+.action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 0;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: 1.2rem;
 }
-.action-left{ display:flex; gap:1.6rem; }
-.action-btn{
-  background:none; border:none; padding:0;
-  font-size:.88rem; color:var(--ink-soft);
-  transition:color .18s ease;
-  display:inline-flex; align-items:center; gap:.4rem;
+.action-left {
+  display: flex;
+  gap: 1.6rem;
 }
-.action-btn:hover{ color:var(--ink); }
-.action-btn.liked{ color:#B4453A; font-weight:600; }
-.action-btn.saved{ color:var(--ochre); font-weight:600; }
+.action-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+  transition: color 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.action-btn:hover {
+  color: var(--ink);
+}
+.action-btn.liked {
+  color: #b4453a;
+  font-weight: 600;
+}
+.action-btn.saved {
+  color: var(--ochre);
+  font-weight: 600;
+}
 /* icon-inline：跟文字並排的小圖示共用樣式，顏色跟著所在文字走（currentColor），
    跟 CommunityView.vue 的 .icon-inline 是同一個概念，各自獨立的 <style scoped> 沒辦法共用，
    所以這裡也宣告一次。 */
-.icon-inline{ flex-shrink:0; }
+.icon-inline {
+  flex-shrink: 0;
+}
 
 /*
   分享選單：
@@ -1288,229 +1615,461 @@ const addComment = async () => {
   .share-menu-backdrop 鋪滿整個畫面但透明，點選單以外的地方都算點到它，直接關閉選單，
   比自己寫「偵測點擊發生在選單外面」的邏輯簡單很多。
 */
-.share-wrapper{ position:relative; }
-.share-menu-backdrop{ position:fixed; inset:0; z-index:9; }
-.share-menu{
-  position:absolute; top:calc(100% + 8px); left:0; z-index:10;
-  background:var(--paper);
-  border:1px solid var(--hairline);
-  border-radius:8px;
-  box-shadow:0 10px 30px rgba(42,36,32,.18);
-  padding:.4rem;
-  min-width:180px;
-  display:flex; flex-direction:column; gap:.15rem;
+.share-wrapper {
+  position: relative;
 }
-.share-menu-item{
-  display:flex; align-items:center; gap:.6rem;
-  background:none; border:none; border-radius:5px;
-  padding:.55rem .7rem; font-size:.84rem; color:var(--ink);
-  text-align:left; cursor:pointer;
-  transition:background .15s ease;
+.share-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
 }
-.share-menu-item:hover{ background:var(--cream); }
+.share-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 10;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(42, 36, 32, 0.18);
+  padding: 0.4rem;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.share-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.84rem;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.share-menu-item:hover {
+  background: var(--cream);
+}
 /* 系統分享、複製連結、LINE、Facebook 現在全部都是 SVG（沒有任何 <i> 圖示了），
    統一用同一條規則控制尺寸／顏色，currentColor 會直接跟著這裡設定的 color 走。 */
-.share-menu-item svg{ width:16px; height:16px; flex-shrink:0; color:var(--ink-soft); }
+.share-menu-item svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--ink-soft);
+}
 
 /* 檢舉面板：跟分享選單同一種定位邏輯（.report-wrapper 是參考點），
    共用同一顆 .share-menu-backdrop 處理「點外面關閉」。 */
-.report-wrapper{ position:relative; }
-.report-panel{
-  position:absolute; top:calc(100% + 8px); right:0; z-index:10;
-  background:var(--paper);
-  border:1px solid var(--hairline);
-  border-radius:8px;
-  box-shadow:0 10px 30px rgba(42,36,32,.18);
-  padding:1rem;
-  width:260px;
+.report-wrapper {
+  position: relative;
 }
-.report-panel-title{
-  margin:0 0 .6rem; font-size:.86rem; font-weight:700; color:var(--ink);
+.report-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 10;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(42, 36, 32, 0.18);
+  padding: 1rem;
+  width: 260px;
 }
-.report-textarea{
-  width:100%; border:1px solid var(--hairline); background:var(--cream);
-  border-radius:6px; padding:.6rem .7rem; font-size:.82rem; color:var(--ink);
-  font-family:inherit; resize:vertical;
+.report-panel-title {
+  margin: 0 0 0.6rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--ink);
 }
-.report-textarea:focus{ outline:none; border-color:var(--plum); }
-.report-panel-actions{ display:flex; gap:.5rem; margin-top:.7rem; }
-.report-btn-cancel{
-  flex:1; padding:.45rem; font-size:.78rem;
-  background:transparent; color:var(--ink-soft);
-  border:1px solid var(--hairline); border-radius:4px; cursor:pointer;
+.report-textarea {
+  width: 100%;
+  border: 1px solid var(--hairline);
+  background: var(--cream);
+  border-radius: 6px;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.82rem;
+  color: var(--ink);
+  font-family: inherit;
+  resize: vertical;
 }
-.report-btn-cancel:hover{ border-color:var(--ink); color:var(--ink); }
-.report-btn-submit{
-  flex:1; padding:.45rem; font-size:.78rem; font-weight:600;
-  background:var(--ink); color:var(--paper);
-  border:none; border-radius:4px; cursor:pointer;
-  transition:background .18s ease;
+.report-textarea:focus {
+  outline: none;
+  border-color: var(--plum);
 }
-.report-btn-submit:hover:not(:disabled){ background:var(--plum-deep); }
-.report-btn-submit:disabled{ opacity:.5; cursor:not-allowed; }
+.report-panel-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+}
+.report-btn-cancel {
+  flex: 1;
+  padding: 0.45rem;
+  font-size: 0.78rem;
+  background: transparent;
+  color: var(--ink-soft);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.report-btn-cancel:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.report-btn-submit {
+  flex: 1;
+  padding: 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+.report-btn-submit:hover:not(:disabled) {
+  background: var(--plum-deep);
+}
+.report-btn-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* ---------- 內文 ---------- */
-.post-content{
-  font-size:.94rem; line-height:1.8; color:var(--ink);
-  margin-bottom:1.2rem;
+.post-content {
+  font-size: 0.94rem;
+  line-height: 1.8;
+  color: var(--ink);
+  margin-bottom: 1.2rem;
 }
 
 /* ---------- 標記商品（貼文下方） ---------- */
-.tagged-products{
-  display:flex; align-items:center; flex-wrap:wrap; gap:.7rem;
-  margin-bottom:1.6rem;
+.tagged-products {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-bottom: 1.6rem;
 }
-.tagged-label{
-  font-size:.8rem; color:var(--ink-soft); font-weight:600; flex-shrink:0;
+.tagged-label {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  font-weight: 600;
+  flex-shrink: 0;
 }
-.tagged-products .tag-cloud{ display:flex; flex-wrap:wrap; gap:.5rem; }
-.tagged-products .tag-chip{
-  font-size:.78rem; padding:.32rem .8rem; border-radius:999px;
-  background:var(--cream); border:1px solid var(--hairline); color:var(--plum);
-  text-decoration:none; font-weight:600;
-  transition:all .18s ease;
+.tagged-products .tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
-.tagged-products .tag-chip:hover{ border-color:var(--plum); background:var(--paper); }
+.tagged-products .tag-chip {
+  font-size: 0.78rem;
+  padding: 0.32rem 0.8rem;
+  border-radius: 999px;
+  background: var(--cream);
+  border: 1px solid var(--hairline);
+  color: var(--plum);
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.18s ease;
+}
+.tagged-products .tag-chip:hover {
+  border-color: var(--plum);
+  background: var(--paper);
+}
 
 /* ---------- 留言區 ---------- */
-.comment-block{
-  background:var(--cream);
-  border-radius:8px;
-  padding:1.3rem;
+.comment-block {
+  background: var(--cream);
+  border-radius: 8px;
+  padding: 1.3rem;
 }
-.comment-title{
-  font-family:'Noto Serif TC', serif; font-weight:700; font-size:.95rem;
-  display:flex; align-items:center; gap:.5rem;
-  margin-bottom:1rem; color:var(--ink);
+.comment-title {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  color: var(--ink);
 }
-.comment-title .dot, .side-title .dot{
-  width:6px; height:6px; border-radius:50%; background:var(--ochre);
+.comment-title .dot,
+.side-title .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ochre);
 }
 
-.comments-list{ display:flex; flex-direction:column; gap:1rem; margin-bottom:1.1rem; }
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+}
 /* 查看更多留言：跟 CommunityView.vue「載入更多穿搭」是同一顆按鈕樣式，維持整個網站
    一致的「還有更多內容」互動語言。 */
-.load-more-comments-wrap{ text-align:center; margin-bottom:1.3rem; }
-.btn-load-comments{
-  background:transparent; border:1px solid var(--ink); color:var(--ink);
-  border-radius:999px; padding:.5rem 1.6rem; font-size:.82rem; letter-spacing:.03em;
-  transition:all .2s ease;
+.load-more-comments-wrap {
+  text-align: center;
+  margin-bottom: 1.3rem;
 }
-.btn-load-comments:hover{ background:var(--ink); color:var(--cream); }
-.comment-thread{ display:flex; flex-direction:column; gap:.5rem; }
-.comment-row{ display:flex; align-items:flex-start; gap:.6rem; }
-.comment-row.comment-reply{ margin-left:2.4rem; } /* 往內縮排，跟 IG 的回覆呈現方式一樣 */
-.comment-avatar{ width:28px; height:28px; border-radius:50%; object-fit:cover; flex-shrink:0; }
-.comment-bubble{
-  background:var(--paper);
-  border:1px solid var(--hairline);
-  border-radius:4px;
-  padding:.55rem .9rem;
-  font-size:.85rem; color:var(--ink);
-  width:100%;
-  display:flex; align-items:baseline; flex-wrap:wrap; gap:.4rem;
+.btn-load-comments {
+  background: transparent;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 0.5rem 1.6rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.03em;
+  transition: all 0.2s ease;
 }
-.comment-user{ font-weight:700; margin-right:.1rem; }
-.comment-meta{ display:flex; align-items:center; gap:.6rem; margin-left:auto; flex-shrink:0; }
-.comment-time{ font-size:.72rem; color:var(--ink-soft); white-space:nowrap; }
-.btn-reply{
-  background:none; border:none; padding:0;
-  font-size:.78rem; color:var(--ink-soft); cursor:pointer;
+.btn-load-comments:hover {
+  background: var(--ink);
+  color: var(--cream);
 }
-.btn-reply:hover{ color:var(--plum); }
-.reply-count{ font-size:.76rem; color:var(--ochre); font-weight:600; width:100%; }
+.comment-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.comment-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+.comment-row.comment-reply {
+  margin-left: 2.4rem;
+} /* 往內縮排，跟 IG 的回覆呈現方式一樣 */
+.comment-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.comment-bubble {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.85rem;
+  color: var(--ink);
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.comment-user {
+  font-weight: 700;
+  margin-right: 0.1rem;
+}
+.comment-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.comment-time {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.btn-reply {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.btn-reply:hover {
+  color: var(--plum);
+}
+.reply-count {
+  font-size: 0.76rem;
+  color: var(--ochre);
+  font-weight: 600;
+  width: 100%;
+}
 
-.replying-to-row{
-  display:flex; align-items:center; gap:.5rem;
-  font-size:.8rem; color:var(--ink-soft);
-  margin-bottom:.5rem;
+.replying-to-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin-bottom: 0.5rem;
 }
-.btn-cancel-reply{
-  border:none; background:var(--hairline); color:var(--ink-soft);
-  width:18px; height:18px; border-radius:50%;
-  font-size:.68rem; line-height:1;
-  display:flex; align-items:center; justify-content:center;
-  transition:background .18s ease,color .18s ease;
+.btn-cancel-reply {
+  border: none;
+  background: var(--hairline);
+  color: var(--ink-soft);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 0.68rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease;
 }
-.btn-cancel-reply:hover{ background:var(--plum); color:#fff; }
+.btn-cancel-reply:hover {
+  background: var(--plum);
+  color: #fff;
+}
 
-.comment-input-row{ display:flex; gap:.6rem; margin-bottom:1.3rem; }
-.comment-input{
-  flex:1;
-  border:1px solid var(--hairline);
-  background:var(--paper);
-  border-radius:4px;
-  padding:.6rem 1rem;
-  font-size:.86rem; color:var(--ink);
-  outline:none;
-  transition:border-color .18s ease;
+.comment-input-row {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 1.3rem;
 }
-.comment-input:focus{ border-color:var(--plum); }
-.comment-input::placeholder{ color:var(--ink-soft); }
-.btn-send{
-  background:var(--ink); color:var(--paper);
-  border:none; border-radius:4px;
-  padding:.6rem 1.4rem; font-size:.85rem; font-weight:600;
-  white-space:nowrap;
-  transition:background .18s ease;
+.comment-input {
+  flex: 1;
+  border: 1px solid var(--hairline);
+  background: var(--paper);
+  border-radius: 4px;
+  padding: 0.6rem 1rem;
+  font-size: 0.86rem;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.18s ease;
 }
-.btn-send:hover{ background:var(--plum-deep); }
+.comment-input:focus {
+  border-color: var(--plum);
+}
+.comment-input::placeholder {
+  color: var(--ink-soft);
+}
+.btn-send {
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 4px;
+  padding: 0.6rem 1.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.18s ease;
+}
+.btn-send:hover {
+  background: var(--plum-deep);
+}
 
 /* ---------- 側邊欄 ---------- */
-.side-card{
-  background:var(--paper);
-  border:1px solid var(--hairline);
-  border-radius:16px;
-  padding:1.4rem 1.3rem;
-  margin-bottom:1.5rem;
+.side-card {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  padding: 1.4rem 1.3rem;
+  margin-bottom: 1.5rem;
 }
-.side-title{
-  font-family:'Noto Serif TC', serif; font-weight:700; font-size:1.02rem;
-  display:flex; align-items:center; gap:.5rem;
-  margin-bottom:1.1rem; color:var(--ink);
+.side-title {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 700;
+  font-size: 1.02rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.1rem;
+  color: var(--ink);
 }
 
-.product-list{ display:flex; flex-direction:column; gap:.8rem; margin-bottom:1.2rem; }
-.product-row{
-  display:flex; align-items:center; gap:.7rem;
-  background:var(--cream);
-  border-radius:8px;
-  padding:.55rem;
+.product-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  margin-bottom: 1.2rem;
+}
+.product-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  background: var(--cream);
+  border-radius: 8px;
+  padding: 0.55rem;
 }
 /*
   product-link 把圖片跟文字包在一起排成一列，現在是真的 router-link（會跳轉到
   /shop/product/:id），color/text-decoration 這兩行是為了讓連結看起來不像連結
   （不變色、不加底線），維持跟其他文字一樣的視覺樣式。
 */
-.product-link{
-  display:flex; align-items:center; gap:.7rem;
-  flex:1; min-width:0;
-  color:inherit; text-decoration:none;
+.product-link {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
 }
-.product-thumb{ width:56px; height:56px; border-radius:6px; object-fit:cover; flex-shrink:0; }
-.product-info{ flex:1; min-width:0; }
-.product-name{
-  font-size:.83rem; font-weight:700; color:var(--ink);
-  margin:0 0 .2rem;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+.product-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
 }
-.product-price{ font-size:.8rem; color:var(--ochre); font-weight:600; margin:0; }
-.similar-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:.6rem; }
-.similar-thumb{
-  display:block;
-  aspect-ratio:3/4; border-radius:6px; overflow:hidden;
-  background:var(--cream);
-  cursor:pointer;
+.product-info {
+  flex: 1;
+  min-width: 0;
 }
-.similar-thumb img{
-  width:100%; height:100%; object-fit:cover;
-  transition:transform .3s ease;
+.product-name {
+  font-size: 0.83rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 0.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.similar-thumb:hover img{ transform:scale(1.06); }
+.product-price {
+  font-size: 0.8rem;
+  color: var(--ochre);
+  font-weight: 600;
+  margin: 0;
+}
+.similar-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+}
+.similar-thumb {
+  display: block;
+  aspect-ratio: 3/4;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--cream);
+  cursor: pointer;
+}
+.similar-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+.similar-thumb:hover img {
+  transform: scale(1.06);
+}
 
-@media (max-width: 767px){
-  .post-image{ height:380px; }
-  .post-main-card{ padding:1.1rem; }
+@media (max-width: 767px) {
+  .post-image {
+    height: 380px;
+  }
+  .post-main-card {
+    padding: 1.1rem;
+  }
 }
 </style>
 
@@ -1521,6 +2080,6 @@ const addComment = async () => {
 -->
 <style>
 body {
-  background-color: #F9F4F0 !important;
+  background-color: #f9f4f0 !important;
 }
 </style>

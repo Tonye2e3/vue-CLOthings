@@ -12,7 +12,7 @@ import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 // api：跟其他頁面共用同一個 axios 實例（src/services/api.js），會自動把登入後的 JWT
 // token 帶進 Authorization header，跟直接 import axios from 'axios' 不一樣。
-import api from '@/services/api'
+import api from '@/api/api'
 // animate：anime.js v4 的動畫函式，這裡用來做編輯貼文彈出視窗的開關動畫，
 // 跟 CommunityView.vue、ChatView.vue 是同一個套件、同一套用法。
 import { animate } from 'animejs'
@@ -24,7 +24,13 @@ import { animate } from 'animejs'
 // 跟 CommunityView.vue 自己 <template> 要另外重複宣告一份不一樣——
 // 因為這裡是「別的檔案」透過 import 拿到它，並不是同一個 SFC 裡的 <script setup>／<template>
 // 那種限制，所以可以直接在這個檔案的 <template> 裡正常使用。
-import { savedPosts, loadSavedPosts, formatCount, currentUserId, loadCurrentUserId } from '@/views/Community/CommunityView.vue'
+import {
+  savedPosts,
+  loadSavedPosts,
+  formatCount,
+  currentUserId,
+  loadCurrentUserId,
+} from '@/views/Community/CommunityView.vue'
 
 // IMAGE_BASE：圖片是靜態檔案，走的不是 /api 這條路徑，不能直接用 api 服務的
 // baseURL（那個含 /api）；VITE_API_URL 本身就是純後端主機網址。
@@ -58,8 +64,6 @@ const onAvatarError = (event, name) => {
 // 這裡用 computed 才能保證 viewedUserId 隨時反映網址上「現在」的 :userId。
 const viewedUserId = computed(() => Number(route.params.userId))
 
-
-
 // 使用者個人資料
 // 這是一個「物件」（用 { } 包起來、裡面很多 key: value 的資料），
 // 存放這個使用者頁面要顯示的所有基本資訊。
@@ -72,10 +76,10 @@ const userProfile = ref({
   bio: '喜歡分享每天的穿搭靈感    點擊看板搭配同款單品，一起變美！',
   avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily', // 大頭貼圖片網址
   bannerBg: '#EFE8E1', // 暖質感奶茶底色
-  postsCount: '1,284',    // 貼文數（純文字顯示用，不是拿來計算的數字）
+  postsCount: '1,284', // 貼文數（純文字顯示用，不是拿來計算的數字）
   followersCount: '58.6K',
   followingCount: '342',
-  isFollowing: false // 「我」有沒有追蹤這個人，true/false 這種只有兩種狀態的值叫做布林值
+  isFollowing: false, // 「我」有沒有追蹤這個人，true/false 這種只有兩種狀態的值叫做布林值
 })
 
 // 當前頁籤 (穿搭作品, 收藏, 同款商品, 關於我)
@@ -100,23 +104,22 @@ const fetchUserPosts = async () => {
     // 後端回傳的格式（CommunityPostDTO）跟這頁 template 原本期待的格式不太一樣，
     // 這裡把它轉成 template 需要的形狀：content、image（取第一張圖）、likesCount、
     // commentsCount、tags（把 taggedProducts 陣列轉成 '#商品名稱' 字串陣列）。
-    userPosts.value = res.data.map(post => ({
+    userPosts.value = res.data.map((post) => ({
       communityPostId: post.communityPostId,
       userId: post.userId,
       status: post.status,
       content: post.content,
-      image: post.images && post.images.length > 0
-        ? `${IMAGE_BASE}${post.images[0].imageFileName}`
-        : '',
+      image:
+        post.images && post.images.length > 0 ? `${IMAGE_BASE}${post.images[0].imageFileName}` : '',
       // images：保留完整的原始圖片清單（不是只有第一張），編輯貼文換照片時要用到，
       // 卡片本身的縮圖顯示還是繼續用上面那個扁平的 image 欄位就好。
       images: post.images || [],
       likesCount: post.likesCount,
       commentsCount: post.commentsCount,
-      tags: post.taggedProducts.map(t => `#${t.name}`),
+      tags: post.taggedProducts.map((t) => `#${t.name}`),
       // taggedProducts：保留完整的原始標記商品清單（不是只有格式化過的 #名稱 字串），
       // 編輯貼文改標記商品時要用到，卡片本身顯示還是繼續用上面那個 tags 就好。
-      taggedProducts: post.taggedProducts || []
+      taggedProducts: post.taggedProducts || [],
     }))
     // 貼文數：直接用剛剛抓回來的貼文數量就好，不用另外多打一支 API 算，
     // 跟 CommunityPostController.cs 裡 LikesCount／CommentsCount 用 .Count() 算的道理一樣，
@@ -143,7 +146,7 @@ const deletePost = async (communityPostId) => {
   }
 
   // API 刪除成功後，把畫面上這篇貼文也從 userPosts 移除，不用整頁重新整理、重打一次 API。
-  userPosts.value = userPosts.value.filter(p => p.communityPostId !== communityPostId)
+  userPosts.value = userPosts.value.filter((p) => p.communityPostId !== communityPostId)
 }
 
 // editingPostId：現在正在編輯哪一篇貼文，null 代表沒有任何一篇正在編輯中。
@@ -157,9 +160,9 @@ const availableProducts = ref([])
 const fetchProducts = async () => {
   try {
     const res = await api.get('/Product')
-    availableProducts.value = res.data.map(p => ({
+    availableProducts.value = res.data.map((p) => ({
       productId: p.productId,
-      name: p.productName
+      name: p.productName,
     }))
   } catch (err) {
     console.error('讀取商品清單失敗：', err)
@@ -179,7 +182,7 @@ const filteredProducts = computed(() => {
     // 前端邏輯不用變。
     return availableProducts.value.slice(0, 5)
   }
-  return availableProducts.value.filter(p => p.name.toLowerCase().includes(q))
+  return availableProducts.value.filter((p) => p.name.toLowerCase().includes(q))
 })
 
 // toggleEditProduct：點某個商品標籤時執行，已選就取消、未選就加入，跟
@@ -211,13 +214,13 @@ const startEdit = (post) => {
   editForm.value = {
     content: post.content,
     status: post.status || 'public',
-    images: (post.images || []).map(img => ({
+    images: (post.images || []).map((img) => ({
       imageFileName: img.imageFileName,
       sortOrder: img.sortOrder,
       url: `${IMAGE_BASE}${img.imageFileName}`,
-      isNew: false
+      isNew: false,
     })),
-    taggedProducts: (post.taggedProducts || []).map(t => t.name)
+    taggedProducts: (post.taggedProducts || []).map((t) => t.name),
   }
 }
 
@@ -243,7 +246,7 @@ const onEditModalEnter = (el, done) => {
     scale: [0.92, 1],
     duration: 260,
     ease: 'outQuad',
-    onComplete: done
+    onComplete: done,
   })
 }
 
@@ -259,7 +262,7 @@ const onEditModalLeave = (el, done) => {
     scale: [1, 0.92],
     duration: 180,
     ease: 'inQuad',
-    onComplete: done
+    onComplete: done,
   })
 }
 
@@ -277,13 +280,13 @@ const closeLightbox = () => {
 // handleFileChange 是同一套，只是這裡是加進 editForm.value.images。
 const handleEditFileChange = (event) => {
   const files = Array.from(event.target.files || [])
-  files.forEach(file => {
+  files.forEach((file) => {
     editForm.value.images.push({
       file, // 保留原始檔案本身，saveEdit 真正送出前要用它上傳
       imageFileName: file.name, // 先用檔案原始名稱佔位，saveEdit 上傳成功後會換成真正的路徑
       sortOrder: editForm.value.images.length + 1,
       url: URL.createObjectURL(file), // 本地暫時預覽網址
-      isNew: true
+      isNew: true,
     })
   })
   event.target.value = ''
@@ -298,15 +301,15 @@ const removeEditImage = (index) => {
 const saveEdit = async (post) => {
   // 第一步：把 isNew 是 true 的照片（這次新選的）真正上傳到後端，
   // 舊照片（isNew 是 false）已經在伺服器上了，不用再傳一次。
-  const newImages = editForm.value.images.filter(img => img.isNew)
+  const newImages = editForm.value.images.filter((img) => img.isNew)
 
   if (newImages.length > 0) {
     const formData = new FormData()
-    newImages.forEach(img => formData.append('files', img.file))
+    newImages.forEach((img) => formData.append('files', img.file))
 
     try {
       const uploadRes = await api.post(`/CommunityPost/upload-images`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
       })
       // uploadRes.data 的順序跟 newImages 送出的順序是對應的，
       // 把每一筆新照片的 imageFileName 換成後端真正回傳的路徑。
@@ -324,17 +327,17 @@ const saveEdit = async (post) => {
   // 避免使用者移除中間某張照片後，順序留下缺口（例如變成 1、3、4）。
   const images = editForm.value.images.map((img, idx) => ({
     imageFileName: img.imageFileName,
-    sortOrder: idx + 1
+    sortOrder: idx + 1,
   }))
 
   // 把選中的商品名稱陣列，轉換成對應 Post_Tagged_Product 格式的物件陣列，
   // 用 availableProducts.find(...) 找回這個名字對應的 productId，
   // 跟 CreatePostView.vue 組 taggedProducts 的方式完全一樣。
-  const taggedProducts = editForm.value.taggedProducts.map(name => {
-    const matched = availableProducts.value.find(p => p.name === name)
+  const taggedProducts = editForm.value.taggedProducts.map((name) => {
+    const matched = availableProducts.value.find((p) => p.name === name)
     return {
       productId: matched ? matched.productId : null,
-      productRoute: null
+      productRoute: null,
     }
   })
 
@@ -345,7 +348,7 @@ const saveEdit = async (post) => {
       content: editForm.value.content,
       status: editForm.value.status,
       images,
-      taggedProducts
+      taggedProducts,
     })
   } catch (err) {
     console.error('編輯貼文失敗：', err)
@@ -360,9 +363,9 @@ const saveEdit = async (post) => {
   post.image = images.length > 0 ? `${IMAGE_BASE}${images[0].imageFileName}` : ''
   // 標記商品也要跟著更新畫面：tags（給卡片顯示用的 #名稱 字串）跟
   // taggedProducts（保留原始格式，下次再編輯時要用）都要同步。
-  post.tags = editForm.value.taggedProducts.map(name => `#${name}`)
-  post.taggedProducts = editForm.value.taggedProducts.map(name => {
-    const matched = availableProducts.value.find(p => p.name === name)
+  post.tags = editForm.value.taggedProducts.map((name) => `#${name}`)
+  post.taggedProducts = editForm.value.taggedProducts.map((name) => {
+    const matched = availableProducts.value.find((p) => p.name === name)
     return { name, productId: matched ? matched.productId : null, productRoute: null }
   })
   editingPostId.value = null
@@ -393,18 +396,21 @@ onMounted(async () => {
 // 跟 PostDetailView.vue 換貼文時遇到的狀況一樣——從「這個人的個人頁」點連結切到
 // 「另一個人的個人頁」時，Vue Router 會重複使用同一個元件，onMounted 不會再執行第二次，
 // 所以另外監看 :userId，只要它變了（換了要看的人），就重新打一次 API。
-watch(() => route.params.userId, () => {
-  fetchUserPosts()
-  fetchFollowCounts()
-  fetchPublicProfile()
-  if (viewedUserId.value !== currentUserId.value) {
-    fetchFollowStatus()
-  } else {
-    // 換到看自己的頁面時，重設狀態，避免殘留上一個人的追蹤紀錄 id
-    userProfile.value.isFollowing = false
-    myFollowId.value = null
-  }
-})
+watch(
+  () => route.params.userId,
+  () => {
+    fetchUserPosts()
+    fetchFollowCounts()
+    fetchPublicProfile()
+    if (viewedUserId.value !== currentUserId.value) {
+      fetchFollowStatus()
+    } else {
+      // 換到看自己的頁面時，重設狀態，避免殘留上一個人的追蹤紀錄 id
+      userProfile.value.isFollowing = false
+      myFollowId.value = null
+    }
+  },
+)
 
 // 這是頁籤按鈕要顯示的清單：每個頁籤有一個「代號」(key，程式判斷用)
 // 跟一個「顯示文字」(label，給人看的)。
@@ -412,7 +418,7 @@ watch(() => route.params.userId, () => {
 // 只有純顯示用途，所以不需要讓 Vue 特別去「追蹤」它的變化。
 const tabs = [
   { key: 'works', label: '穿搭作品' },
-  { key: 'saved', label: '收藏' }
+  { key: 'saved', label: '收藏' },
 ]
 
 // myFollowId：如果目前這個測試帳號已經追蹤這個人，這裡存那筆 User_Follow 紀錄的
@@ -459,7 +465,9 @@ const fetchFollowCounts = async () => {
 
 const fetchFollowStatus = async () => {
   try {
-    const res = await api.get(`/UserFollow/follower/${currentUserId.value}/following/${viewedUserId.value}`)
+    const res = await api.get(
+      `/UserFollow/follower/${currentUserId.value}/following/${viewedUserId.value}`,
+    )
     if (res.data) {
       userProfile.value.isFollowing = true
       myFollowId.value = res.data.userFollowId
@@ -490,7 +498,7 @@ const toggleFollow = async () => {
     try {
       await api.post(`/UserFollow`, {
         followerId: currentUserId.value,
-        followingId: viewedUserId.value
+        followingId: viewedUserId.value,
       })
     } catch (err) {
       console.error('追蹤失敗：', err)
@@ -505,13 +513,8 @@ const toggleFollow = async () => {
 </script>
 
 <template>
-  
-
   <div class="community-page min-vh-100 w-100">
-    
-
     <div class="container-fluid container-lg pb-5">
-
       <!--
         返回社群按鈕：跟 CreatePostView.vue、PostDetailView.vue 的 back-pill 是同一顆按鈕、同一套樣式，
         統一放在頁面內容最上面，讓使用者從個人頁也能一鍵回到社群列表，不用一直靠瀏覽器的上一頁。
@@ -520,13 +523,11 @@ const toggleFollow = async () => {
 
       <!-- 個人檔案卡 -->
       <div class="profile-card mb-4">
-
         <!-- 封面橫幅：改用斜紋質感取代純色平塗 -->
         <div class="profile-banner"></div>
 
         <div class="profile-body">
           <div class="profile-top">
-
             <!-- 大頭貼 -->
             <div class="avatar-wrapper">
               <!--
@@ -536,7 +537,12 @@ const toggleFollow = async () => {
                 所以這裡的圖片網址會直接抓 userProfile 裡的 avatar 值。
                 （在 template 裡面直接寫 userProfile.avatar，不用加 .value）
               -->
-              <img :src="userProfile.avatar" class="avatar-img" alt="Avatar" @error="onAvatarError($event, userProfile.name)" />
+              <img
+                :src="userProfile.avatar"
+                class="avatar-img"
+                alt="Avatar"
+                @error="onAvatarError($event, userProfile.name)"
+              />
             </div>
 
             <!-- 數據與動作 -->
@@ -548,11 +554,17 @@ const toggleFollow = async () => {
                   <div class="stat-label">貼文</div>
                 </div>
                 <!-- router-link 換掉了原本的彈窗按鈕：長列表切到獨立頁面比彈窗好滑、好找 -->
-                <router-link :to="`/community/profile/${viewedUserId}/followers`" class="stat-item stat-item-clickable">
+                <router-link
+                  :to="`/community/profile/${viewedUserId}/followers`"
+                  class="stat-item stat-item-clickable"
+                >
                   <div class="stat-num">{{ userProfile.followersCount }}</div>
                   <div class="stat-label">粉絲</div>
                 </router-link>
-                <router-link :to="`/community/profile/${viewedUserId}/following`" class="stat-item stat-item-clickable">
+                <router-link
+                  :to="`/community/profile/${viewedUserId}/following`"
+                  class="stat-item stat-item-clickable"
+                >
                   <div class="stat-num">{{ userProfile.followingCount }}</div>
                   <div class="stat-label">追蹤中</div>
                 </router-link>
@@ -580,7 +592,9 @@ const toggleFollow = async () => {
                   還是開一段新對話。class="btn-message" 還是套用原本的按鈕樣式，
                   外觀不會變，只是從 <a mailto> 換成站內的 <router-link>。
                 -->
-                <router-link :to="`/community/messages/${viewedUserId}`" class="btn-message">✉ 訊息</router-link>
+                <router-link :to="`/community/messages/${viewedUserId}`" class="btn-message"
+                  >✉ 訊息</router-link
+                >
               </div>
             </div>
           </div>
@@ -627,7 +641,9 @@ const toggleFollow = async () => {
               class="tab-btn"
               :class="{ active: activeTab === t.key }"
               @click="activeTab = t.key"
-            >{{ t.label }}</button>
+            >
+              {{ t.label }}
+            </button>
           </div>
         </div>
       </div>
@@ -641,7 +657,6 @@ const toggleFollow = async () => {
       <div v-if="activeTab === 'works'" class="post-grid">
         <!-- 一樣是 v-for 迴圈，把 userPosts 陣列裡每一篇貼文都畫成一張卡片 -->
         <div v-for="post in userPosts" :key="post.communityPostId" class="post-card">
-
           <!--
             <router-link> 是 Vue Router（負責網址切換的套件）提供的元件，
             功能跟 HTML 原生的 <a> 連結很像，差別是點下去不會整頁重新整理，
@@ -650,7 +665,10 @@ const toggleFollow = async () => {
             用反引號 ` ` 包起來，裡面的 ${...} 會被換成實際的變數值，
             例如 post.communityPostId 是 1，網址就會變成 /community/post/1。
           -->
-          <router-link :to="`/community/post/${post.communityPostId}`" class="post-media d-block text-decoration-none">
+          <router-link
+            :to="`/community/post/${post.communityPostId}`"
+            class="post-media d-block text-decoration-none"
+          >
             <!--
               v-if="post.tags[0]"：如果這篇貼文的標籤陣列第一筆存在（不是空的），
               才顯示這個標籤小方塊。
@@ -668,12 +686,16 @@ const toggleFollow = async () => {
               v-if="viewedUserId === currentUserId && post.status !== 'public'"
               class="post-status-badge"
               :class="post.status === 'hide' ? 'badge-hide' : 'badge-check'"
-            >{{ post.status === 'hide' ? '隱藏' : '審核中' }}</span>
+              >{{ post.status === 'hide' ? '隱藏' : '審核中' }}</span
+            >
             <img :src="post.image" :alt="post.content" />
           </router-link>
 
           <div class="post-body">
-            <router-link :to="`/community/post/${post.communityPostId}`" class="text-decoration-none">
+            <router-link
+              :to="`/community/post/${post.communityPostId}`"
+              class="text-decoration-none"
+            >
               <h6 class="post-title">{{ post.content }}</h6>
             </router-link>
 
@@ -714,106 +736,147 @@ const toggleFollow = async () => {
                   v-if 要跟著移到這裡才抓得到。
                 -->
                 <Transition @enter="onEditModalEnter" @leave="onEditModalLeave" :css="false">
-                  <div v-if="editingPostId === post.communityPostId" class="edit-modal-overlay" @click.self="cancelEdit">
+                  <div
+                    v-if="editingPostId === post.communityPostId"
+                    class="edit-modal-overlay"
+                    @click.self="cancelEdit"
+                  >
                     <div class="edit-modal">
-                    <!-- 新增一個標題列：跟原本純表單比起來更有「這是一個彈出視窗」的感覺，右上角 ✕ 也能關閉 -->
-                    <div class="edit-modal-header">
-                      <h3 class="edit-modal-title">編輯貼文</h3>
-                      <button type="button" class="edit-modal-close" @click="cancelEdit">✕</button>
-                    </div>
+                      <!-- 新增一個標題列：跟原本純表單比起來更有「這是一個彈出視窗」的感覺，右上角 ✕ 也能關閉 -->
+                      <div class="edit-modal-header">
+                        <h3 class="edit-modal-title">編輯貼文</h3>
+                        <button type="button" class="edit-modal-close" @click="cancelEdit">
+                          ✕
+                        </button>
+                      </div>
 
-                    <div class="edit-form">
-                      <textarea v-model="editForm.content" class="edit-textarea" rows="3"></textarea>
+                      <div class="edit-form">
+                        <textarea
+                          v-model="editForm.content"
+                          class="edit-textarea"
+                          rows="3"
+                        ></textarea>
 
-                      <!-- 照片編輯：跟 CreatePostView.vue 的縮圖列是同一套邏輯，只是排版比較精簡 -->
-                      <div class="edit-thumb-row">
-                        <div class="edit-thumb-item" v-for="(img, idx) in editForm.images" :key="idx">
-                          <!-- @click="openLightbox(img.url)"：點縮圖本身放大看原圖，跟點右上角 ✕ 移除圖片是分開的兩個按鈕，不會互相誤觸 -->
-                          <img :src="img.url" alt="縮圖" @click="openLightbox(img.url)" />
-                          <button type="button" class="edit-thumb-remove" @click="removeEditImage(idx)">✕</button>
+                        <!-- 照片編輯：跟 CreatePostView.vue 的縮圖列是同一套邏輯，只是排版比較精簡 -->
+                        <div class="edit-thumb-row">
+                          <div
+                            class="edit-thumb-item"
+                            v-for="(img, idx) in editForm.images"
+                            :key="idx"
+                          >
+                            <!-- @click="openLightbox(img.url)"：點縮圖本身放大看原圖，跟點右上角 ✕ 移除圖片是分開的兩個按鈕，不會互相誤觸 -->
+                            <img :src="img.url" alt="縮圖" @click="openLightbox(img.url)" />
+                            <button
+                              type="button"
+                              class="edit-thumb-remove"
+                              @click="removeEditImage(idx)"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          <!-- 這個「＋」縮圖也是一個隱藏的檔案上傳框，讓使用者可以再加選照片 -->
+                          <label class="edit-thumb-add">
+                            <input
+                              type="file"
+                              class="file-input-hidden"
+                              accept="image/*"
+                              multiple
+                              @change="handleEditFileChange"
+                            />
+                            ＋
+                          </label>
                         </div>
-                        <!-- 這個「＋」縮圖也是一個隱藏的檔案上傳框，讓使用者可以再加選照片 -->
-                        <label class="edit-thumb-add">
-                          <input
-                            type="file"
-                            class="file-input-hidden"
-                            accept="image/*"
-                            multiple
-                            @change="handleEditFileChange"
-                          />
-                          ＋
-                        </label>
-                      </div>
-                      <p class="edit-photo-hint">
-                        第一張會作為封面，點縮圖可以放大看原圖
-                      </p>
+                        <p class="edit-photo-hint">第一張會作為封面，點縮圖可以放大看原圖</p>
 
-                      <!-- 標記標籤商品：跟 CreatePostView.vue 是同一套搜尋/選取邏輯，只是改在編輯表單上操作 -->
-                      <label class="edit-field-label">標記標籤商品</label>
-                      <div class="edit-search-bar">
-                        <input
-                          type="text"
-                          v-model="productSearch"
-                          class="edit-search-input"
-                          placeholder="輸入商品名稱搜尋，例如：牛仔褲"
-                        />
-                        <button
-                          v-if="productSearch"
-                          type="button"
-                          class="edit-search-clear"
-                          @click="productSearch = ''"
-                        >✕</button>
-                      </div>
-                      <!--
+                        <!-- 標記標籤商品：跟 CreatePostView.vue 是同一套搜尋/選取邏輯，只是改在編輯表單上操作 -->
+                        <label class="edit-field-label">標記標籤商品</label>
+                        <div class="edit-search-bar">
+                          <input
+                            type="text"
+                            v-model="productSearch"
+                            class="edit-search-input"
+                            placeholder="輸入商品名稱搜尋，例如：牛仔褲"
+                          />
+                          <button
+                            v-if="productSearch"
+                            type="button"
+                            class="edit-search-clear"
+                            @click="productSearch = ''"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <!--
                         沒有打字搜尋的時候，只列出「熱門」的前 5 個標籤，
                         而不是把資料庫裡所有商品全部攤開——不然商品一多，
                         這個標籤區塊、進而整張卡片就會被拉得越來越長。
                         想標記其他商品的話，直接在上面搜尋框打名字就找得到。
                       -->
-                      <p class="edit-field-hint" v-if="!productSearch.trim()">熱門標籤，想找其他商品請直接搜尋</p>
-                      <div class="tag-cloud">
-                        <button
-                          v-for="product in filteredProducts"
-                          :key="product.productId"
-                          type="button"
-                          class="tag-chip selectable"
-                          :class="{ active: editForm.taggedProducts.includes(product.name) }"
-                          @click="toggleEditProduct(product.name)"
-                        >#{{ product.name }}</button>
-                        <span v-if="filteredProducts.length === 0" class="tag-empty">
-                          找不到符合「{{ productSearch }}」的商品
-                        </span>
-                      </div>
-                      <div class="tag-preview" v-if="editForm.taggedProducts.length">
-                        <span v-for="name in editForm.taggedProducts" :key="name" class="tag-chip selected-chip">
-                          #{{ name }}
-                          <button type="button" class="chip-remove" @click="toggleEditProduct(name)">✕</button>
-                        </span>
+                        <p class="edit-field-hint" v-if="!productSearch.trim()">
+                          熱門標籤，想找其他商品請直接搜尋
+                        </p>
+                        <div class="tag-cloud">
+                          <button
+                            v-for="product in filteredProducts"
+                            :key="product.productId"
+                            type="button"
+                            class="tag-chip selectable"
+                            :class="{ active: editForm.taggedProducts.includes(product.name) }"
+                            @click="toggleEditProduct(product.name)"
+                          >
+                            #{{ product.name }}
+                          </button>
+                          <span v-if="filteredProducts.length === 0" class="tag-empty">
+                            找不到符合「{{ productSearch }}」的商品
+                          </span>
+                        </div>
+                        <div class="tag-preview" v-if="editForm.taggedProducts.length">
+                          <span
+                            v-for="name in editForm.taggedProducts"
+                            :key="name"
+                            class="tag-chip selected-chip"
+                          >
+                            #{{ name }}
+                            <button
+                              type="button"
+                              class="chip-remove"
+                              @click="toggleEditProduct(name)"
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        </div>
+
+                        <div class="edit-visibility">
+                          <label
+                            ><input type="radio" v-model="editForm.status" value="public" />
+                            公開</label
+                          >
+                          <label
+                            ><input type="radio" v-model="editForm.status" value="hide" />
+                            隱藏</label
+                          >
+                        </div>
                       </div>
 
-                      <div class="edit-visibility">
-                        <label><input type="radio" v-model="editForm.status" value="public" /> 公開</label>
-                        <label><input type="radio" v-model="editForm.status" value="hide" /> 隱藏</label>
+                      <!-- 底部按鈕獨立在 .edit-form 外面，不會跟著上面內容一起捲動，滑到多長都找得到 -->
+                      <div class="edit-modal-footer">
+                        <button class="btn-cancel-edit" @click="cancelEdit">取消</button>
+                        <button class="btn-save-edit" @click="saveEdit(post)">儲存</button>
                       </div>
-                    </div>
-
-                    <!-- 底部按鈕獨立在 .edit-form 外面，不會跟著上面內容一起捲動，滑到多長都找得到 -->
-                    <div class="edit-modal-footer">
-                      <button class="btn-cancel-edit" @click="cancelEdit">取消</button>
-                      <button class="btn-save-edit" @click="saveEdit(post)">儲存</button>
                     </div>
                   </div>
-                </div>
                 </Transition>
               </Teleport>
 
               <div v-if="editingPostId !== post.communityPostId" class="post-manage-actions">
                 <button class="btn-edit-post" @click="startEdit(post)">編輯貼文</button>
-                <button class="btn-delete-post" @click="deletePost(post.communityPostId)">刪除貼文</button>
+                <button class="btn-delete-post" @click="deletePost(post.communityPostId)">
+                  刪除貼文
+                </button>
               </div>
             </template>
           </div>
-
         </div>
       </div>
 
@@ -830,13 +893,19 @@ const toggleFollow = async () => {
         <div v-if="savedPosts.length" class="post-grid">
           <!-- 這裡的卡片排版跟上面「穿搭作品牆」幾乎一模一樣，差別只是資料來源換成 savedPosts -->
           <div v-for="post in savedPosts" :key="post.communityPostId" class="post-card">
-            <router-link :to="`/community/post/${post.communityPostId}`" class="post-media d-block text-decoration-none">
+            <router-link
+              :to="`/community/post/${post.communityPostId}`"
+              class="post-media d-block text-decoration-none"
+            >
               <span class="tag-label" v-if="post.tags[0]">{{ post.tags[0].replace('#', '') }}</span>
               <img :src="post.image" :alt="post.content" />
             </router-link>
 
             <div class="post-body">
-              <router-link :to="`/community/post/${post.communityPostId}`" class="text-decoration-none">
+              <router-link
+                :to="`/community/post/${post.communityPostId}`"
+                class="text-decoration-none"
+              >
                 <h6 class="post-title">{{ post.content }}</h6>
               </router-link>
 
@@ -860,7 +929,17 @@ const toggleFollow = async () => {
             這裡也還沒踩到問題，但既然已經在處理圖示一致性，先換成 SVG 畫的線條圖示——
             不吃字型，風格上也比較貼近網站其他地方（搜尋圖示、輪播箭頭）用的線條風。
           -->
-          <svg class="empty-icon" viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            class="empty-icon"
+            viewBox="0 0 24 24"
+            width="40"
+            height="40"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <path d="M4 8l2.5-4h11L20 8" />
             <path d="M4 8v10a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 18V8" />
             <path d="M4 8h16" />
@@ -869,7 +948,6 @@ const toggleFollow = async () => {
           <p class="empty-note">「還沒有收藏任何穿搭，去社群逛逛按個收藏吧。」</p>
         </div>
       </div>
-
     </div>
 
     <!--
@@ -899,7 +977,7 @@ const toggleFollow = async () => {
 .community-page {
   width: 100%;
   min-height: 100vh;
-  background-color: #F9F4F0 !important;
+  background-color: #f9f4f0 !important;
   box-sizing: border-box;
   /*
     --cream、--paper 這種用兩個減號開頭的名稱，叫做「CSS 變數」。
@@ -907,229 +985,407 @@ const toggleFollow = async () => {
     只要寫 var(--cream) 就能重複使用同一個顏色，
     以後想換色系，只要改這裡一個地方，全部套用到它的樣式都會一起變。
   */
-  --cream:#F9F4F0;
-  --paper:#FFFDFB;
-  --ink:#2A2420;
-  --ink-soft:#7A6E63;
-  --plum:#7A4B54;
-  --plum-deep:#5E3941;
-  --ochre:#B8862E;
-  --hairline:#E4D8CC;
+  --cream: #f9f4f0;
+  --paper: #fffdfb;
+  --ink: #2a2420;
+  --ink-soft: #7a6e63;
+  --plum: #7a4b54;
+  --plum-deep: #5e3941;
+  --ochre: #b8862e;
+  --hairline: #e4d8cc;
   color: var(--ink);
   font-family: 'Noto Sans TC', sans-serif;
 }
 
 /* ---------- 返回社群按鈕 ---------- */
-.back-pill{
-  display:inline-flex; align-items:center; gap:.3rem;
-  border:1px solid var(--ink); border-radius:999px;
-  padding:.35rem 1rem; font-size:.82rem; color:var(--ink);
-  text-decoration:none; margin-bottom:1.2rem;
-  transition:all .18s ease;
+.back-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  padding: 0.35rem 1rem;
+  font-size: 0.82rem;
+  color: var(--ink);
+  text-decoration: none;
+  margin-bottom: 1.2rem;
+  transition: all 0.18s ease;
 }
-.back-pill:hover{ background:var(--ink); color:var(--cream); }
+.back-pill:hover {
+  background: var(--ink);
+  color: var(--cream);
+}
 
 /* ---------- 個人檔案卡 ---------- */
-.profile-card{
-  background:var(--paper);
-  border:1px solid var(--hairline);
-  border-radius:22px;
-  overflow:hidden;
+.profile-card {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 22px;
+  overflow: hidden;
 }
 
-.profile-banner{
-  height:150px;
-  background:
-    repeating-linear-gradient(
-      135deg,
-      var(--cream) 0px, var(--cream) 22px,
-      #F1E6DC 22px, #F1E6DC 44px
-    );
-  position:relative;
+.profile-banner {
+  height: 150px;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--cream) 0px,
+    var(--cream) 22px,
+    #f1e6dc 22px,
+    #f1e6dc 44px
+  );
+  position: relative;
 }
-.profile-banner::after{
-  content:"";
-  position:absolute; inset:0;
-  background:linear-gradient(180deg, rgba(122,75,84,.08), rgba(122,75,84,0) 60%);
-}
-
-.profile-body{ padding:0 2.2rem 1.6rem; position:relative; }
-
-.profile-top{
-  display:flex; align-items:flex-end; justify-content:space-between;
-  flex-wrap:wrap; gap:1.2rem;
-  margin-top:-58px;
+.profile-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(122, 75, 84, 0.08), rgba(122, 75, 84, 0) 60%);
 }
 
-.avatar-wrapper{
-  width:112px; height:112px; border-radius:50%;
-  background:var(--paper); padding:5px;
-  box-shadow:0 0 0 2px var(--plum);
-  flex-shrink:0;
-}
-.avatar-img{ width:100%; height:100%; border-radius:50%; object-fit:cover; display:block; }
-
-.profile-meta{
-  flex:1;
-  display:flex; align-items:center; justify-content:space-between;
-  flex-wrap:wrap; gap:1rem;
-  padding-bottom:.3rem;
+.profile-body {
+  padding: 0 2.2rem 1.6rem;
+  position: relative;
 }
 
-.stat-group{ display:flex; gap:2.2rem; }
-.stat-item{ text-align:center; }
-.stat-item-clickable{
-  background:none; border:none; padding:0; cursor:pointer;
-  text-decoration:none; display:block;
-  transition:opacity .18s ease;
+.profile-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+  margin-top: -58px;
 }
-.stat-item-clickable:hover{ opacity:.7; }
-.stat-num{
-  font-family:'Noto Serif TC', serif;
-  font-weight:900; font-size:1.25rem; color:var(--ink); line-height:1.1;
-}
-.stat-label{ font-size:.74rem; color:var(--ink-soft); margin-top:.15rem; }
 
-.action-group{ display:flex; gap:.7rem; }
-.btn-follow-main{
-  background:var(--ink); color:var(--paper);
-  border:none; border-radius:4px;
-  padding:.6rem 1.5rem; font-size:.88rem; font-weight:600;
-  transition:background .18s ease, transform .18s ease;
+.avatar-wrapper {
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  background: var(--paper);
+  padding: 5px;
+  box-shadow: 0 0 0 2px var(--plum);
+  flex-shrink: 0;
 }
-.btn-follow-main:hover{ background:var(--plum-deep); transform:translateY(-1px); }
-.btn-follow-main.following{ background:var(--hairline); color:var(--ink-soft); }
-.btn-follow-main.following:hover{ background:var(--hairline); transform:none; }
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
 
-.btn-message{
-  display:inline-block; text-decoration:none;
-  background:transparent; color:var(--ink);
-  border:1px solid var(--ink); border-radius:4px;
-  padding:.6rem 1.4rem; font-size:.88rem; font-weight:500;
-  transition:all .18s ease;
+.profile-meta {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding-bottom: 0.3rem;
 }
-.btn-message:hover{ background:var(--ink); color:var(--paper); }
+
+.stat-group {
+  display: flex;
+  gap: 2.2rem;
+}
+.stat-item {
+  text-align: center;
+}
+.stat-item-clickable {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: none;
+  display: block;
+  transition: opacity 0.18s ease;
+}
+.stat-item-clickable:hover {
+  opacity: 0.7;
+}
+.stat-num {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 900;
+  font-size: 1.25rem;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.stat-label {
+  font-size: 0.74rem;
+  color: var(--ink-soft);
+  margin-top: 0.15rem;
+}
+
+.action-group {
+  display: flex;
+  gap: 0.7rem;
+}
+.btn-follow-main {
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 4px;
+  padding: 0.6rem 1.5rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition:
+    background 0.18s ease,
+    transform 0.18s ease;
+}
+.btn-follow-main:hover {
+  background: var(--plum-deep);
+  transform: translateY(-1px);
+}
+.btn-follow-main.following {
+  background: var(--hairline);
+  color: var(--ink-soft);
+}
+.btn-follow-main.following:hover {
+  background: var(--hairline);
+  transform: none;
+}
+
+.btn-message {
+  display: inline-block;
+  text-decoration: none;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  padding: 0.6rem 1.4rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  transition: all 0.18s ease;
+}
+.btn-message:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
 
 /* ---------- 姓名 / 簡介 ---------- */
-.profile-intro{ margin-top:1rem; }
-.profile-name{
-  font-family:'Noto Serif TC', serif;
-  font-weight:900; font-size:1.5rem;
-  margin:0 0 .3rem;
-  color:var(--ink);
+.profile-intro {
+  margin-top: 1rem;
 }
-.profile-handle{
-  font-size:.86rem; color:var(--ink-soft);
-  display:flex; align-items:center; gap:.4rem; margin-bottom:.6rem;
+.profile-name {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 900;
+  font-size: 1.5rem;
+  margin: 0 0 0.3rem;
+  color: var(--ink);
 }
-.profile-handle .dot{ color:var(--hairline); }
-.profile-handle .tagline{ color:var(--ochre); font-weight:600; }
-.profile-bio{
-  font-size:.9rem; color:var(--ink-soft); line-height:1.7;
-  max-width:640px; margin:0;
+.profile-handle {
+  font-size: 0.86rem;
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+.profile-handle .dot {
+  color: var(--hairline);
+}
+.profile-handle .tagline {
+  color: var(--ochre);
+  font-weight: 600;
+}
+.profile-bio {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  line-height: 1.7;
+  max-width: 640px;
+  margin: 0;
 }
 
 /* ---------- 頁籤 ---------- */
-.tab-row{
-  display:flex; gap:1.8rem;
-  border-bottom:1px solid var(--hairline);
-  margin-top:1.6rem;
+.tab-row {
+  display: flex;
+  gap: 1.8rem;
+  border-bottom: 1px solid var(--hairline);
+  margin-top: 1.6rem;
 }
-.tab-btn{
-  background:none; border:none; padding:.8rem 0;
-  font-family:'Noto Serif TC', serif;
-  font-size:1rem; color:var(--ink-soft);
-  position:relative; cursor:pointer;
+.tab-btn {
+  background: none;
+  border: none;
+  padding: 0.8rem 0;
+  font-family: 'Noto Serif TC', serif;
+  font-size: 1rem;
+  color: var(--ink-soft);
+  position: relative;
+  cursor: pointer;
 }
-.tab-btn.active{ color:var(--ink); font-weight:700; }
-.tab-btn.active::after{
-  content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px;
-  background:var(--plum);
+.tab-btn.active {
+  color: var(--ink);
+  font-weight: 700;
+}
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--plum);
 }
 
 /* ---------- 作品牆 ---------- */
-.post-grid{
-  display:grid;
-  grid-template-columns:repeat(4, 1fr);
-  gap:1.4rem;
-  margin-top:2rem;
+.post-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.4rem;
+  margin-top: 2rem;
 }
-.post-card{
-  background:var(--paper);
-  border:1px solid var(--hairline);
-  border-radius:16px;
-  overflow:hidden;
-  transition:transform .25s ease, box-shadow .25s ease;
+.post-card {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  overflow: hidden;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
 }
-.post-card:hover{
-  transform:translateY(-4px) rotate(-0.3deg);
-  box-shadow:0 16px 30px -20px rgba(42,36,32,.4);
-}
-
-.post-media{ position:relative; aspect-ratio:4/5; overflow:hidden; display:block; background:var(--hairline); }
-.post-media img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform .5s ease; }
-.post-card:hover .post-media img{ transform:scale(1.06); }
-
-.tag-label{
-  position:absolute; top:12px; left:-6px; z-index:2;
-  background:var(--plum); color:#fff;
-  font-size:.66rem; letter-spacing:.04em; font-weight:600;
-  padding:.26rem .65rem .26rem .9rem;
-  box-shadow:0 4px 10px rgba(0,0,0,.18);
-}
-.tag-label::after{
-  content:""; position:absolute; left:0; bottom:-6px;
-  border-width:0 6px 6px 0; border-style:solid;
-  border-color:transparent var(--plum-deep) transparent transparent;
+.post-card:hover {
+  transform: translateY(-4px) rotate(-0.3deg);
+  box-shadow: 0 16px 30px -20px rgba(42, 36, 32, 0.4);
 }
 
-.post-status-badge{
-  position:absolute; top:12px; right:12px; z-index:2;
-  color:#fff; font-size:.68rem; font-weight:700;
-  padding:.26rem .7rem; border-radius:999px;
-  box-shadow:0 2px 6px rgba(0,0,0,.2);
+.post-media {
+  position: relative;
+  aspect-ratio: 4/5;
+  overflow: hidden;
+  display: block;
+  background: var(--hairline);
 }
-.post-status-badge.badge-hide{ background:var(--ink-soft); }
-.post-status-badge.badge-check{ background:var(--ochre); }
-
-.post-body{ padding:.95rem 1rem 1.1rem; }
-.post-title{
-  font-family:'Noto Serif TC', serif;
-  font-weight:700; font-size:.92rem; color:var(--ink);
-  margin:0 0 .55rem;
-  display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden;
+.post-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.5s ease;
 }
-.post-stats{
-  display:flex; align-items:center; gap:.9rem;
-  font-size:.76rem; color:var(--ink-soft);
-}
-.post-stats a{ color:var(--plum); text-decoration:none; font-weight:600; }
-
-.tag-cloud{ display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.7rem; }
-.tag-chip{
-  font-size:.7rem; padding:.28rem .65rem; border-radius:4px;
-  background:var(--cream); border:1px solid var(--hairline); color:var(--ink-soft);
+.post-card:hover .post-media img {
+  transform: scale(1.06);
 }
 
-.post-manage-actions{ display:flex; gap:.6rem; margin-top:.8rem; }
-
-.btn-edit-post{
-  flex:1;
-  background:transparent; color:var(--ink);
-  border:1px solid var(--ink); border-radius:4px;
-  padding:.45rem; font-size:.78rem; font-weight:600;
-  transition:all .18s ease;
+.tag-label {
+  position: absolute;
+  top: 12px;
+  left: -6px;
+  z-index: 2;
+  background: var(--plum);
+  color: #fff;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  padding: 0.26rem 0.65rem 0.26rem 0.9rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
 }
-.btn-edit-post:hover{ background:var(--ink); color:var(--paper); }
-
-.btn-delete-post{
-  flex:1;
-  background:transparent; color:#B4453A;
-  border:1px solid #B4453A; border-radius:4px;
-  padding:.45rem; font-size:.78rem; font-weight:600;
-  transition:all .18s ease;
+.tag-label::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -6px;
+  border-width: 0 6px 6px 0;
+  border-style: solid;
+  border-color: transparent var(--plum-deep) transparent transparent;
 }
-.btn-delete-post:hover{ background:#B4453A; color:#fff; }
+
+.post-status-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.26rem 0.7rem;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+.post-status-badge.badge-hide {
+  background: var(--ink-soft);
+}
+.post-status-badge.badge-check {
+  background: var(--ochre);
+}
+
+.post-body {
+  padding: 0.95rem 1rem 1.1rem;
+}
+.post-title {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--ink);
+  margin: 0 0 0.55rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.post-stats {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+}
+.post-stats a {
+  color: var(--plum);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+.tag-chip {
+  font-size: 0.7rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 4px;
+  background: var(--cream);
+  border: 1px solid var(--hairline);
+  color: var(--ink-soft);
+}
+
+.post-manage-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+}
+
+.btn-edit-post {
+  flex: 1;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  padding: 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: all 0.18s ease;
+}
+.btn-edit-post:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.btn-delete-post {
+  flex: 1;
+  background: transparent;
+  color: #b4453a;
+  border: 1px solid #b4453a;
+  border-radius: 4px;
+  padding: 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: all 0.18s ease;
+}
+.btn-delete-post:hover {
+  background: #b4453a;
+  color: #fff;
+}
 
 /*
   edit-modal-overlay：鋪滿整個畫面的半透明黑底，蓋在其他內容上面（position:fixed + inset:0），
@@ -1143,140 +1399,291 @@ const toggleFollow = async () => {
   就是因為 var(--plum) 抓不到值，背景跟文字都變不出顏色）。在這裡重新宣告一次，
   底下所有 var(--xxx) 才能正常運作。
 */
-.edit-modal-overlay{
-  --cream:#F9F4F0;
-  --paper:#FFFDFB;
-  --ink:#2A2420;
-  --ink-soft:#7A6E63;
-  --plum:#7A4B54;
-  --plum-deep:#5E3941;
-  --ochre:#B8862E;
-  --hairline:#E4D8CC;
-  position:fixed; inset:0;
-  background:rgba(42,36,32,.55);
-  display:flex; align-items:center; justify-content:center;
-  z-index:1000;
-  padding:1.5rem;
+.edit-modal-overlay {
+  --cream: #f9f4f0;
+  --paper: #fffdfb;
+  --ink: #2a2420;
+  --ink-soft: #7a6e63;
+  --plum: #7a4b54;
+  --plum-deep: #5e3941;
+  --ochre: #b8862e;
+  --hairline: #e4d8cc;
+  position: fixed;
+  inset: 0;
+  background: rgba(42, 36, 32, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1.5rem;
 }
-.edit-modal{
-  background:var(--paper);
-  border-radius:14px;
-  width:100%;
-  max-width:760px;
-  max-height:90vh;
-  box-shadow:0 20px 60px rgba(42,36,32,.35);
-  display:flex; flex-direction:column;
-  overflow:hidden; /* 讓內層 .edit-form 自己捲動，標題列跟底部按鈕才能固定不跟著捲走 */
+.edit-modal {
+  background: var(--paper);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 760px;
+  max-height: 90vh;
+  box-shadow: 0 20px 60px rgba(42, 36, 32, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* 讓內層 .edit-form 自己捲動，標題列跟底部按鈕才能固定不跟著捲走 */
 }
-.edit-modal-header{
-  display:flex; align-items:center; justify-content:space-between;
-  padding:1.2rem 1.6rem;
-  border-bottom:1px solid var(--hairline);
-  flex-shrink:0;
+.edit-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.2rem 1.6rem;
+  border-bottom: 1px solid var(--hairline);
+  flex-shrink: 0;
 }
-.edit-modal-title{
-  font-family:'Noto Serif TC', serif; font-weight:700; font-size:1.1rem;
-  color:var(--ink); margin:0;
+.edit-modal-title {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--ink);
+  margin: 0;
 }
-.edit-modal-close{
-  width:28px; height:28px; border-radius:50%;
-  border:none; background:var(--hairline); color:var(--ink-soft);
-  font-size:.8rem; line-height:1; cursor:pointer;
-  display:flex; align-items:center; justify-content:center; flex-shrink:0;
-  transition:background .18s ease, color .18s ease;
+.edit-modal-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: var(--hairline);
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease;
 }
-.edit-modal-close:hover{ background:var(--plum); color:#fff; }
-.edit-field-hint{ font-size:.72rem; color:var(--ink-soft); margin:-.3rem 0 0; }
+.edit-modal-close:hover {
+  background: var(--plum);
+  color: #fff;
+}
+.edit-field-hint {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  margin: -0.3rem 0 0;
+}
 
-.edit-form{ display:flex; flex-direction:column; gap:.6rem; padding:1.4rem 1.6rem; overflow-y:auto; }
-
-.edit-textarea{
-  width:100%;
-  border:1px solid var(--hairline); border-radius:4px;
-  padding:.6rem .8rem; font-size:.83rem; color:var(--ink);
-  font-family:inherit; resize:vertical;
-  outline:none;
+.edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.4rem 1.6rem;
+  overflow-y: auto;
 }
-.edit-textarea:focus{ border-color:var(--plum); }
-.edit-visibility{ display:flex; gap:1rem; font-size:.8rem; color:var(--ink); }
-.edit-visibility label{ display:flex; align-items:center; gap:.35rem; cursor:pointer; }
-.edit-modal-footer{
-  display:flex; gap:.6rem;
-  padding:1.1rem 1.6rem;
-  border-top:1px solid var(--hairline);
-  flex-shrink:0;
+
+.edit-textarea {
+  width: 100%;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.83rem;
+  color: var(--ink);
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+}
+.edit-textarea:focus {
+  border-color: var(--plum);
+}
+.edit-visibility {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+.edit-visibility label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+.edit-modal-footer {
+  display: flex;
+  gap: 0.6rem;
+  padding: 1.1rem 1.6rem;
+  border-top: 1px solid var(--hairline);
+  flex-shrink: 0;
 }
 .edit-modal-footer .btn-cancel-edit,
-.edit-modal-footer .btn-save-edit{ flex:1; }
+.edit-modal-footer .btn-save-edit {
+  flex: 1;
+}
 
-.file-input-hidden{
-  position:absolute; opacity:0; width:100%; height:100%;
-  top:0; left:0; cursor:pointer;
+.file-input-hidden {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  cursor: pointer;
 }
-.edit-thumb-row{ display:flex; flex-wrap:wrap; gap:.5rem; }
-.edit-thumb-item{
-  position:relative;
-  width:64px; height:64px; border-radius:6px; overflow:hidden;
-  border:1px solid var(--hairline); flex-shrink:0;
+.edit-thumb-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
-.edit-thumb-item img{ width:100%; height:100%; object-fit:cover; display:block; cursor:zoom-in; }
-.edit-thumb-remove{
-  position:absolute; top:2px; right:2px;
-  width:18px; height:18px; border-radius:50%;
-  background:rgba(0,0,0,.6); color:#fff; border:none;
-  font-size:.65rem; line-height:1;
-  display:flex; align-items:center; justify-content:center;
+.edit-thumb-item {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  flex-shrink: 0;
 }
-.edit-thumb-add{
-  position:relative;
-  width:64px; height:64px; border-radius:6px; flex-shrink:0;
-  border:1px dashed var(--hairline);
-  display:flex; align-items:center; justify-content:center;
-  font-size:1.2rem; color:var(--ink-soft); cursor:pointer;
+.edit-thumb-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  cursor: zoom-in;
 }
-.edit-thumb-add:hover{ border-color:var(--plum); color:var(--plum); }
-.edit-photo-hint{ font-size:.72rem; color:var(--ink-soft); margin:0; }
+.edit-thumb-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: none;
+  font-size: 0.65rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.edit-thumb-add {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  border: 1px dashed var(--hairline);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.edit-thumb-add:hover {
+  border-color: var(--plum);
+  color: var(--plum);
+}
+.edit-photo-hint {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
 
-.edit-field-label{ font-size:.8rem; font-weight:700; color:var(--ink); }
-.edit-search-bar{
-  display:flex; align-items:center; gap:.4rem;
-  border:1px solid var(--hairline); border-radius:4px;
-  padding:.4rem .7rem; background:var(--paper);
+.edit-field-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink);
 }
-.edit-search-input{
-  flex:1; border:none; outline:none; font-size:.82rem; color:var(--ink); background:transparent;
+.edit-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 0.4rem 0.7rem;
+  background: var(--paper);
 }
-.edit-search-clear{ background:none; border:none; color:var(--ink-soft); font-size:.75rem; }
+.edit-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 0.82rem;
+  color: var(--ink);
+  background: transparent;
+}
+.edit-search-clear {
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+}
 
-.tag-chip.selectable{
-  background:var(--paper); border:1px solid var(--hairline); color:var(--ink);
-  cursor:pointer; transition:all .18s ease;
+.tag-chip.selectable {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.18s ease;
 }
-.tag-chip.selectable:hover{ border-color:var(--plum); color:var(--plum); }
-.tag-chip.selectable.active{ background:var(--plum); border-color:var(--plum); color:#fff; }
-.tag-empty{ font-size:.76rem; color:var(--ink-soft); }
+.tag-chip.selectable:hover {
+  border-color: var(--plum);
+  color: var(--plum);
+}
+.tag-chip.selectable.active {
+  background: var(--plum);
+  border-color: var(--plum);
+  color: #fff;
+}
+.tag-empty {
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+}
 
-.tag-preview{ display:flex; flex-wrap:wrap; gap:.4rem; }
-.tag-chip.selected-chip{
-  background:var(--plum); border:1px solid var(--plum); color:#fff;
-  display:inline-flex; align-items:center; gap:.35rem;
+.tag-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
 }
-.chip-remove{ background:none; border:none; color:#fff; font-size:.68rem; line-height:1; opacity:.8; }
-.chip-remove:hover{ opacity:1; }
-.btn-cancel-edit{
-  flex:1;
-  background:transparent; color:var(--ink-soft);
-  border:1px solid var(--hairline); border-radius:4px;
-  padding:.45rem; font-size:.78rem;
+.tag-chip.selected-chip {
+  background: var(--plum);
+  border: 1px solid var(--plum);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
-.btn-save-edit{
-  flex:1;
-  background:var(--ink); color:var(--paper);
-  border:none; border-radius:4px;
-  padding:.45rem; font-size:.78rem; font-weight:600;
-  transition:background .18s ease;
+.chip-remove {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 0.68rem;
+  line-height: 1;
+  opacity: 0.8;
 }
-.btn-save-edit:hover{ background:var(--plum-deep); }
+.chip-remove:hover {
+  opacity: 1;
+}
+.btn-cancel-edit {
+  flex: 1;
+  background: transparent;
+  color: var(--ink-soft);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 0.45rem;
+  font-size: 0.78rem;
+}
+.btn-save-edit {
+  flex: 1;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 4px;
+  padding: 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: background 0.18s ease;
+}
+.btn-save-edit:hover {
+  background: var(--plum-deep);
+}
 
 /*
   燈箱（lightbox）：點編輯表單裡的縮圖時，把原圖放大顯示在最上層。
@@ -1284,42 +1691,69 @@ const toggleFollow = async () => {
   理由跟上面 .edit-modal-overlay 註解講的一樣——不過燈箱本身用到的顏色不多，
   這裡只是保險加上，之後如果燈箱樣式要用到 var(--xxx) 也不會抓空值。
 */
-.lightbox-overlay{
-  --ink:#2A2420;
-  position:fixed; inset:0;
-  background:rgba(20,16,14,.88);
-  display:flex; align-items:center; justify-content:center;
-  z-index:1100;
-  padding:2rem;
-  cursor:zoom-out;
+.lightbox-overlay {
+  --ink: #2a2420;
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 16, 14, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 2rem;
+  cursor: zoom-out;
 }
-.lightbox-image{
-  max-width:90vw; max-height:88vh;
-  object-fit:contain;
-  border-radius:6px;
-  box-shadow:0 20px 60px rgba(0,0,0,.5);
-  cursor:default; /* 圖片本身不算「背景」，不用跟著顯示可以關閉的游標 */
+.lightbox-image {
+  max-width: 90vw;
+  max-height: 88vh;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  cursor: default; /* 圖片本身不算「背景」，不用跟著顯示可以關閉的游標 */
 }
-.lightbox-close{
-  position:fixed; top:1.5rem; right:1.8rem;
-  width:38px; height:38px; border-radius:50%;
-  border:none; background:rgba(255,255,255,.15); color:#fff;
-  font-size:1rem; line-height:1; cursor:pointer;
-  display:flex; align-items:center; justify-content:center;
-  transition:background .18s ease;
+.lightbox-close {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.8rem;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.18s ease;
 }
-.lightbox-close:hover{ background:rgba(255,255,255,.3); }
-
+.lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
 
 /* ---------- 其他頁籤空狀態 ---------- */
-.empty-state{
-  background:var(--paper); border:1px solid var(--hairline); border-radius:22px;
-  padding:3.5rem 2rem; text-align:center; margin-top:2rem;
+.empty-state {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 22px;
+  padding: 3.5rem 2rem;
+  text-align: center;
+  margin-top: 2rem;
 }
-.empty-icon{ display:block; margin:0 auto .8rem; color:var(--ink-soft); opacity:.7; }
-.empty-note{
-  font-family:'Noto Serif TC', serif; font-style:italic;
-  color:var(--ink-soft); font-size:.95rem; margin:0;
+.empty-icon {
+  display: block;
+  margin: 0 auto 0.8rem;
+  color: var(--ink-soft);
+  opacity: 0.7;
+}
+.empty-note {
+  font-family: 'Noto Serif TC', serif;
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  margin: 0;
 }
 
 /*
@@ -1327,13 +1761,23 @@ const toggleFollow = async () => {
   意思是「當瀏覽器視窗寬度小於等於 991px 時，才套用大括號裡的樣式」。
   這樣可以讓網頁在手機、平板、電腦上，自動切換成不同的排版方式。
 */
-@media (max-width: 991px){
-  .post-grid{ grid-template-columns:repeat(2, 1fr); }
+@media (max-width: 991px) {
+  .post-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
-@media (max-width: 640px){
-  .profile-top{ flex-direction:column; align-items:flex-start; }
-  .profile-meta{ width:100%; justify-content:space-between; }
-  .post-grid{ grid-template-columns:1fr; }
+@media (max-width: 640px) {
+  .profile-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .profile-meta {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .post-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
 
@@ -1344,6 +1788,6 @@ const toggleFollow = async () => {
 -->
 <style>
 body {
-  background-color: #F9F4F0 !important;
+  background-color: #f9f4f0 !important;
 }
 </style>

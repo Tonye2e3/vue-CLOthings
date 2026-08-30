@@ -1,10 +1,5 @@
-import {
-  ref,
-  computed
-} from 'vue'
-import {
-  defineStore
-} from 'pinia'
+import { ref, computed } from 'vue'
+import { defineStore } from 'pinia'
 
 // 設定 pinia 的持久化儲存
 export const useAuthStore = defineStore(
@@ -56,6 +51,8 @@ export const useAuthStore = defineStore(
 
     const isAdmin = computed(() => role.value === 'Admin' || role.value === 'SuperAdmin')
 
+    const isSuperAdmin = computed(() => role.value === 'SuperAdmin')
+
     return {
       token,
       userId,
@@ -65,6 +62,7 @@ export const useAuthStore = defineStore(
 
       isLoggedIn,
       isAdmin,
+      isSuperAdmin,
 
       setAuth,
       setToken,

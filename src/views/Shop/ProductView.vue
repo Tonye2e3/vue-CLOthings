@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import api from '@/services/api'
+import api from '@/api/api'
 import Review from '@/components/Shop/ProductReview.vue'
 import Post from '@/components/Shop/ProductPost.vue'
 import { useCartStore } from '@/stores/ShopCart'
@@ -14,7 +14,6 @@ const route = useRoute()
 const router = useRouter()
 const API_BASE = import.meta.env.VITE_API_URL
 const buyNowStore = useBuyNowStore()
-
 
 function getImageUrl(fileName) {
   if (!fileName) {
@@ -128,8 +127,6 @@ const selectedSpec = computed(() => {
     (spec) => spec.color === selectedColor.value && spec.size === selectedSize.value,
   )
 })
-
-
 </script>
 
 <!-- =========================================================== -->
@@ -148,8 +145,13 @@ const selectedSpec = computed(() => {
 
         <!-- 小圖列表，點擊切換大圖 -->
         <div class="gallery-smallpics">
-          <button v-for="(img, index) in product.images" :key="index" class="smallpic-btn"
-            :class="{ active: currentImage === getImageUrl(img) }" @click="currentImage = getImageUrl(img)">
+          <button
+            v-for="(img, index) in product.images"
+            :key="index"
+            class="smallpic-btn"
+            :class="{ active: currentImage === getImageUrl(img) }"
+            @click="currentImage = getImageUrl(img)"
+          >
             <img :src="getImageUrl(img)" alt="商品縮圖" />
           </button>
         </div>
@@ -175,8 +177,13 @@ const selectedSpec = computed(() => {
         <div class="option-group">
           <p class="option-label">顏色</p>
           <div class="option-list">
-            <button v-for="color in colorOptions" :key="color" class="option-btn"
-              :class="{ selected: selectedColor === color }" @click="selectedColor = color">
+            <button
+              v-for="color in colorOptions"
+              :key="color"
+              class="option-btn"
+              :class="{ selected: selectedColor === color }"
+              @click="selectedColor = color"
+            >
               {{ color }}
             </button>
           </div>
@@ -186,8 +193,13 @@ const selectedSpec = computed(() => {
         <div class="option-group">
           <p class="option-label">尺寸</p>
           <div class="option-list">
-            <button v-for="size in sizeOptions" :key="size" class="option-btn"
-              :class="{ selected: selectedSize === size }" @click="selectedSize = size">
+            <button
+              v-for="size in sizeOptions"
+              :key="size"
+              class="option-btn"
+              :class="{ selected: selectedSize === size }"
+              @click="selectedSize = size"
+            >
               {{ size }}
             </button>
           </div>

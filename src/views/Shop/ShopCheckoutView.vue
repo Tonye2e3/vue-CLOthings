@@ -5,7 +5,7 @@ import { useCartStore } from '@/stores/ShopCart'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useBuyNowStore } from '@/stores/ShopBuyNow'
-import api from '@/services/api'
+import api from '@/api/api'
 const cartStore = useCartStore()
 const router = useRouter()
 const route = useRoute()
@@ -67,9 +67,9 @@ async function submitOrder() {
   try {
     const response = await api.post('/order', orderData)
     if (isBuyNow.value) {
-      buyNowStore.clear()   // 清立即購買暫存
+      buyNowStore.clear() // 清立即購買暫存
     } else {
-      await cartStore.loadCart()   // 重新載入購物車（後端已清，前端同步）
+      await cartStore.loadCart() // 重新載入購物車（後端已清，前端同步）
     }
     alert('訂單建立成功！訂單編號：' + response.data.orderId)
     // ④ 成功後：跳到訂單頁（或首頁）
@@ -103,8 +103,6 @@ const shippingFee = computed(() => {
 const finalTotal = computed(() => {
   return checkoutTotal.value + shippingFee.value
 })
-
-
 </script>
 
 <template>
@@ -122,11 +120,17 @@ const finalTotal = computed(() => {
 
       <!-- 有商品：列出勾選的商品 -->
       <div v-else>
-        <div v-for="product in checkoutItems" :key="product.productSpecificationId"
-          class="d-flex align-items-center gap-3 border-bottom py-3">
+        <div
+          v-for="product in checkoutItems"
+          :key="product.productSpecificationId"
+          class="d-flex align-items-center gap-3 border-bottom py-3"
+        >
           <!-- 商品圖片 -->
-          <img :src="getImageUrl(product.image)" :alt="product.productName"
-     style="width: 56px; height: 56px; object-fit: cover; border-radius: 6px" />
+          <img
+            :src="getImageUrl(product.image)"
+            :alt="product.productName"
+            style="width: 56px; height: 56px; object-fit: cover; border-radius: 6px"
+          />
           <!-- 名稱 + 規格 -->
           <div class="flex-fill">
             <div class="fw-semibold">{{ product.productName }}</div>
