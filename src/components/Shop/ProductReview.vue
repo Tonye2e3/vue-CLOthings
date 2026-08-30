@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
-import api from '@/services/api'
+import api from '@/api/api'
 
 // 接收商品頁傳來的 productId
 const props = defineProps({
@@ -15,7 +15,7 @@ const reviews = ref([])
 const API_BASE = import.meta.env.VITE_API_URL
 function getImageUrl(fileName) {
   if (!fileName) return null
-  return `${API_BASE}/images/review/${fileName}`   // 評價圖片路徑（依你實際擺放調整）
+  return `${API_BASE}/images/review/${fileName}` // 評價圖片路徑（依你實際擺放調整）
 }
 
 function formatDate(dateString) {
@@ -25,7 +25,7 @@ function formatDate(dateString) {
 async function loadReviews() {
   try {
     const response = await api.get(`/review/product/${props.productId}`)
-    console.log('評價 API 回傳:', response.data)   // 加這行
+    console.log('評價 API 回傳:', response.data) // 加這行
     reviews.value = response.data
   } catch (error) {
     console.error('載入評價失敗：', error)
@@ -48,9 +48,7 @@ watch(() => props.productId, loadReviews)
     <h2 class="section-title">顧客評價</h2>
 
     <!-- 沒有評價 -->
-    <div v-if="reviews.length === 0" class="no-review">
-      目前還沒有評價
-    </div>
+    <div v-if="reviews.length === 0" class="no-review">目前還沒有評價</div>
 
     <div v-else class="reviews-grid">
       <div v-for="review in reviews" :key="review.reviewId" class="review-card">

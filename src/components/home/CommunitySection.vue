@@ -1,9 +1,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-// api：跟 Community 那幾個頁面共用同一個 axios 實例（src/services/api.js），
+// api：跟 Community 那幾個頁面共用同一個 axios 實例（src/api/api.js），
 // 會自動把登入後的 JWT token 帶進 Authorization header。
-import api from '@/services/api'
+import api from '@/api/api'
 
 // IMAGE_BASE：貼文圖片是靜態檔案，走的不是 /api 這條路徑，
 // 跟 CommunityView.vue 拿圖片網址的邏輯一樣。
@@ -24,13 +24,13 @@ const fetchTopPosts = async () => {
     posts.value = [...res.data]
       .sort((a, b) => b.likesCount - a.likesCount)
       .slice(0, 3)
-      .map(p => ({
+      .map((p) => ({
         communityPostId: p.communityPostId,
         author: p.user?.name ? `@${p.user.name}` : '@未知使用者',
         caption: p.content,
         // p.images[0]？如果這篇貼文有圖片，接上 IMAGE_BASE 組成完整網址；
         // 沒有圖片（理論上不會發生，發文一定要選照片）就留 null，畫面上退回原本的灰底佔位。
-        image: p.images && p.images.length ? `${IMAGE_BASE}${p.images[0].imageFileName}` : null
+        image: p.images && p.images.length ? `${IMAGE_BASE}${p.images[0].imageFileName}` : null,
       }))
   } catch (err) {
     console.error('讀取首頁熱門穿搭失敗：', err)

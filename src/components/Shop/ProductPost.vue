@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import api from '@/services/api'
+import api from '@/api/api'
 
 // productId：從父層 ProductView.vue 傳進來，是「目前正在看的這件商品」的 id——
 // 這個元件本身不知道自己在哪個商品頁底下，一定要靠外面傳進來才知道要查哪件商品。

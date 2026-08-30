@@ -3,17 +3,21 @@ import { ref, computed, onMounted } from 'vue'
 // useRouter：Vue Router 提供的功能，讓我們可以在 <script> 裡面「用程式的方式」
 // 切換網址（例如發文成功後自動跳轉回社群頁），而不是只能靠使用者自己點連結。
 import { useRouter } from 'vue-router'
-// api：跟其他頁面共用同一個 axios 實例（src/services/api.js），會自動把登入後的 JWT
+// api：跟其他頁面共用同一個 axios 實例（src/api/api.js），會自動把登入後的 JWT
 // token 帶進 Authorization header，跟直接 import axios from 'axios' 不一樣。
-import api from '@/services/api'
-
+import api from '@/api/api'
 
 // 全站共用的貼文清單（跟 CommunityView.vue 共用同一份資料，直接 import 那個檔案）
 // 這裡 import 進來的 addPost、currentUser，就是 CommunityView.vue 裡面
 // 用 export 開放出來的那兩個東西（可以回去那個檔案最上面看說明）。
 // 因為兩邊抓到的是「同一份」資料，所以只要在這裡呼叫 addPost() 新增一篇貼文，
 // 回到 CommunityView.vue 的畫面上就會馬上看得到，不需要重新整理頁面、也不需要資料庫。
-import { addPost, currentUser, currentUserId, loadCurrentUserId } from '@/views/Community/CommunityView.vue'
+import {
+  addPost,
+  currentUser,
+  currentUserId,
+  loadCurrentUserId,
+} from '@/views/Community/CommunityView.vue'
 
 // IMAGE_BASE：圖片是靜態檔案，走的不是 /api 這條路徑，不能直接用 api 服務的
 // baseURL（那個含 /api）；VITE_API_URL 本身就是純後端主機網址。
@@ -30,7 +34,7 @@ const router = useRouter()
 const postForm = ref({
   content: '', // 使用者輸入的穿搭心得文字（對應資料庫 Community_Post.content 這個欄位）
   selectedProducts: [], // 改為陣列，支援複選；存放使用者勾選的商品標籤名稱
-  status: 'public' // 貼文狀態：public（公開）或 hide（隱藏），對應資料庫 Community_Post.status，預設公開
+  status: 'public', // 貼文狀態：public（公開）或 hide（隱藏），對應資料庫 Community_Post.status，預設公開
 })
 
 // 圖片檔案與預覽用的 URL（改為陣列，支援多張照片）
@@ -48,9 +52,9 @@ const availableProducts = ref([])
 const fetchProducts = async () => {
   try {
     const res = await api.get(`/Product`)
-    availableProducts.value = res.data.map(p => ({
+    availableProducts.value = res.data.map((p) => ({
       productId: p.productId,
-      name: p.productName
+      name: p.productName,
     }))
   } catch (err) {
     console.error('讀取商品清單失敗：', err)
@@ -78,7 +82,7 @@ const filteredProducts = computed(() => {
     // 前端邏輯不用變。
     return availableProducts.value.slice(0, 5)
   }
-  return availableProducts.value.filter(p => p.name.toLowerCase().includes(q))
+  return availableProducts.value.filter((p) => p.name.toLowerCase().includes(q))
 })
 
 // 處理檔案選取與即時預覽（可一次選多張，也可分次加選）
@@ -91,13 +95,13 @@ const handleFileChange = (event) => {
   // || []：如果 event.target.files 是空的（沒有選檔案），就改用空陣列，避免出錯。
   const files = Array.from(event.target.files || [])
   // .forEach(file => { ... })：把剛剛選的每一個檔案都跑一次下面這段程式碼。
-  files.forEach(file => {
+  files.forEach((file) => {
     imageFiles.value.push({
       file,
       // URL.createObjectURL(file)：瀏覽器內建的功能，可以幫一個「還沒上傳到網路」的
       // 本地檔案，產生一個暫時的網址，讓 <img> 標籤可以直接拿來預覽，
       // 但這個網址只在「現在這個分頁」有效，重新整理頁面就會失效。
-      url: URL.createObjectURL(file)
+      url: URL.createObjectURL(file),
     })
   })
   // 清空 input 的值，避免選同一張圖片時不觸發 change
@@ -132,7 +136,11 @@ const toggleProduct = (name) => {
 // 改成 async，因為裡面要用 await 等後端 API 回應。
 const handleSubmit = async () => {
   // 檢查：如果一張照片都沒選、或是心得文字是空的，就跳出提示視窗、不繼續往下執行。
-  if (imageFiles.value.length === 0 || !postForm.value.content || postForm.value.selectedProducts.length === 0) {
+  if (
+    imageFiles.value.length === 0 ||
+    !postForm.value.content ||
+    postForm.value.selectedProducts.length === 0
+  ) {
     alert('請上傳穿搭照片、填寫貼文心得，並至少標記一項商品！')
     return // return 在這裡的作用是「提早結束這個函式」，後面的程式碼都不會被執行。
   }
@@ -148,7 +156,7 @@ const handleSubmit = async () => {
   // FormData：瀏覽器內建的物件，專門用來包「檔案」這種二進位資料送出去
   // （一般的 axios.post(url, { ... }) 送 JSON 沒辦法包真正的檔案內容，要用 FormData）。
   const formData = new FormData()
-  imageFiles.value.forEach(img => {
+  imageFiles.value.forEach((img) => {
     // 'files' 這個欄位名稱要跟後端 UploadImages(List<IFormFile> files) 的參數名稱一致，
     // 模型繫結才抓得到；append 同一個名稱多次，後端就會收到一個「檔案清單」。
     formData.append('files', img.file)
@@ -157,7 +165,7 @@ const handleSubmit = async () => {
   let uploadedPaths = []
   try {
     const uploadRes = await api.post(`/CommunityPost/upload-images`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data' },
     })
     uploadedPaths = uploadRes.data
   } catch (err) {
@@ -176,17 +184,17 @@ const handleSubmit = async () => {
     // 不再是檔案原始名稱佔位了——uploadedPaths 陣列的順序跟 imageFiles 是對應的。
     images: uploadedPaths.map((path, idx) => ({
       imageFileName: path,
-      sortOrder: idx + 1
+      sortOrder: idx + 1,
     })),
     // taggedProducts：把選中的商品名稱陣列，轉換成對應 Post_Tagged_Product 格式的物件陣列。
     // 用 availableProducts.find(...) 找回這個名字對應的 productId。
-    taggedProducts: postForm.value.selectedProducts.map(name => {
-      const matched = availableProducts.value.find(p => p.name === name)
+    taggedProducts: postForm.value.selectedProducts.map((name) => {
+      const matched = availableProducts.value.find((p) => p.name === name)
       return {
         productId: matched ? matched.productId : null,
-        productRoute: null
+        productRoute: null,
       }
-    })
+    }),
   }
 
   try {
@@ -213,19 +221,19 @@ const handleSubmit = async () => {
       sortOrder: idx + 1,
       // 這裡直接組出跟 CommunityView.vue 一樣的正式網址（IMAGE_BASE + 路徑），
       // 不用再靠本地暫時預覽網址頂著了，因為圖片這時候已經是真的存在伺服器上。
-      url: `${IMAGE_BASE}${path}`
+      url: `${IMAGE_BASE}${path}`,
     })),
     likesCount: 0,
     commentsCount: 0,
-    taggedProducts: postForm.value.selectedProducts.map(name => {
-      const matched = availableProducts.value.find(p => p.name === name)
+    taggedProducts: postForm.value.selectedProducts.map((name) => {
+      const matched = availableProducts.value.find((p) => p.name === name)
       return {
         postTaggedProductId: null,
         productId: matched ? matched.productId : null,
         productRoute: null,
-        name
+        name,
       }
-    })
+    }),
   })
 
   alert('發文成功！即將返回社群首頁。')
@@ -234,13 +242,8 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-  
-
   <div class="create-post-page min-vh-100 w-100">
-    
-
     <div class="container container-md py-4">
-
       <!-- 返回與頁首：韓風簡約版 — 左側細直線引導，字體維持原本的 Noto Serif TC -->
       <div class="page-head">
         <router-link to="/community" class="back-pill">← 返回社群</router-link>
@@ -265,7 +268,6 @@ const handleSubmit = async () => {
         -->
         <form @submit.prevent="handleSubmit">
           <div class="compose-grid">
-
             <!-- 左側：上傳／預覽 -->
             <div class="compose-media">
               <span class="tag-label">封面預覽</span>
@@ -300,7 +302,16 @@ const handleSubmit = async () => {
                       SVG 風格，這裡也一起換掉，整個 Community 的圖示風格才會一致，
                       也少一個依賴外部字型/CDN 的地方。
                     -->
-                    <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="32"
+                      height="32"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
                       <rect x="3" y="4" width="18" height="16" rx="2" />
                       <circle cx="8.5" cy="9.5" r="1.5" />
                       <path d="M21 15l-5-5-4 4-3-3-6 6" />
@@ -350,10 +361,17 @@ const handleSubmit = async () => {
 
             <!-- 右側：文字內容 -->
             <div class="compose-body">
-
               <div class="field-block">
                 <label class="field-label">
-                  <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <svg
+                    class="field-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
                     <path d="M12 20h9" />
                     <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
                   </svg>
@@ -374,7 +392,15 @@ const handleSubmit = async () => {
 
               <div class="field-block">
                 <label class="field-label">
-                  <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <svg
+                    class="field-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
                     <path d="M9 4L7 20" />
                     <path d="M17 4l-2 16" />
                     <path d="M4 9h16" />
@@ -383,9 +409,19 @@ const handleSubmit = async () => {
                   標記標籤商品（至少選 1 項，可複選）
                 </label>
                 <div class="search-bar">
-                  <svg class="search-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.6"/>
-                    <path d="M14 14L18 18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                  <svg
+                    class="search-icon"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.6" />
+                    <path
+                      d="M14 14L18 18"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                      stroke-linecap="round"
+                    />
                   </svg>
                   <input
                     type="text"
@@ -398,14 +434,18 @@ const handleSubmit = async () => {
                     type="button"
                     class="search-clear"
                     @click="productSearch = ''"
-                  >✕</button>
+                  >
+                    ✕
+                  </button>
                 </div>
 
                 <!--
                   沒有打字搜尋的時候，只列出「熱門」的前 5 個標籤，提示使用者
                   想找其他商品要用上面的搜尋框，避免以為標籤雲裡列出來的就是全部商品。
                 -->
-                <p class="field-hint" v-if="!productSearch.trim()">熱門標籤，想找其他商品請直接搜尋</p>
+                <p class="field-hint" v-if="!productSearch.trim()">
+                  熱門標籤，想找其他商品請直接搜尋
+                </p>
 
                 <div class="tag-cloud">
                   <!--
@@ -421,7 +461,9 @@ const handleSubmit = async () => {
                     class="tag-chip selectable"
                     :class="{ active: postForm.selectedProducts.includes(product.name) }"
                     @click="toggleProduct(product.name)"
-                  >#{{ product.name }}</button>
+                  >
+                    #{{ product.name }}
+                  </button>
 
                   <span v-if="filteredProducts.length === 0" class="tag-empty">
                     找不到符合「{{ productSearch }}」的商品
@@ -430,9 +472,15 @@ const handleSubmit = async () => {
 
                 <!-- 已選標籤預覽區：把使用者選中的標籤，各自畫成一個可以再點掉的小標籤 -->
                 <div class="tag-preview" v-if="postForm.selectedProducts.length">
-                  <span v-for="name in postForm.selectedProducts" :key="name" class="tag-chip selected-chip">
+                  <span
+                    v-for="name in postForm.selectedProducts"
+                    :key="name"
+                    class="tag-chip selected-chip"
+                  >
                     #{{ name }}
-                    <button type="button" class="chip-remove" @click="toggleProduct(name)">✕</button>
+                    <button type="button" class="chip-remove" @click="toggleProduct(name)">
+                      ✕
+                    </button>
                   </span>
                 </div>
               </div>
@@ -457,21 +505,534 @@ const handleSubmit = async () => {
                 <!-- type="submit"：這個按鈕會觸發上面 <form> 的 @submit.prevent="handleSubmit" -->
                 <button type="submit" class="btn-publish">確認發布</button>
               </div>
-
             </div>
           </div>
         </form>
       </div>
-
     </div>
   </div>
 </template>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap');.create-post-page{width:100%;min-height:100vh;background-color:#F9F4F0  !important;box-sizing:border-box;--cream:#F9F4F0;--paper:#FFFDFB;--ink:#2A2420;--ink-soft:#7A6E63;--plum:#7A4B54;--plum-deep:#5E3941;--ochre:#B8862E;--hairline:#E4D8CC;color:var(--ink);font-family:'Noto Sans TC',sans-serif;}.page-head{padding:2rem 0 1.4rem;}.back-pill{display:inline-flex;align-items:center;gap:.3rem;border:1px solid var(--ink);border-radius:999px;padding:.35rem 1rem;font-size:.82rem;color:var(--ink);text-decoration:none;margin-bottom:1.1rem;transition:all .18s ease;}.back-pill:hover{background:var(--ink);color:var(--cream);}.page-head-inner{display:flex;align-items:center;gap:1.2rem;}.page-head-divider{width:1px;align-self:stretch;background:var(--hairline);flex-shrink:0;}.page-head-text{padding-left:.2rem;}.eyebrow{font-size:.7rem;letter-spacing:.24em;text-transform:uppercase;color:#A9A196;font-weight:600;margin-bottom:.4rem;}.page-title{font-family:'Noto Serif TC',serif;font-weight:900;font-size:clamp(1.5rem,3.2vw,1.9rem);line-height:1.15;margin:0 0 .4rem;color:var(--ink);}.page-sub{font-family:'Noto Serif TC',serif;font-style:italic;color:#9C9086;font-size:.9rem;margin:0;}.compose-card{background:var(--paper);border:1px solid var(--hairline);border-radius:22px;overflow:hidden;}.compose-grid{display:grid;grid-template-columns:1fr 1.1fr;}.compose-media{position:relative;background:var(--cream);padding:1.6rem;display:flex;flex-direction:column;}.compose-media .tag-label{position:absolute;top:16px;left:1rem;z-index:2;background:var(--plum);color:#fff;font-size:.72rem;letter-spacing:.05em;font-weight:600;padding:.32rem .8rem .32rem 1.1rem;box-shadow:0 4px 10px rgba(0,0,0,.18);}.compose-media .tag-label::after{content:"";position:absolute;left:0;bottom:-7px;border-width:0 8px 7px 0;border-style:solid;border-color:transparent var(--plum-deep) transparent transparent;}.dropzone{position:relative;flex:1;min-height:360px;border:1.5px dashed var(--hairline);background:var(--paper);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;transition:border-color .2s ease,background .2s ease;}.dropzone:hover{border-color:var(--plum);}.dropzone.has-image{border-style:solid;}.file-input-hidden{position:absolute;inset:0;opacity:0;cursor:pointer;}.dropzone-empty{display:flex;flex-direction:column;align-items:center;gap:.4rem;color:var(--ink-soft);padding:2rem;text-align:center;}.dz-icon{display:flex;margin-bottom:.3rem;color:var(--plum);}.dz-title{font-family:'Noto Serif TC',serif;font-weight:700;color:var(--ink);font-size:1rem;}.dz-sub{font-size:.78rem;}.dropzone-preview{width:100%;height:100%;min-height:360px;object-fit:cover;display:block;}.dropzone-hover{position:absolute;inset:0;background:rgba(42,36,32,.45);color:#fff;font-size:.9rem;font-weight:600;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s ease;pointer-events:none;}.dropzone.has-image:hover .dropzone-hover{opacity:1;}.thumb-row{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:.9rem;}.thumb-item{position:relative;width:64px;height:64px;border-radius:6px;overflow:hidden;border:1px solid var(--hairline);flex-shrink:0;}.thumb-item img{width:100%;height:100%;object-fit:cover;display:block;}.thumb-cover-badge{position:absolute;bottom:0;left:0;right:0;background:rgba(42,36,32,.72);color:#fff;font-size:.58rem;text-align:center;padding:.1rem 0;}.thumb-remove{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(42,36,32,.75);color:#fff;border:none;font-size:.62rem;line-height:1;display:flex;align-items:center;justify-content:center;transition:background .18s ease;}.thumb-remove:hover{background:var(--plum);}.thumb-add{width:64px;height:64px;border-radius:6px;border:1.5px dashed var(--hairline);display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:var(--ink-soft);cursor:pointer;position:relative;flex-shrink:0;transition:border-color .18s ease,color .18s ease;}.thumb-add:hover{border-color:var(--plum);color:var(--plum);}.upload-hint{font-size:.76rem;color:var(--ink-soft);margin:.7rem 0 0;}.compose-body{padding:2rem 2rem 1.8rem;display:flex;flex-direction:column;}.field-block{margin-bottom:1.6rem;}.field-label{display:flex;align-items:center;gap:.4rem;font-family:'Noto Serif TC',serif;font-weight:700;font-size:.95rem;color:var(--ink);margin-bottom:.6rem;}.field-icon{width:16px;height:16px;color:var(--plum);flex-shrink:0;}.field-hint{font-size:.76rem;color:var(--ink-soft);margin:.5rem 0 0;}.field-textarea{width:100%;border:1px solid var(--hairline);background:var(--cream);border-radius:4px;padding:.9rem 1rem;font-family:'Noto Sans TC',sans-serif;font-size:.92rem;color:var(--ink);resize:vertical;transition:border-color .18s ease,background .18s ease;}.field-textarea:focus{outline:none;border-color:var(--plum);background:var(--paper);}.field-textarea::placeholder{color:var(--ink-soft);}.visibility-toggle{display:flex;flex-wrap:wrap;gap:1.2rem;}.visibility-option{display:flex;align-items:center;gap:.5rem;font-size:.88rem;color:var(--ink);cursor:pointer;}.visibility-option input[type="radio"]{accent-color:var(--plum);width:16px;height:16px;cursor:pointer;}.tag-preview{margin-top:.9rem;padding-top:.9rem;border-top:1px dashed var(--hairline);display:flex;flex-wrap:wrap;gap:.5rem;}.tag-chip{display:inline-block;font-size:.78rem;padding:.4rem .9rem;border-radius:999px;background:var(--cream);border:1px solid var(--ochre);color:var(--ochre);font-weight:600;}.tag-chip.selected-chip{display:inline-flex;align-items:center;gap:.4rem;background:var(--plum);border-color:var(--plum);color:#fff;}.chip-remove{background:rgba(255,255,255,.25);border:none;color:#fff;width:16px;height:16px;border-radius:50%;font-size:.6rem;line-height:1;display:flex;align-items:center;justify-content:center;transition:background .18s ease;}.chip-remove:hover{background:rgba(255,255,255,.45);}.search-bar{position:relative;display:flex;align-items:center;border:1px solid var(--hairline);background:var(--cream);border-radius:4px;padding:.5rem .5rem .5rem 1rem;transition:border-color .18s ease,background .18s ease;}.search-bar:focus-within{border-color:var(--plum);background:var(--paper);}.search-icon{width:16px;height:16px;color:var(--ink-soft);flex-shrink:0;}.search-input{flex:1;border:none;background:transparent;padding:.15rem .6rem;font-size:.88rem;color:var(--ink);outline:none;}.search-input::placeholder{color:var(--ink-soft);}.search-clear{border:none;background:var(--hairline);color:var(--ink-soft);width:20px;height:20px;border-radius:50%;font-size:.7rem;line-height:1;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:background .18s ease,color .18s ease;}.search-clear:hover{background:var(--plum);color:#fff;}.tag-cloud{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.8rem;}.tag-chip.selectable{border:1px solid var(--hairline);background:var(--paper);color:var(--ink);cursor:pointer;transition:all .18s ease;}.tag-chip.selectable:hover{border-color:var(--ochre);color:var(--ochre);}.tag-chip.selectable.active{background:var(--plum);border-color:var(--plum);color:#fff;}.tag-empty{font-size:.8rem;color:var(--ink-soft);font-family:'Noto Serif TC',serif;font-style:italic;}.compose-actions{margin-top:auto;padding-top:1.4rem;border-top:1px dashed var(--hairline);display:flex;justify-content:flex-end;gap:.8rem;}.btn-cancel{border:1px solid var(--hairline);color:var(--ink-soft);border-radius:4px;padding:.6rem 1.6rem;font-size:.88rem;text-decoration:none;transition:all .18s ease;}.btn-cancel:hover{border-color:var(--ink);color:var(--ink);}.btn-publish{background:var(--ink);color:var(--paper);border:none;border-radius:4px;padding:.65rem 2.1rem;font-size:.9rem;font-weight:600;transition:background .18s ease,transform .18s ease;}.btn-publish:hover{background:var(--plum-deep);transform:translateY(-1px);}@media (max-width:860px){.compose-grid{grid-template-columns:1fr;}.compose-media{padding:1.2rem;}.dropzone,.dropzone-preview{min-height:280px;}.compose-body{padding:1.6rem;}}
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
+.create-post-page {
+  width: 100%;
+  min-height: 100vh;
+  background-color: #f9f4f0 !important;
+  box-sizing: border-box;
+  --cream: #f9f4f0;
+  --paper: #fffdfb;
+  --ink: #2a2420;
+  --ink-soft: #7a6e63;
+  --plum: #7a4b54;
+  --plum-deep: #5e3941;
+  --ochre: #b8862e;
+  --hairline: #e4d8cc;
+  color: var(--ink);
+  font-family: 'Noto Sans TC', sans-serif;
+}
+.page-head {
+  padding: 2rem 0 1.4rem;
+}
+.back-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  padding: 0.35rem 1rem;
+  font-size: 0.82rem;
+  color: var(--ink);
+  text-decoration: none;
+  margin-bottom: 1.1rem;
+  transition: all 0.18s ease;
+}
+.back-pill:hover {
+  background: var(--ink);
+  color: var(--cream);
+}
+.page-head-inner {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+}
+.page-head-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--hairline);
+  flex-shrink: 0;
+}
+.page-head-text {
+  padding-left: 0.2rem;
+}
+.eyebrow {
+  font-size: 0.7rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #a9a196;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+.page-title {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 900;
+  font-size: clamp(1.5rem, 3.2vw, 1.9rem);
+  line-height: 1.15;
+  margin: 0 0 0.4rem;
+  color: var(--ink);
+}
+.page-sub {
+  font-family: 'Noto Serif TC', serif;
+  font-style: italic;
+  color: #9c9086;
+  font-size: 0.9rem;
+  margin: 0;
+}
+.compose-card {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 22px;
+  overflow: hidden;
+}
+.compose-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+}
+.compose-media {
+  position: relative;
+  background: var(--cream);
+  padding: 1.6rem;
+  display: flex;
+  flex-direction: column;
+}
+.compose-media .tag-label {
+  position: absolute;
+  top: 16px;
+  left: 1rem;
+  z-index: 2;
+  background: var(--plum);
+  color: #fff;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  padding: 0.32rem 0.8rem 0.32rem 1.1rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+}
+.compose-media .tag-label::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -7px;
+  border-width: 0 8px 7px 0;
+  border-style: solid;
+  border-color: transparent var(--plum-deep) transparent transparent;
+}
+.dropzone {
+  position: relative;
+  flex: 1;
+  min-height: 360px;
+  border: 1.5px dashed var(--hairline);
+  background: var(--paper);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+.dropzone:hover {
+  border-color: var(--plum);
+}
+.dropzone.has-image {
+  border-style: solid;
+}
+.file-input-hidden {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.dropzone-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--ink-soft);
+  padding: 2rem;
+  text-align: center;
+}
+.dz-icon {
+  display: flex;
+  margin-bottom: 0.3rem;
+  color: var(--plum);
+}
+.dz-title {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 1rem;
+}
+.dz-sub {
+  font-size: 0.78rem;
+}
+.dropzone-preview {
+  width: 100%;
+  height: 100%;
+  min-height: 360px;
+  object-fit: cover;
+  display: block;
+}
+.dropzone-hover {
+  position: absolute;
+  inset: 0;
+  background: rgba(42, 36, 32, 0.45);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+.dropzone.has-image:hover .dropzone-hover {
+  opacity: 1;
+}
+.thumb-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+}
+.thumb-item {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  flex-shrink: 0;
+}
+.thumb-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.thumb-cover-badge {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(42, 36, 32, 0.72);
+  color: #fff;
+  font-size: 0.58rem;
+  text-align: center;
+  padding: 0.1rem 0;
+}
+.thumb-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(42, 36, 32, 0.75);
+  color: #fff;
+  border: none;
+  font-size: 0.62rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.18s ease;
+}
+.thumb-remove:hover {
+  background: var(--plum);
+}
+.thumb-add {
+  width: 64px;
+  height: 64px;
+  border-radius: 6px;
+  border: 1.5px dashed var(--hairline);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition:
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+.thumb-add:hover {
+  border-color: var(--plum);
+  color: var(--plum);
+}
+.upload-hint {
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+  margin: 0.7rem 0 0;
+}
+.compose-body {
+  padding: 2rem 2rem 1.8rem;
+  display: flex;
+  flex-direction: column;
+}
+.field-block {
+  margin-bottom: 1.6rem;
+}
+.field-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--ink);
+  margin-bottom: 0.6rem;
+}
+.field-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--plum);
+  flex-shrink: 0;
+}
+.field-hint {
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+  margin: 0.5rem 0 0;
+}
+.field-textarea {
+  width: 100%;
+  border: 1px solid var(--hairline);
+  background: var(--cream);
+  border-radius: 4px;
+  padding: 0.9rem 1rem;
+  font-family: 'Noto Sans TC', sans-serif;
+  font-size: 0.92rem;
+  color: var(--ink);
+  resize: vertical;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+.field-textarea:focus {
+  outline: none;
+  border-color: var(--plum);
+  background: var(--paper);
+}
+.field-textarea::placeholder {
+  color: var(--ink-soft);
+}
+.visibility-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+}
+.visibility-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+.visibility-option input[type='radio'] {
+  accent-color: var(--plum);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+.tag-preview {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px dashed var(--hairline);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.tag-chip {
+  display: inline-block;
+  font-size: 0.78rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  background: var(--cream);
+  border: 1px solid var(--ochre);
+  color: var(--ochre);
+  font-weight: 600;
+}
+.tag-chip.selected-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--plum);
+  border-color: var(--plum);
+  color: #fff;
+}
+.chip-remove {
+  background: rgba(255, 255, 255, 0.25);
+  border: none;
+  color: #fff;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 0.6rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.18s ease;
+}
+.chip-remove:hover {
+  background: rgba(255, 255, 255, 0.45);
+}
+.search-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--hairline);
+  background: var(--cream);
+  border-radius: 4px;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+.search-bar:focus-within {
+  border-color: var(--plum);
+  background: var(--paper);
+}
+.search-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--ink-soft);
+  flex-shrink: 0;
+}
+.search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.88rem;
+  color: var(--ink);
+  outline: none;
+}
+.search-input::placeholder {
+  color: var(--ink-soft);
+}
+.search-clear {
+  border: none;
+  background: var(--hairline);
+  color: var(--ink-soft);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  line-height: 1;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease;
+}
+.search-clear:hover {
+  background: var(--plum);
+  color: #fff;
+}
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+.tag-chip.selectable {
+  border: 1px solid var(--hairline);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.tag-chip.selectable:hover {
+  border-color: var(--ochre);
+  color: var(--ochre);
+}
+.tag-chip.selectable.active {
+  background: var(--plum);
+  border-color: var(--plum);
+  color: #fff;
+}
+.tag-empty {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  font-family: 'Noto Serif TC', serif;
+  font-style: italic;
+}
+.compose-actions {
+  margin-top: auto;
+  padding-top: 1.4rem;
+  border-top: 1px dashed var(--hairline);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.8rem;
+}
+.btn-cancel {
+  border: 1px solid var(--hairline);
+  color: var(--ink-soft);
+  border-radius: 4px;
+  padding: 0.6rem 1.6rem;
+  font-size: 0.88rem;
+  text-decoration: none;
+  transition: all 0.18s ease;
+}
+.btn-cancel:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.btn-publish {
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 4px;
+  padding: 0.65rem 2.1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition:
+    background 0.18s ease,
+    transform 0.18s ease;
+}
+.btn-publish:hover {
+  background: var(--plum-deep);
+  transform: translateY(-1px);
+}
+@media (max-width: 860px) {
+  .compose-grid {
+    grid-template-columns: 1fr;
+  }
+  .compose-media {
+    padding: 1.2rem;
+  }
+  .dropzone,
+  .dropzone-preview {
+    min-height: 280px;
+  }
+  .compose-body {
+    padding: 1.6rem;
+  }
+}
 </style>
 
 <!-- 不加 scoped：讓這段 CSS 變成全域樣式，直接套用到 body 上 -->
 <style>
-body{background-color:#F9F4F0  !important;}
+body {
+  background-color: #f9f4f0 !important;
+}
 </style>

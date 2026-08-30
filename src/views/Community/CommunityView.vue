@@ -16,11 +16,11 @@
 // 這樣兩個檔案就能共用同一份資料，而不是各自擁有一份自己的假資料。
 // ============================================================
 import { reactive, ref } from 'vue'
-// api：跟其他頁面共用同一個 axios 實例（src/services/api.js），
+// api：跟其他頁面共用同一個 axios 實例（src/api/api.js），
 // 這個實例會自動把登入後的 JWT token 帶進 Authorization header，
 // 跟直接 import axios from 'axios' 不一樣——那樣打 API 不會帶 token，
 // 登入後也一樣會被 [Authorize] 擋下來（401）。
-import api from '@/services/api'
+import api from '@/api/api'
 // useAuthStore：只「讀」登入狀態（有沒有登入），不會去改動共用的 authStore 本身。
 import { useAuthStore } from '@/stores/auth'
 
@@ -41,7 +41,7 @@ const IMAGE_BASE = import.meta.env.VITE_API_URL
 // 這裡先給一個預設值頂著，等 loadCurrentUser() 打完 API 才會換成真的。
 export const currentUser = ref({
   name: '',
-  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=guest'
+  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=guest',
 })
 
 export const currentUserId = ref(null)
@@ -74,7 +74,9 @@ const loadCurrentUser = async () => {
       name: res.data.username,
       // res.data.avatar 後端存的是相對路徑，要接上 IMAGE_BASE 才是完整網址；
       // 沒設大頭貼的人（avatar 是 null）用預設頭像頂著，不要顯示破圖。
-      avatar: res.data.avatar ? `${IMAGE_BASE}${res.data.avatar}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${res.data.username}`
+      avatar: res.data.avatar
+        ? `${IMAGE_BASE}${res.data.avatar}`
+        : `https://api.dicebear.com/7.x/avataaars/svg?seed=${res.data.username}`,
     }
   } catch (err) {
     console.error('讀取自己的公開個人資料失敗：', err)
@@ -141,14 +143,14 @@ export const loadSavedPosts = async () => {
   try {
     const res = await api.get(`/CommunityFavorite/user/${currentUserId.value}`)
     savedPosts.splice(0, savedPosts.length) // 先清空，避免重複呼叫時舊資料疊加
-    res.data.forEach(p => {
+    res.data.forEach((p) => {
       savedPosts.push({
         communityPostId: p.communityPostId,
         content: p.content,
-        image: (p.images && p.images.length) ? `${IMAGE_BASE}${p.images[0].imageFileName}` : '',
+        image: p.images && p.images.length ? `${IMAGE_BASE}${p.images[0].imageFileName}` : '',
         likesCount: p.likesCount,
         commentsCount: p.commentsCount,
-        tags: (p.taggedProducts || []).map(t => `#${t.name}`)
+        tags: (p.taggedProducts || []).map((t) => `#${t.name}`),
       })
     })
   } catch (err) {
@@ -158,20 +160,21 @@ export const loadSavedPosts = async () => {
 
 // isPostSaved：檢查某篇貼文（用 communityPostId 判斷）現在是不是已經在收藏清單裡。
 // .some(...)：陣列方法，只要陣列裡「有任何一筆」符合條件，就回傳 true，否則回傳 false。
-export const isPostSaved = (communityPostId) => savedPosts.some(p => p.communityPostId === communityPostId)
+export const isPostSaved = (communityPostId) =>
+  savedPosts.some((p) => p.communityPostId === communityPostId)
 
 // toggleSavePost：切換某篇貼文的收藏狀態。改成 async，因為裡面要打真正的 API。
 // post 參數是一個「整理好格式」的貼文物件，欄位名稱對照 Community_Favorite +
 // Community_Post：communityPostId、content、image、likesCount、commentsCount、tags。
 export const toggleSavePost = async (post) => {
-  const idx = savedPosts.findIndex(p => p.communityPostId === post.communityPostId)
+  const idx = savedPosts.findIndex((p) => p.communityPostId === post.communityPostId)
 
   if (idx === -1) {
     // 還沒收藏過 → 打 POST 新增一筆 Community_Favorite 紀錄
     try {
       await api.post(`/CommunityFavorite`, {
         userId: currentUserId.value,
-        communityPostId: post.communityPostId
+        communityPostId: post.communityPostId,
       })
     } catch (err) {
       console.error('收藏失敗：', err)
@@ -181,7 +184,9 @@ export const toggleSavePost = async (post) => {
   } else {
     // 已經收藏過了 → 先問後端這筆收藏紀錄的 id，再打 DELETE 刪掉
     try {
-      const res = await api.get(`/CommunityFavorite/post/${post.communityPostId}/user/${currentUserId.value}`)
+      const res = await api.get(
+        `/CommunityFavorite/post/${post.communityPostId}/user/${currentUserId.value}`,
+      )
       if (res.data) {
         await api.delete(`/CommunityFavorite/${res.data.communityFavoriteId}`)
       }
@@ -255,29 +260,34 @@ const fetchPosts = async () => {
     // 大部分欄位名稱其實跟後端 DTO 已經一致（因為之前有跟後端一起對過欄位名稱），
     // 這裡主要是幫 images 陣列裡每張圖，組出一個可以直接放進 <img> 的完整網址，
     // 因為後端目前只回傳 imageFileName（檔名），還沒有回傳完整網址。
-    const apiPosts = res.data.map(p => ({
+    const apiPosts = res.data.map((p) => ({
       communityPostId: p.communityPostId,
       userId: p.userId,
       // p.user.avatar 後端存的是相對路徑（例如 /avatars/user002.png），要接上 IMAGE_BASE
       // 才是完整網址，跟貼文圖片是同一種處理方式；沒設大頭貼的人用預設頭像頂著。
       user: p.user
-        ? { ...p.user, avatar: p.user.avatar ? `${IMAGE_BASE}${p.user.avatar}` : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + p.user.name }
+        ? {
+            ...p.user,
+            avatar: p.user.avatar
+              ? `${IMAGE_BASE}${p.user.avatar}`
+              : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + p.user.name,
+          }
         : { name: '未知使用者', avatar: '' },
       content: p.content,
       postDate: p.postDate,
       status: p.status,
-      images: (p.images || []).map(img => ({
+      images: (p.images || []).map((img) => ({
         postImageId: img.postImageId,
         imageFileName: img.imageFileName,
         sortOrder: img.sortOrder,
         // imageFileName 本身已經帶路徑了（例如 "/images/posts/post01_1.jpg"），
         // 不是單純的檔名，所以這裡直接接在 IMAGE_BASE 後面就好，
         // 不用再自己加一段 /uploads/ 進去（之前那樣寫網址會多一層、變成錯的路徑）。
-        url: `${IMAGE_BASE}${img.imageFileName}`
+        url: `${IMAGE_BASE}${img.imageFileName}`,
       })),
       likesCount: p.likesCount,
       commentsCount: p.commentsCount,
-      taggedProducts: p.taggedProducts || []
+      taggedProducts: p.taggedProducts || [],
     }))
 
     // posts.splice(0, posts.length, ...apiPosts)：
@@ -339,7 +349,7 @@ const loadLikedPosts = async () => {
   try {
     const res = await api.get(`/PostLike/user/${currentUserId.value}`)
     likedPostIds.clear()
-    res.data.forEach(like => {
+    res.data.forEach((like) => {
       likedPostIds.set(like.communityPostId, like.postLikesId)
     })
   } catch (err) {
@@ -371,7 +381,7 @@ const toggleLikePost = async (post) => {
     try {
       await api.post(`/PostLike`, {
         communityPostId: post.communityPostId,
-        userId: currentUserId.value
+        userId: currentUserId.value,
       })
     } catch (err) {
       console.error('按讚失敗：', err)
@@ -382,7 +392,9 @@ const toggleLikePost = async (post) => {
     // 跟 PostDetailView.vue toggleLike 的做法一樣，只是這裡只需要問「這一篇」就好，
     // 不用整份 loadLikedPosts() 重打一次。
     try {
-      const res = await api.get(`/PostLike/post/${post.communityPostId}/user/${currentUserId.value}`)
+      const res = await api.get(
+        `/PostLike/post/${post.communityPostId}/user/${currentUserId.value}`,
+      )
       if (res.data) likedPostIds.set(post.communityPostId, res.data.postLikesId)
     } catch (err) {
       console.error('讀取剛剛按讚的紀錄失敗：', err)
@@ -402,7 +414,7 @@ const popularProducts = ref([
   { id: 2, name: '法式碎花洋裝' },
   { id: 3, name: '羊毛混紡針織外套' },
   { id: 4, name: '修身牛仔褲' },
-  { id: 5, name: '百褶及膝裙' }
+  { id: 5, name: '百褶及膝裙' },
 ])
 
 // 穿搭達人資料：右側欄「熱門穿搭達人」清單，先給空陣列，等 fetchCreators() 打完 API 才會有資料。
@@ -413,20 +425,22 @@ const creators = ref([])
 const fetchCreators = async () => {
   try {
     const res = await api.get(`/UserFollow/popular-creators`, {
-      params: { take: 3, followerId: currentUserId.value }
+      params: { take: 3, followerId: currentUserId.value },
     })
-    creators.value = res.data.map(c => ({
+    creators.value = res.data.map((c) => ({
       id: c.userId, // 這個 id 現在是真的 userId，不再是這份清單自己編的假號碼了
       name: c.name,
       // c.avatar 一樣是相對路徑，要接上 IMAGE_BASE；沒設大頭貼的人用預設頭像頂著。
-      avatar: c.avatar ? `${IMAGE_BASE}${c.avatar}` : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + c.name,
+      avatar: c.avatar
+        ? `${IMAGE_BASE}${c.avatar}`
+        : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + c.name,
       // followersCount 改存「純數字」，不是先組好的 "4追蹤" 字串——這樣按下追蹤／取消追蹤
       // 的時候，才能直接把這個數字 +1 / -1，畫面上的粉絲數即時更新。
       // 如果先組成字串存起來，之後要更新就要整個字串重新拼一次，不如一開始就存數字，
       // 顯示的時候（template 裡）才用 formatCount() 轉成「4追蹤」這種格式。
       followersCount: c.followersCount,
       isFollowing: c.isFollowing,
-      userFollowId: c.userFollowId
+      userFollowId: c.userFollowId,
     }))
   } catch (err) {
     console.error('讀取熱門穿搭達人失敗：', err)
@@ -437,9 +451,13 @@ const fetchCreators = async () => {
 // 這是一個「物件的物件」，外層用 hot / new / follow 三個 key，
 // 對應到現在的三個分頁；每個分頁裡面又是一個小物件，裝著這個分頁要顯示的文字。
 const tabCopy = {
-  hot:    { ribbon: '封面故事', role: '本週封面 · 秋季選品', empty: '目前沒有符合的熱門穿搭。' },
-  new:    { ribbon: '最新發布', role: '剛剛發布的穿搭',      empty: '目前還沒有最新的穿搭貼文。' },
-  follow: { ribbon: '追蹤精選', role: '來自你追蹤的達人',    empty: '你還沒有追蹤任何穿搭達人，去右側「熱門穿搭達人」追蹤幾位，這裡就會出現他們的貼文。' }
+  hot: { ribbon: '封面故事', role: '本週封面 · 秋季選品', empty: '目前沒有符合的熱門穿搭。' },
+  new: { ribbon: '最新發布', role: '剛剛發布的穿搭', empty: '目前還沒有最新的穿搭貼文。' },
+  follow: {
+    ribbon: '追蹤精選',
+    role: '來自你追蹤的達人',
+    empty: '你還沒有追蹤任何穿搭達人，去右側「熱門穿搭達人」追蹤幾位，這裡就會出現他們的貼文。',
+  },
 }
 
 // computed() 是 Vue 提供的另一種「特殊變數」，跟 ref() 不一樣的地方是：
@@ -464,21 +482,17 @@ const tabPosts = computed(() => {
     // new Date(b.postDate) - new Date(a.postDate)：
     // 把日期文字轉換成「時間」再相減，結果是正數還是負數，決定了 a、b 誰排前面，
     // 這樣寫的效果就是「時間新的排前面、時間舊的排後面」。
-    return [...posts].sort(
-      (a, b) => new Date(b.postDate) - new Date(a.postDate)
-    )
+    return [...posts].sort((a, b) => new Date(b.postDate) - new Date(a.postDate))
   }
   if (currentTab.value === 'follow') {
     // 追蹤中：只顯示已追蹤達人的貼文
     // .filter(...)：filter 是陣列方法，作用是「留下符合條件的資料，其他丟掉」。
     // 這裡先從 creators 裡面，篩出「isFollowing 是 true」的人，
     // 再用 .map(...) 把這些人的名字抽出來，變成一個「名字陣列」。
-    const followingNames = creators.value
-      .filter(c => c.isFollowing)
-      .map(c => c.name)
+    const followingNames = creators.value.filter((c) => c.isFollowing).map((c) => c.name)
     // 接著再對 posts 做一次 filter：只留下「發文者的名字」有出現在
     // followingNames 這個名單裡的貼文。
-    return posts.filter(p => followingNames.includes(p.user.name))
+    return posts.filter((p) => followingNames.includes(p.user.name))
   }
   // 熱門：依按讚數（likesCount）新到舊排序，likesCount 是 Community_Post 那邊真正的資料，
   // 不用再想像成「已經排好」了。跟「最新」那段一樣，用展開運算子複製一份陣列再排序，
@@ -495,9 +509,12 @@ const searchQuery = ref(route.query.tag || '')
 // 社群首頁，又點了另一篇貼文裡不同商品的標籤，Vue Router 會直接重用同一個元件
 // （不會整個重新整理、重新掛載），上面那個初始值只會套用一次，之後網址查詢字串
 // 再怎麼變都不會自動反映。這裡另外監看 route.query.tag，之後變了就同步更新搜尋框。
-watch(() => route.query.tag, (newTag) => {
-  if (newTag) searchQuery.value = newTag
-})
+watch(
+  () => route.query.tag,
+  (newTag) => {
+    if (newTag) searchQuery.value = newTag
+  },
+)
 
 const filteredPosts = computed(() => {
   // .trim()：把文字前後多餘的空白刪掉。
@@ -506,7 +523,7 @@ const filteredPosts = computed(() => {
   const base = tabPosts.value
   // 如果搜尋框是空的，就直接回傳目前分頁的完整清單，不用篩選。
   if (!q) return base
-  return base.filter(post => {
+  return base.filter((post) => {
     // .includes(q)：判斷字串裡面「有沒有包含」q 這段文字。
     // 原本是搜尋 post.title，因為資料庫沒有分開存 title/desc，改成搜尋 post.content。
     const inContent = post.content.toLowerCase().includes(q)
@@ -514,7 +531,7 @@ const filteredPosts = computed(() => {
     // post.taggedProducts || []：如果這篇貼文沒有 taggedProducts（是 undefined），
     // 就改用一個空陣列 []，避免下面呼叫 .some() 的時候噴錯。
     // .some(...)：只要陣列裡「有任何一筆」符合條件，就回傳 true。
-    const inTags = (post.taggedProducts || []).some(p => p.name.toLowerCase().includes(q))
+    const inTags = (post.taggedProducts || []).some((p) => p.name.toLowerCase().includes(q))
     // 內文、發文者名字、標籤，只要其中一個有搜尋到關鍵字，這篇貼文就會被留下來。
     return inContent || inUser || inTags
   })
@@ -523,13 +540,13 @@ const filteredPosts = computed(() => {
 const filteredCreators = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   if (!q) return creators.value
-  return creators.value.filter(c => c.name.toLowerCase().includes(q))
+  return creators.value.filter((c) => c.name.toLowerCase().includes(q))
 })
 
 const filteredTags = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   if (!q) return popularProducts.value
-  return popularProducts.value.filter(p => p.name.toLowerCase().includes(q))
+  return popularProducts.value.filter((p) => p.name.toLowerCase().includes(q))
 })
 
 // isSearching：判斷「使用者現在是不是正在搜尋」，
@@ -618,7 +635,9 @@ const stopFeatureAutoplay = () => {
 // gridPosts：如果正在搜尋，網格就顯示全部搜尋結果；
 // 如果沒有搜尋，網格就顯示「除了第一篇以外」的其他貼文
 // （.slice(1) 的意思是「從陣列的第 1 筆開始，取到最後」，等於跳過第 0 筆）。
-const gridPosts = computed(() => (isSearching.value ? filteredPosts.value : filteredPosts.value.slice(1)))
+const gridPosts = computed(() =>
+  isSearching.value ? filteredPosts.value : filteredPosts.value.slice(1),
+)
 
 // visibleGridCount：網格區「現在願意顯示到第幾篇」，一開始只顯示前 6 篇，
 // 按「載入更多穿搭」再一次多顯示 6 篇，不是一開始就把全部貼文塞滿畫面。
@@ -647,9 +666,12 @@ watch([currentTab, searchQuery], () => {
 // 換了一篇不同的貼文當封面故事時（例如切分頁），輪播位置重設回第一張，
 // 不然可能會卡在「上一篇封面故事」切到的第 3 張，但新的這篇根本沒有第 3 張圖。
 const featureCardEl = ref(null)
-watch(() => featurePost.value?.communityPostId, () => {
-  featureImageIndex.value = 0
-})
+watch(
+  () => featurePost.value?.communityPostId,
+  () => {
+    featureImageIndex.value = 0
+  },
+)
 
 // ============================================================
 // 捲動觸發進場動畫：卡片不是「一渲染出來就播動畫」，而是真的捲動到
@@ -674,7 +696,7 @@ const runRevealAnimation = (el, translateFrom = 20, duration = 500) => {
     onComplete: () => {
       el.style.opacity = ''
       el.style.transform = ''
-    }
+    },
   })
 }
 
@@ -686,15 +708,18 @@ const runRevealAnimation = (el, translateFrom = 20, duration = 500) => {
 let cardObserver = null
 const getCardObserver = () => {
   if (cardObserver) return cardObserver
-  cardObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (!entry.isIntersecting) return
-      runRevealAnimation(entry.target)
-      // unobserve：這張卡片已經播過動畫了，不用繼續盯著它的捲動狀態，
-      // 節省效能，也確保「只在第一次進入畫面時播放一次」。
-      cardObserver.unobserve(entry.target)
-    })
-  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' })
+  cardObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return
+        runRevealAnimation(entry.target)
+        // unobserve：這張卡片已經播過動畫了，不用繼續盯著它的捲動狀態，
+        // 節省效能，也確保「只在第一次進入畫面時播放一次」。
+        cardObserver.unobserve(entry.target)
+      })
+    },
+    { threshold: 0.15, rootMargin: '0px 0px -40px 0px' },
+  )
   return cardObserver
 }
 
@@ -718,9 +743,13 @@ const observeGridCards = () => {
 // 不用自己再包一層 nextTick(...) 去等畫面更新——observeGridCards 裡面要用
 // document.querySelectorAll 抓真正畫出來的 <div class="post-card">，一定要等
 // DOM 更新完成才抓得到剛渲染出來的新卡片。
-watch(visibleGridPosts, () => {
-  observeGridCards()
-}, { flush: 'post' })
+watch(
+  visibleGridPosts,
+  () => {
+    observeGridCards()
+  },
+  { flush: 'post' },
+)
 
 // 封面故事卡片也用同一套邏輯，只是它只有單獨一張，直接用 featureCardEl 這個範本參照，
 // 不用像網格卡片那樣批次抓 DOM，動畫細節（滑動距離、時長）跟網格卡片共用同一顆
@@ -736,7 +765,7 @@ watch(featureCardEl, (el) => {
 // 是不必要的資源浪費。
 onUnmounted(() => {
   if (cardObserver) cardObserver.disconnect()
-  cardAutoplayTimers.forEach(timer => clearInterval(timer))
+  cardAutoplayTimers.forEach((timer) => clearInterval(timer))
   cardAutoplayTimers.clear()
   if (featureAutoplayTimer) clearInterval(featureAutoplayTimer)
 })
@@ -760,7 +789,7 @@ const toggleFollow = async (creator) => {
     try {
       await api.post(`/UserFollow`, {
         followerId: currentUserId.value,
-        followingId: creator.id
+        followingId: creator.id,
       })
     } catch (err) {
       console.error('追蹤失敗：', err)
@@ -770,7 +799,9 @@ const toggleFollow = async (creator) => {
     creator.followersCount += 1 // 追蹤成功，粉絲數立刻加 1
     // POST 沒有回傳新建紀錄的 id，重新問一次這位使用者的追蹤狀態，拿到真正的 userFollowId。
     try {
-      const statusRes = await api.get(`/UserFollow/follower/${currentUserId.value}/following/${creator.id}`)
+      const statusRes = await api.get(
+        `/UserFollow/follower/${currentUserId.value}/following/${creator.id}`,
+      )
       creator.userFollowId = statusRes.data ? statusRes.data.userFollowId : null
     } catch (err) {
       console.error('讀取追蹤狀態失敗：', err)
@@ -781,11 +812,7 @@ const toggleFollow = async (creator) => {
 
 <template>
   <div class="community-page min-vh-100 w-100">
-
-    
-
     <div class="container-fluid container-lg pb-5">
-
       <!-- 頁首：韓風簡約版 — 左側細直線引導，字體維持原本的 Noto Serif TC -->
       <div class="page-head">
         <div class="page-head-inner">
@@ -800,8 +827,13 @@ const toggleFollow = async (creator) => {
         <!-- 搜尋列：可搜尋穿搭標籤、單品或用戶 -->
         <div class="search-bar">
           <svg class="search-icon" viewBox="0 0 24 24" fill="none">
-            <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
-            <path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" />
+            <path
+              d="M21 21l-4.3-4.3"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
           </svg>
           <!--
             v-model="searchQuery"：這是「雙向綁定」，白話說：
@@ -819,7 +851,14 @@ const toggleFollow = async (creator) => {
             v-if="searchQuery"：只有搜尋框裡有文字的時候，才顯示這個「清除」按鈕。
             @click="searchQuery = ''"：點下去，直接把 searchQuery 設回空字串，等於清空搜尋框。
           -->
-          <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''" aria-label="清除搜尋">✕</button>
+          <button
+            v-if="searchQuery"
+            class="search-clear"
+            @click="searchQuery = ''"
+            aria-label="清除搜尋"
+          >
+            ✕
+          </button>
         </div>
       </div>
 
@@ -837,17 +876,23 @@ const toggleFollow = async (creator) => {
             class="tab-btn"
             :class="{ active: currentTab === 'hot' }"
             @click="currentTab = 'hot'"
-          >熱門</button>
+          >
+            熱門
+          </button>
           <button
             class="tab-btn"
             :class="{ active: currentTab === 'new' }"
             @click="currentTab = 'new'"
-          >最新</button>
+          >
+            最新
+          </button>
           <button
             class="tab-btn"
             :class="{ active: currentTab === 'follow' }"
             @click="currentTab = 'follow'"
-          >追蹤中</button>
+          >
+            追蹤中
+          </button>
         </div>
 
         <div class="d-flex align-items-center gap-2">         
@@ -859,10 +904,8 @@ const toggleFollow = async (creator) => {
 
       <!-- 主要內容區 -->
       <div class="row g-4">
-
         <!-- 左側：貼文列表區 -->
         <div class="col-12 col-lg-9">
-
           <!--
             骨架載入畫面：postsLoading 是 true（fetchPosts() 還在跑）的時候顯示，
             用幾個灰色佔位區塊模擬「封面故事卡＋網格卡片」大概的版面形狀，
@@ -893,66 +936,113 @@ const toggleFollow = async (creator) => {
           </template>
 
           <template v-else>
-          <!--
+            <!--
             封面故事卡（依目前分頁取第一筆）
             v-if="featurePost"：只有 featurePost 有值的時候（不是 null）才顯示這張大卡片。
             還記得上面 script 裡的邏輯嗎？正在搜尋的時候 featurePost 會是 null，
             這時候這整塊就不會出現，搜尋結果會全部乖乖排在下面的網格裡。
           -->
-          <div class="feature-card" v-if="featurePost" ref="featureCardEl">
-            <!--
+            <div class="feature-card" v-if="featurePost" ref="featureCardEl">
+              <!--
               feature-media 現在是一個普通的 div，不是 router-link 了——
               因為裡面要放輪播箭頭／圓點按鈕，如果整塊還是 router-link，
               點箭頭會被瀏覽器當成「點到連結」一起觸發跳轉。
               改成：router-link 只包住圖片本身（點圖片才會跳轉到貼文詳情），
               箭頭、圓點則是跟 router-link 平級的兄弟元素，點下去不會觸發跳轉。
             -->
-            <div class="feature-media" @mouseenter="startFeatureAutoplay" @mouseleave="stopFeatureAutoplay">
-              <router-link :to="`/community/post/${featurePost.communityPostId}`" class="feature-media-link d-block text-decoration-none">
-                <span class="tag-label">{{ currentTabCopy.ribbon }}</span>
-                <img :src="featurePost.images[featureImageIndex]?.url" :alt="featurePost.content" />
-              </router-link>
+              <div
+                class="feature-media"
+                @mouseenter="startFeatureAutoplay"
+                @mouseleave="stopFeatureAutoplay"
+              >
+                <router-link
+                  :to="`/community/post/${featurePost.communityPostId}`"
+                  class="feature-media-link d-block text-decoration-none"
+                >
+                  <span class="tag-label">{{ currentTabCopy.ribbon }}</span>
+                  <img
+                    :src="featurePost.images[featureImageIndex]?.url"
+                    :alt="featurePost.content"
+                  />
+                </router-link>
 
-              <!-- 只有超過 1 張照片才顯示箭頭／圓點，單張照片顯示輪播控制項沒意義 -->
-              <template v-if="featurePost.images.length > 1">
-                <button class="media-arrow media-arrow-prev" @click.stop="prevFeatureImage" aria-label="上一張">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="15 18 9 12 15 6"></polyline>
-                  </svg>
-                </button>
-                <button class="media-arrow media-arrow-next" @click.stop="nextFeatureImage" aria-label="下一張">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="9 18 15 12 9 6"></polyline>
-                  </svg>
-                </button>
-                <div class="media-dots">
+                <!-- 只有超過 1 張照片才顯示箭頭／圓點，單張照片顯示輪播控制項沒意義 -->
+                <template v-if="featurePost.images.length > 1">
                   <button
-                    v-for="(img, idx) in featurePost.images"
-                    :key="idx"
-                    class="media-dot"
-                    :class="{ active: idx === featureImageIndex }"
-                    @click.stop="featureImageIndex = idx"
-                  ></button>
-                </div>
-              </template>
-            </div>
-            <div class="feature-body">
-              <router-link :to="`/community/profile/${featurePost.userId}`" class="author-row text-decoration-none">
-                <img class="avatar" :src="featurePost.user.avatar" alt="avatar" @error="onAvatarError($event, featurePost.user.name)" />
-                <div>
-                  <div class="author-name">{{ featurePost.user.name }}</div>
-                  <div class="author-role">{{ currentTabCopy.role }}</div>
-                </div>
-              </router-link>
-              <!--
+                    class="media-arrow media-arrow-prev"
+                    @click.stop="prevFeatureImage"
+                    aria-label="上一張"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="18"
+                      height="18"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.4"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                  </button>
+                  <button
+                    class="media-arrow media-arrow-next"
+                    @click.stop="nextFeatureImage"
+                    aria-label="下一張"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="18"
+                      height="18"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.4"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                  </button>
+                  <div class="media-dots">
+                    <button
+                      v-for="(img, idx) in featurePost.images"
+                      :key="idx"
+                      class="media-dot"
+                      :class="{ active: idx === featureImageIndex }"
+                      @click.stop="featureImageIndex = idx"
+                    ></button>
+                  </div>
+                </template>
+              </div>
+              <div class="feature-body">
+                <router-link
+                  :to="`/community/profile/${featurePost.userId}`"
+                  class="author-row text-decoration-none"
+                >
+                  <img
+                    class="avatar"
+                    :src="featurePost.user.avatar"
+                    alt="avatar"
+                    @error="onAvatarError($event, featurePost.user.name)"
+                  />
+                  <div>
+                    <div class="author-name">{{ featurePost.user.name }}</div>
+                    <div class="author-role">{{ currentTabCopy.role }}</div>
+                  </div>
+                </router-link>
+                <!--
                 資料庫的 content 只有一個欄位（不像以前假資料分開存 title/desc），
                 所以這裡直接把 content 當內文顯示，不再另外拆一段標題。
               -->
-              <router-link :to="`/community/post/${featurePost.communityPostId}`" class="text-decoration-none text-dark">
-                <h3>{{ featurePost.content }}</h3>
-              </router-link>
-              <div class="stat-row">
-                <!--
+                <router-link
+                  :to="`/community/post/${featurePost.communityPostId}`"
+                  class="text-decoration-none text-dark"
+                >
+                  <h3>{{ featurePost.content }}</h3>
+                </router-link>
+                <div class="stat-row">
+                  <!--
                   ♥、💬 原本是文字符號／emoji，這裡跟其他圖示一起換成 SVG 心形、對話框圖示，
                   不吃字型、風格也跟輪播箭頭這類線條圖示一致。icon-inline 這個共用 class
                   負責讓圖示跟旁邊的數字文字對齊。
@@ -976,7 +1066,7 @@ const toggleFollow = async (creator) => {
             </div>
           </div>
 
-          <!--
+            <!--
             沒有結果（搜尋無結果 / 追蹤中還沒有內容 等）
             v-if="filteredPosts.length === 0"：如果篩選完的貼文陣列長度是 0（一筆都沒有），才顯示這個提示。
             裡面用了 {{ }} 搭配三元運算子：
@@ -984,72 +1074,121 @@ const toggleFollow = async (creator) => {
             如果不是搜尋造成的空清單（例如切到「追蹤中」但還沒追蹤任何人），
             就改顯示 currentTabCopy.empty 這個針對目前分頁寫好的提示文字。
           -->
-          <div class="empty-state" v-if="filteredPosts.length === 0">
-            {{ isSearching ? `找不到符合「${searchQuery}」的穿搭、標籤或用戶，換個關鍵字試試。` : currentTabCopy.empty }}
-          </div>
+            <div class="empty-state" v-if="filteredPosts.length === 0">
+              {{
+                isSearching
+                  ? `找不到符合「${searchQuery}」的穿搭、標籤或用戶，換個關鍵字試試。`
+                  : currentTabCopy.empty
+              }}
+            </div>
 
-          <!--
+            <!--
             其餘貼文：雙欄網格
             v-if="gridPosts.length"：gridPosts 陣列裡如果「有東西」(長度大於 0，也就是條件成立)，才畫這個區塊。
             v-for="post in visibleGridPosts"：只把「目前願意顯示的那幾篇」畫成小卡片，
             不是把 gridPosts 全部畫出來——視覺上一開始只會看到 6 篇，按「載入更多穿搭」才會再多幾篇。
           -->
-          <div class="post-grid" v-if="gridPosts.length">
-            <div v-for="post in visibleGridPosts" :key="post.communityPostId" class="post-card">
-
-              <!--
+            <div class="post-grid" v-if="gridPosts.length">
+              <div v-for="post in visibleGridPosts" :key="post.communityPostId" class="post-card">
+                <!--
                 跟上面封面故事卡一樣的道理：post-media 改成普通 div，
                 router-link 只包住圖片，箭頭／圓點是平級的兄弟元素，
                 點箭頭切換照片才不會被當成「點到卡片」一起跳轉到貼文詳情。
               -->
-              <div class="post-media" @mouseenter="startCardAutoplay(post)" @mouseleave="stopCardAutoplay(post)">
-                <router-link :to="`/community/post/${post.communityPostId}`" class="post-media-link d-block text-decoration-none">
-                  <span class="tag-label" v-if="post.taggedProducts && post.taggedProducts[0]">
-                    {{ post.taggedProducts[0].name }}
-                  </span>
-                  <!--
+                <div
+                  class="post-media"
+                  @mouseenter="startCardAutoplay(post)"
+                  @mouseleave="stopCardAutoplay(post)"
+                >
+                  <router-link
+                    :to="`/community/post/${post.communityPostId}`"
+                    class="post-media-link d-block text-decoration-none"
+                  >
+                    <span class="tag-label" v-if="post.taggedProducts && post.taggedProducts[0]">
+                      {{ post.taggedProducts[0].name }}
+                    </span>
+                    <!--
                     post.images[getCardImageIndex(post.communityPostId)]?.url：
                     跟固定顯示 images[0] 不一樣，改成依這張卡片「目前切到第幾張」動態抓圖，
                     getCardImageIndex 找不到這篇貼文的紀錄時預設是第 0 張（第一張）。
                   -->
-                  <img :src="post.images[getCardImageIndex(post.communityPostId)]?.url" :alt="post.content" />
-                </router-link>
+                    <img
+                      :src="post.images[getCardImageIndex(post.communityPostId)]?.url"
+                      :alt="post.content"
+                    />
+                  </router-link>
 
-                <template v-if="post.images.length > 1">
-                  <button class="media-arrow media-arrow-prev" @click.stop="prevCardImage(post)" aria-label="上一張">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-                      <polyline points="15 18 9 12 15 6"></polyline>
-                    </svg>
-                  </button>
-                  <button class="media-arrow media-arrow-next" @click.stop="nextCardImage(post)" aria-label="下一張">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-                      <polyline points="9 18 15 12 9 6"></polyline>
-                    </svg>
-                  </button>
-                  <div class="media-dots">
+                  <template v-if="post.images.length > 1">
                     <button
-                      v-for="(img, idx) in post.images"
-                      :key="idx"
-                      class="media-dot"
-                      :class="{ active: idx === getCardImageIndex(post.communityPostId) }"
-                      @click.stop="cardImageIndex[post.communityPostId] = idx"
-                    ></button>
-                  </div>
-                </template>
-              </div>
+                      class="media-arrow media-arrow-prev"
+                      @click.stop="prevCardImage(post)"
+                      aria-label="上一張"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.4"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                      </svg>
+                    </button>
+                    <button
+                      class="media-arrow media-arrow-next"
+                      @click.stop="nextCardImage(post)"
+                      aria-label="下一張"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.4"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                      </svg>
+                    </button>
+                    <div class="media-dots">
+                      <button
+                        v-for="(img, idx) in post.images"
+                        :key="idx"
+                        class="media-dot"
+                        :class="{ active: idx === getCardImageIndex(post.communityPostId) }"
+                        @click.stop="cardImageIndex[post.communityPostId] = idx"
+                      ></button>
+                    </div>
+                  </template>
+                </div>
 
-              <div class="post-body">
-                <router-link :to="`/community/profile/${post.userId}`" class="post-author text-decoration-none">
-                  <img :src="post.user.avatar" alt="avatar" @error="onAvatarError($event, post.user.name)" />
-                  <span>{{ post.user.name }}</span>
-                </router-link>
+                <div class="post-body">
+                  <router-link
+                    :to="`/community/profile/${post.userId}`"
+                    class="post-author text-decoration-none"
+                  >
+                    <img
+                      :src="post.user.avatar"
+                      alt="avatar"
+                      @error="onAvatarError($event, post.user.name)"
+                    />
+                    <span>{{ post.user.name }}</span>
+                  </router-link>
 
-                <router-link :to="`/community/post/${post.communityPostId}`" class="text-decoration-none">
-                  <p class="post-desc line-clamp-2">{{ post.content }}</p>
-                </router-link>
+                  <router-link
+                    :to="`/community/post/${post.communityPostId}`"
+                    class="text-decoration-none"
+                  >
+                    <p class="post-desc line-clamp-2">{{ post.content }}</p>
+                  </router-link>
 
-                <div class="post-foot">
-                  <!--
+                  <div class="post-foot">
+                    <!--
                     formatCount(...)：post.likesCount／commentsCount 現在存的是純數字
                     （例如 1200），不是寫死的 '1.2k' 字串，畫面顯示時才呼叫 formatCount
                     轉換成縮寫格式。這樣資料本身仍然是「可以排序、可以比大小」的數字。
@@ -1073,25 +1212,31 @@ const toggleFollow = async (creator) => {
             </div>
           </div>
 
-          <!-- 載入更多：只有還有更多沒顯示出來的貼文時才出現，全部顯示完就自動收起來 -->
-          <div class="load-more-wrap" v-if="hasMoreGridPosts">
-            <button class="btn-load" @click="loadMoreGridPosts">載入更多穿搭 ▾</button>
-          </div>
+            <!-- 載入更多：只有還有更多沒顯示出來的貼文時才出現，全部顯示完就自動收起來 -->
+            <div class="load-more-wrap" v-if="hasMoreGridPosts">
+              <button class="btn-load" @click="loadMoreGridPosts">載入更多穿搭 ▾</button>
+            </div>
           </template>
         </div>
 
-
         <!-- 右側：側邊欄 -->
         <div class="col-12 col-lg-3">
-
           <div class="side-card">
             <div class="side-title"><span class="dot"></span>熱門穿搭達人</div>
             <!-- 把 filteredCreators（可能被搜尋篩選過的達人清單）逐筆畫成一列 -->
             <!-- creator.id 現在是真的 userId（來自 fetchCreators 打的 popular-creators API），
                  可以放心接 router-link 了，不會再連到不相干的使用者。 -->
             <div v-for="creator in filteredCreators" :key="creator.id" class="stylist-row">
-              <router-link :to="`/community/profile/${creator.id}`" class="d-flex align-items-center text-decoration-none flex-grow-1 min-w-0">
-                <img class="stylist-avatar" :src="creator.avatar" alt="avatar" @error="onAvatarError($event, creator.name)" />
+              <router-link
+                :to="`/community/profile/${creator.id}`"
+                class="d-flex align-items-center text-decoration-none flex-grow-1 min-w-0"
+              >
+                <img
+                  class="stylist-avatar"
+                  :src="creator.avatar"
+                  alt="avatar"
+                  @error="onAvatarError($event, creator.name)"
+                />
                 <div class="min-w-0">
                   <div class="stylist-name text-truncate">{{ creator.name }}</div>
                   <div class="stylist-meta">{{ formatCount(creator.followersCount) }}追蹤</div>
@@ -1119,7 +1264,8 @@ const toggleFollow = async (creator) => {
                 :key="product.id"
                 class="tag-chip"
                 @click="searchQuery = product.name"
-              >#{{ product.name }}</span>
+                >#{{ product.name }}</span
+              >
             </div>
             <p class="empty-hint" v-else>沒有符合的標籤</p>
           </div>
@@ -1127,10 +1273,8 @@ const toggleFollow = async (creator) => {
           <div class="side-card">
             <p class="side-note">「穿搭不是規則，是每天寫給自己的一封短信。」</p>
           </div>
-
         </div>
       </div>
-
     </div>
   </div>
 </template>
@@ -1141,128 +1285,210 @@ const toggleFollow = async (creator) => {
 .community-page {
   width: 100%;
   min-height: 100vh;
-  background-color: #F9F4F0 !important;
+  background-color: #f9f4f0 !important;
   box-sizing: border-box;
-  --cream:#F9F4F0;
-  --paper:#FFFDFB;
-  --ink:#2A2420;
-  --ink-soft:#7A6E63;
-  --plum:#7A4B54;
-  --plum-deep:#5E3941;
-  --ochre:#B8862E;
-  --hairline:#E4D8CC;
-  --font-serif:'Noto Serif TC', serif;
-  --font-sans:'Noto Sans TC', sans-serif;
+  --cream: #f9f4f0;
+  --paper: #fffdfb;
+  --ink: #2a2420;
+  --ink-soft: #7a6e63;
+  --plum: #7a4b54;
+  --plum-deep: #5e3941;
+  --ochre: #b8862e;
+  --hairline: #e4d8cc;
+  --font-serif: 'Noto Serif TC', serif;
+  --font-sans: 'Noto Sans TC', sans-serif;
   color: var(--ink);
   font-family: var(--font-sans);
 }
 
 /* ---------- 頁首：韓風簡約版（左側細直線引導） ---------- */
-.page-head{ padding:2.4rem 0 1.2rem; }
-.page-head-inner{
-  display:flex; align-items:center; gap:1.2rem;
+.page-head {
+  padding: 2.4rem 0 1.2rem;
 }
-.page-head-divider{
-  width:1px; align-self:stretch;
-  background:var(--hairline);
-  flex-shrink:0;
+.page-head-inner {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
 }
-.page-head-text{ padding-left:.2rem; }
-.eyebrow{
-  font-size:.7rem; letter-spacing:.24em; text-transform:uppercase;
-  color:#A9A196; font-weight:600; margin-bottom:.4rem;
+.page-head-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--hairline);
+  flex-shrink: 0;
 }
-.page-title{
-  font-family:var(--font-serif);
-  font-weight:900;
-  font-size:clamp(1.7rem, 3.2vw, 2.1rem);
-  line-height:1.1;
-  margin:0 0 .4rem;
+.page-head-text {
+  padding-left: 0.2rem;
+}
+.eyebrow {
+  font-size: 0.7rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #a9a196;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+.page-title {
+  font-family: var(--font-serif);
+  font-weight: 900;
+  font-size: clamp(1.7rem, 3.2vw, 2.1rem);
+  line-height: 1.1;
+  margin: 0 0 0.4rem;
   color: var(--ink);
 }
-.page-sub{
-  font-family:var(--font-serif);
-  font-style:italic;
-  color:#9C9086;
-  font-size:.92rem;
-  margin:0;
+.page-sub {
+  font-family: var(--font-serif);
+  font-style: italic;
+  color: #9c9086;
+  font-size: 0.92rem;
+  margin: 0;
 }
 
 /* ---------- 搜尋列 ---------- */
-.search-bar{
-  position:relative;
-  display:flex; align-items:center;
-  max-width:420px;
-  margin-top:1.4rem;
-  background:var(--paper);
-  border:1px solid var(--hairline);
-  border-radius:999px;
-  padding:.55rem 1rem;
-  transition:border-color .18s ease, box-shadow .18s ease;
+.search-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  max-width: 420px;
+  margin-top: 1.4rem;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
 }
-.search-bar:focus-within{
-  border-color:var(--plum);
-  box-shadow:0 0 0 3px rgba(122,75,84,.12);
+.search-bar:focus-within {
+  border-color: var(--plum);
+  box-shadow: 0 0 0 3px rgba(122, 75, 84, 0.12);
 }
-.search-icon{ width:17px; height:17px; color:var(--ink-soft); flex-shrink:0; }
-.search-input{
-  border:none; outline:none; background:transparent;
-  flex:1; margin-left:.6rem;
-  font-family:var(--font-sans);
-  font-size:.88rem; color:var(--ink);
+.search-icon {
+  width: 17px;
+  height: 17px;
+  color: var(--ink-soft);
+  flex-shrink: 0;
 }
-.search-input::placeholder{ color:var(--ink-soft); }
-.search-clear{
-  border:none; background:var(--hairline); color:var(--ink-soft);
-  width:20px; height:20px; border-radius:50%; font-size:.7rem;
-  display:flex; align-items:center; justify-content:center; flex-shrink:0;
-  cursor:pointer;
+.search-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  flex: 1;
+  margin-left: 0.6rem;
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  color: var(--ink);
 }
-.search-clear:hover{ background:var(--plum); color:#fff; }
+.search-input::placeholder {
+  color: var(--ink-soft);
+}
+.search-clear {
+  border: none;
+  background: var(--hairline);
+  color: var(--ink-soft);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.search-clear:hover {
+  background: var(--plum);
+  color: #fff;
+}
 
 /* ---------- 分頁列 ---------- */
-.section-row{
-  display:flex; align-items:center; justify-content:space-between;
-  flex-wrap:wrap; gap:1rem;
-  border-bottom:1px solid var(--hairline);
-  padding-bottom:.2rem;
+.section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  border-bottom: 1px solid var(--hairline);
+  padding-bottom: 0.2rem;
 }
-.tab-group{ display:flex; gap:1.8rem; }
-.tab-btn{
-  background:none; border:none; padding:.7rem 0;
-  font-family:var(--font-serif);
-  font-size:1.02rem; color:var(--ink-soft);
-  position:relative; cursor:pointer;
+.tab-group {
+  display: flex;
+  gap: 1.8rem;
 }
-.tab-btn.active{ color:var(--ink); font-weight:700; }
-.tab-btn.active::after{
-  content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px;
-  background:var(--plum);
+.tab-btn {
+  background: none;
+  border: none;
+  padding: 0.7rem 0;
+  font-family: var(--font-serif);
+  font-size: 1.02rem;
+  color: var(--ink-soft);
+  position: relative;
+  cursor: pointer;
 }
-.btn-share{
-  background:var(--ink); color:var(--paper) !important; border:none;
-  border-radius:999px; padding:.6rem 1.4rem; font-size:.88rem; font-weight:600;
-  display:inline-flex; align-items:center; gap:.4rem;
-  transition:background .18s ease, transform .18s ease;
+.tab-btn.active {
+  color: var(--ink);
+  font-weight: 700;
+}
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--plum);
+}
+.btn-share {
+  background: var(--ink);
+  color: var(--paper) !important;
+  border: none;
+  border-radius: 999px;
+  padding: 0.6rem 1.4rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition:
+    background 0.18s ease,
+    transform 0.18s ease;
 }
 .btn-share:hover{ background:var(--plum-deep); transform:translateY(-1px); }
 
 /* ---------- 封面故事卡 ---------- */
-.feature-card{
-  background:var(--paper);
-  border:1px solid var(--hairline);
-  border-radius:22px;
-  overflow:hidden;
-  display:grid;
-  grid-template-columns:1.15fr 1fr;
-  margin-bottom:1.6rem;
-  transition:box-shadow .25s ease;
+.feature-card {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 22px;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  margin-bottom: 1.6rem;
+  transition: box-shadow 0.25s ease;
 }
-.feature-card:hover{ box-shadow:0 18px 34px -22px rgba(42,36,32,.35); }
-.feature-media{ position:relative; overflow:hidden; min-height:320px; background:var(--hairline); }
-.feature-media-link{ display:block; width:100%; height:100%; }
-.feature-media img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform .6s ease; }
-.feature-card:hover .feature-media img{ transform:scale(1.04); }
+.feature-card:hover {
+  box-shadow: 0 18px 34px -22px rgba(42, 36, 32, 0.35);
+}
+.feature-media {
+  position: relative;
+  overflow: hidden;
+  min-height: 320px;
+  background: var(--hairline);
+}
+.feature-media-link {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.feature-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.6s ease;
+}
+.feature-card:hover .feature-media img {
+  transform: scale(1.04);
+}
 
 /* media-arrow／media-dots：跟 PostDetailView.vue 主圖輪播同一套樣式，各自 scoped 無法共用 */
 .media-arrow{
@@ -1272,34 +1498,83 @@ const toggleFollow = async (creator) => {
   display:flex; align-items:center; justify-content:center;
   transition:background .18s ease;
 }
-.media-arrow:hover{ background:rgba(0,0,0,.7); }
-.media-arrow-prev{ left:12px; }
-.media-arrow-next{ right:12px; }
-.media-dots{
-  position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:3;
-  display:flex; gap:.4rem;
+.media-arrow:hover {
+  background: rgba(0, 0, 0, 0.7);
 }
-.media-dot{
-  width:7px; height:7px; border-radius:50%;
-  background:rgba(255,255,255,.55); border:none; padding:0;
-  transition:background .18s ease, transform .18s ease;
+.media-arrow-prev {
+  left: 12px;
 }
-.media-dot.active{ background:#fff; transform:scale(1.25); }
+.media-arrow-next {
+  right: 12px;
+}
+.media-dots {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  gap: 0.4rem;
+}
+.media-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  border: none;
+  padding: 0;
+  transition:
+    background 0.18s ease,
+    transform 0.18s ease;
+}
+.media-dot.active {
+  background: #fff;
+  transform: scale(1.25);
+}
 
-.tag-label{
-  position:absolute; top:16px; left:16px; z-index:2;
-  background:var(--plum); color:#fff;
-  font-size:.72rem; letter-spacing:.05em; font-weight:600;
-  padding:.32rem .85rem;
-  border-radius:999px;
-  box-shadow:0 4px 10px rgba(0,0,0,.18);
+.tag-label {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 2;
+  background: var(--plum);
+  color: #fff;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  padding: 0.32rem 0.85rem;
+  border-radius: 999px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
 }
 
-.feature-body{ padding:1.9rem 1.8rem; display:flex; flex-direction:column; }
-.author-row{ display:flex; align-items:center; gap:.65rem; margin-bottom:1rem; color:var(--ink); }
-.avatar{ width:40px; height:40px; border-radius:50%; object-fit:cover; box-shadow:0 0 0 1.5px var(--plum); background:#fff; }
-.author-name{ font-weight:700; font-size:.95rem; }
-.author-role{ font-size:.76rem; color:var(--ink-soft); }
+.feature-body {
+  padding: 1.9rem 1.8rem;
+  display: flex;
+  flex-direction: column;
+}
+.author-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+  color: var(--ink);
+}
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 1.5px var(--plum);
+  background: #fff;
+}
+.author-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.author-role {
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+}
 
 .feature-body h3{
   font-family:var(--font-serif);
@@ -1308,10 +1583,15 @@ const toggleFollow = async (creator) => {
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
 }
 
-.stat-row{
-  display:flex; align-items:center; gap:1.2rem;
-  border-top:1px dashed var(--hairline); padding-top:1rem; margin-top:1rem;
-  font-size:.85rem; color:var(--ink-soft);
+.stat-row {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  border-top: 1px dashed var(--hairline);
+  padding-top: 1rem;
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
 }
 .stat-row span, .stat-row a{ display:inline-flex; align-items:center; gap:.3rem; color:inherit; }
 /* stat-like-btn：按鈕歸零預設樣式、對齊旁邊的 span；已讚顏色跟 PostDetailView.vue 一致 */
@@ -1326,51 +1606,145 @@ const toggleFollow = async (creator) => {
 .icon-inline{ flex-shrink:0; } /* 小圖示跟隨文字顏色（currentColor） */
 
 /* ---------- 貼文網格 ---------- */
-.post-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:1.4rem; }
-.post-card{
-  background:var(--paper); border:1px solid var(--hairline);
-  border-radius:16px;
-  overflow:hidden; transition:transform .25s ease, box-shadow .25s ease;
+.post-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.4rem;
 }
-.post-card:hover{ transform:translateY(-4px) rotate(-0.3deg); box-shadow:0 16px 30px -20px rgba(42,36,32,.4); }
-.post-media{ position:relative; display:block; aspect-ratio:4/3; overflow:hidden; background:var(--hairline); }
-.post-media-link{ display:block; width:100%; height:100%; }
-.post-media img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform .5s ease; }
-.post-card:hover .post-media img{ transform:scale(1.06); }
-.post-media .tag-label{ font-size:.66rem; padding:.24rem .7rem; top:12px; left:12px; }
+.post-card {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  overflow: hidden;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+.post-card:hover {
+  transform: translateY(-4px) rotate(-0.3deg);
+  box-shadow: 0 16px 30px -20px rgba(42, 36, 32, 0.4);
+}
+.post-media {
+  position: relative;
+  display: block;
+  aspect-ratio: 4/3;
+  overflow: hidden;
+  background: var(--hairline);
+}
+.post-media-link {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.post-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.5s ease;
+}
+.post-card:hover .post-media img {
+  transform: scale(1.06);
+}
+.post-media .tag-label {
+  font-size: 0.66rem;
+  padding: 0.24rem 0.7rem;
+  top: 12px;
+  left: 12px;
+}
 /* 網格卡片比封面故事卡小很多，箭頭、圓點跟著縮小一點，不會佔掉太多圖片空間 */
-.post-media .media-arrow{ width:26px; height:26px; }
-.post-media .media-arrow-prev{ left:8px; }
-.post-media .media-arrow-next{ right:8px; }
-.post-media .media-dots{ bottom:8px; }
-.post-media .media-dot{ width:5px; height:5px; }
-
-.post-body{ padding:1rem 1.1rem 1.2rem; }
-.post-author{ display:flex; align-items:center; gap:.5rem; margin-bottom:.6rem; color:var(--ink); }
-.post-author img{ width:28px; height:28px; border-radius:50%; object-fit:cover; }
-.post-author span{ font-size:.85rem; font-weight:700; }
-.post-desc{ font-size:.85rem; color:var(--ink-soft); line-height:1.55; min-height:2.6em; margin:0; }
-.post-foot{
-  display:flex; align-items:center; gap:1rem; margin-top:.9rem;
-  padding-top:.8rem; border-top:1px solid var(--hairline);
-  font-size:.8rem; color:var(--ink-soft);
+.post-media .media-arrow {
+  width: 26px;
+  height: 26px;
 }
-.post-foot span{ display:inline-flex; align-items:center; gap:.3rem; }
-.post-foot a{ margin-left:auto; color:var(--plum); text-decoration:none; font-weight:600; }
+.post-media .media-arrow-prev {
+  left: 8px;
+}
+.post-media .media-arrow-next {
+  right: 8px;
+}
+.post-media .media-dots {
+  bottom: 8px;
+}
+.post-media .media-dot {
+  width: 5px;
+  height: 5px;
+}
 
-.line-clamp-2{
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+.post-body {
+  padding: 1rem 1.1rem 1.2rem;
+}
+.post-author {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  color: var(--ink);
+}
+.post-author img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.post-author span {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.post-desc {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  line-height: 1.55;
+  min-height: 2.6em;
+  margin: 0;
+}
+.post-foot {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--hairline);
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+.post-foot span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.post-foot a {
+  margin-left: auto;
+  color: var(--plum);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* ---------- 骨架載入畫面 ---------- */
 /* skeleton-shimmer：底色疊一道會左右移動的光斑，做出常見的骨架讀取效果 */
 @keyframes skeleton-shimmer {
-  0% { background-position: -300px 0; }
-  100% { background-position: 300px 0; }
+  0% {
+    background-position: -300px 0;
+  }
+  100% {
+    background-position: 300px 0;
+  }
 }
-.skeleton-block{
+.skeleton-block {
   background-color: var(--hairline);
-  background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,.55) 50%, rgba(255,255,255,0) 100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
   background-size: 300px 100%;
   background-repeat: no-repeat;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
@@ -1383,94 +1757,239 @@ const toggleFollow = async (creator) => {
   overflow:hidden; margin-bottom:1.6rem;
   display:grid; grid-template-columns:1.15fr 1fr;
 }
-.skeleton-feature-media{ min-height:320px; border-radius:0; }
-.skeleton-feature-body{ padding:1.9rem 1.8rem; display:flex; flex-direction:column; gap:.9rem; }
-.skeleton-avatar{ width:40px; height:40px; border-radius:50%; }
-.skeleton-line{ height:14px; }
-.skeleton-line-80{ width:80%; }
-.skeleton-line-60{ width:60%; }
-.skeleton-line-50{ width:50%; }
-.skeleton-line-90{ width:90%; }
-.skeleton-line-70{ width:70%; }
+.skeleton-feature-media {
+  min-height: 320px;
+  border-radius: 0;
+}
+.skeleton-feature-body {
+  padding: 1.9rem 1.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.skeleton-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+.skeleton-line {
+  height: 14px;
+}
+.skeleton-line-80 {
+  width: 80%;
+}
+.skeleton-line-60 {
+  width: 60%;
+}
+.skeleton-line-50 {
+  width: 50%;
+}
+.skeleton-line-90 {
+  width: 90%;
+}
+.skeleton-line-70 {
+  width: 70%;
+}
 
 /* 骨架版網格卡片：欄數、圓角、間距比照 .post-grid／.post-card */
 .skeleton-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:1.4rem; }
 .skeleton-card{
   background:var(--paper); border:1px solid var(--hairline); border-radius:16px; overflow:hidden;
 }
-.skeleton-card-media{ aspect-ratio:4/3; border-radius:0; }
-.skeleton-card-body{ padding:1rem 1.1rem 1.2rem; display:flex; flex-direction:column; gap:.6rem; }
+.skeleton-card-media {
+  aspect-ratio: 4/3;
+  border-radius: 0;
+}
+.skeleton-card-body {
+  padding: 1rem 1.1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
 
-@media (max-width: 991px){
-  .skeleton-feature{ grid-template-columns:1fr; }
-  .skeleton-feature-media{ min-height:240px; }
+@media (max-width: 991px) {
+  .skeleton-feature {
+    grid-template-columns: 1fr;
+  }
+  .skeleton-feature-media {
+    min-height: 240px;
+  }
 }
-@media (max-width: 767px){
-  .skeleton-grid{ grid-template-columns:1fr; }
+@media (max-width: 767px) {
+  .skeleton-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
-.empty-state{
-  background:var(--paper); border:1px dashed var(--hairline); border-radius:16px;
-  padding:2.2rem 1.5rem; text-align:center; color:var(--ink-soft);
-  font-size:.92rem; margin-bottom:1.6rem;
+.empty-state {
+  background: var(--paper);
+  border: 1px dashed var(--hairline);
+  border-radius: 16px;
+  padding: 2.2rem 1.5rem;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  margin-bottom: 1.6rem;
 }
-.empty-hint{ font-size:.8rem; color:var(--ink-soft); margin:0; }
+.empty-hint {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
 
 /* ---------- 載入更多 ---------- */
-.load-more-wrap{ text-align:center; margin-top:2.2rem; }
-.btn-load{
-  background:transparent; border:1px solid var(--ink); color:var(--ink);
-  border-radius:999px; padding:.6rem 2rem; font-size:.88rem; letter-spacing:.03em;
-  transition:all .2s ease;
+.load-more-wrap {
+  text-align: center;
+  margin-top: 2.2rem;
 }
-.btn-load:hover{ background:var(--ink); color:var(--cream); }
+.btn-load {
+  background: transparent;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 0.6rem 2rem;
+  font-size: 0.88rem;
+  letter-spacing: 0.03em;
+  transition: all 0.2s ease;
+}
+.btn-load:hover {
+  background: var(--ink);
+  color: var(--cream);
+}
 
 /* ---------- 側邊欄 ---------- */
-.side-card{ background:var(--paper); border:1px solid var(--hairline); border-radius:16px; padding:1.4rem 1.3rem; margin-bottom:1.4rem; }
-.side-title{
-  font-family:var(--font-serif); font-weight:700; font-size:1.02rem;
-  margin-bottom:1.1rem; display:flex; align-items:center; gap:.5rem; color:var(--ink);
+.side-card {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  padding: 1.4rem 1.3rem;
+  margin-bottom: 1.4rem;
 }
-.side-title .dot{ width:6px; height:6px; border-radius:50%; background:var(--ochre); }
-
-.stylist-row{ display:flex; align-items:center; gap:.7rem; padding:.65rem 0; border-bottom:1px solid var(--hairline); }
-.stylist-row:last-child{ border-bottom:none; padding-bottom:0; }
-.stylist-avatar{ width:44px; height:44px; border-radius:50%; object-fit:cover; flex-shrink:0; }
-.stylist-name{ font-weight:700; font-size:.88rem; color:var(--ink); }
-.stylist-meta{ font-size:.72rem; color:var(--ink-soft); }
-.min-w-0{ min-width:0; }
-.btn-follow{
-  margin-left:.5rem; font-size:.74rem; padding:.34rem .85rem; border-radius:999px;
-  border:1px solid var(--plum); color:var(--plum); background:transparent;
-  transition:all .18s ease; white-space:nowrap; flex-shrink:0;
+.side-title {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-size: 1.02rem;
+  margin-bottom: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ink);
 }
-.btn-follow.following{ background:var(--hairline); border-color:var(--hairline); color:var(--ink-soft); }
-.btn-follow:not(.following):hover{ background:var(--plum); color:#fff; }
-
-.tag-cloud{ display:flex; flex-wrap:wrap; gap:.5rem; }
-.tag-chip{
-  font-size:.76rem; padding:.38rem .85rem; border-radius:999px;
-  background:var(--cream); border:1px solid var(--hairline); color:var(--ink);
-  cursor:pointer; transition:all .18s ease;
-}
-.tag-chip:nth-child(3n+1){ transform:rotate(-1deg); }
-.tag-chip:nth-child(3n+2){ transform:rotate(1deg); }
-.tag-chip:hover{ border-color:var(--ochre); color:var(--ochre); }
-
-.side-note{
-  font-family:var(--font-serif); font-style:italic;
-  font-size:.84rem; color:var(--ink-soft); line-height:1.7;
-  border-left:2px solid var(--plum); padding-left:.9rem; margin:0;
+.side-title .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ochre);
 }
 
-@media (max-width: 991px){
-  .feature-card{ grid-template-columns:1fr; }
-  .feature-media{ min-height:240px; }
+.stylist-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--hairline);
 }
-@media (max-width: 767px){
-  .post-grid{ grid-template-columns:1fr; }
-  .section-row{ flex-direction:column; align-items:flex-start; }
-  .search-bar{ max-width:100%; }
+.stylist-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.stylist-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.stylist-name {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+.stylist-meta {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+}
+.min-w-0 {
+  min-width: 0;
+}
+.btn-follow {
+  margin-left: 0.5rem;
+  font-size: 0.74rem;
+  padding: 0.34rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--plum);
+  color: var(--plum);
+  background: transparent;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn-follow.following {
+  background: var(--hairline);
+  border-color: var(--hairline);
+  color: var(--ink-soft);
+}
+.btn-follow:not(.following):hover {
+  background: var(--plum);
+  color: #fff;
+}
+
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.tag-chip {
+  font-size: 0.76rem;
+  padding: 0.38rem 0.85rem;
+  border-radius: 999px;
+  background: var(--cream);
+  border: 1px solid var(--hairline);
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.tag-chip:nth-child(3n + 1) {
+  transform: rotate(-1deg);
+}
+.tag-chip:nth-child(3n + 2) {
+  transform: rotate(1deg);
+}
+.tag-chip:hover {
+  border-color: var(--ochre);
+  color: var(--ochre);
+}
+
+.side-note {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.84rem;
+  color: var(--ink-soft);
+  line-height: 1.7;
+  border-left: 2px solid var(--plum);
+  padding-left: 0.9rem;
+  margin: 0;
+}
+
+@media (max-width: 991px) {
+  .feature-card {
+    grid-template-columns: 1fr;
+  }
+  .feature-media {
+    min-height: 240px;
+  }
+}
+@media (max-width: 767px) {
+  .post-grid {
+    grid-template-columns: 1fr;
+  }
+  .section-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .search-bar {
+    max-width: 100%;
+  }
 }
 </style>
 
@@ -1481,6 +2000,6 @@ const toggleFollow = async (creator) => {
 -->
 <style>
 body {
-  background-color: #F9F4F0 !important;
+  background-color: #f9f4f0 !important;
 }
 </style>
