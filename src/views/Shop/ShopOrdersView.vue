@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import api from '@/services/api' // 組員的 api（自動帶 token）
+import api from '@/api/api' // 組員的 api（自動帶 token）
 
 const router = useRouter()
 const orders = ref([]) // 存訂單清單

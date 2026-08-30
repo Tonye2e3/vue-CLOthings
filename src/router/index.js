@@ -1,19 +1,12 @@
-import {
-  createRouter,
-  createWebHistory
-} from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
-import {
-  useAuthStore
-} from '@/stores/auth'
+import { useAuthStore } from '@/stores/auth'
 
 import GoogleOAuthCallback from '@/views/Users/GoogleOAuthCallback.vue'
 
 const router = createRouter({
-  history: createWebHistory(
-    import.meta.env.BASE_URL),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    //內建主頁暫不使用
     {
       path: '/',
       name: 'home',
@@ -261,7 +254,8 @@ const router = createRouter({
         requiresAuth: true,
       },
 
-      children: [{
+      children: [
+        {
           // /user
           path: '',
           name: 'user',
@@ -346,6 +340,11 @@ const router = createRouter({
       name: 'google-oauth-callback',
       component: GoogleOAuthCallback,
     },
+    {
+      path: '/verify-email',
+      name: 'VerifyEmail',
+      component: () => import('../views/Users/VerifyEmailView.vue'),
+    },
   ],
 })
 
@@ -365,6 +364,13 @@ router.beforeEach((to) => {
 
   // 要進入的頁面需要管理員權限，而目前登入的角色不是 Admin / SuperAdmin
   if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    return {
+      name: 'home',
+    }
+  }
+
+  // 要進入的頁面需要超級管理員權限，而目前登入的角色不是 SuperAdmin
+  if (to.meta.requiresSuperAdmin && !authStore.isSuperAdmin) {
     return {
       name: 'home',
     }

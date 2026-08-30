@@ -34,18 +34,16 @@ const post = ref({
   user: {
     name: '載入中...',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily',
-    location: ''
+    location: '',
   },
   isFollowing: false,
   postDate: new Date().toISOString(),
   status: 'published',
-  images: [
-    { postImageId: null, imageFileName: null, sortOrder: 1, url: postImage }
-  ],
+  images: [{ postImageId: null, imageFileName: null, sortOrder: 1, url: postImage }],
   content: '',
   commentsCount: 0,
   isLiked: false,
-  taggedProducts: []
+  taggedProducts: [],
 })
 
 // 找不到這篇貼文時顯示「找不到這篇貼文」
@@ -110,7 +108,12 @@ const fetchPost = async () => {
       communityPostId: p.communityPostId,
       userId: p.userId,
       user: p.user
-        ? { ...p.user, avatar: p.user.avatar ? `${IMAGE_BASE}${p.user.avatar}` : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + p.user.name }
+        ? {
+            ...p.user,
+            avatar: p.user.avatar
+              ? `${IMAGE_BASE}${p.user.avatar}`
+              : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + p.user.name,
+          }
         : { name: '未知使用者', avatar: '', location: '' },
       isFollowing: false, // 實際狀態由 fetchFollowStatus() 另外查
       postDate: p.postDate,
@@ -236,7 +239,7 @@ const animateLikeIcon = () => {
   animate(likeIconEl.value, {
     scale: [1, 1.4, 1],
     duration: 380,
-    ease: 'outBack'
+    ease: 'outBack',
   })
 }
 
@@ -256,7 +259,7 @@ const toggleLike = async () => {
     try {
       await api.post(`/PostLike`, {
         communityPostId: post.value.communityPostId,
-        userId: currentUserId.value
+        userId: currentUserId.value,
       })
     } catch (err) {
       console.error('按讚失敗：', err)
@@ -339,7 +342,7 @@ const submitReport = async () => {
     const res = await api.post('/PostReport', {
       communityPostId: post.value.communityPostId,
       reporterId: currentUserId.value,
-      reason
+      reason,
     })
     if (res.data.ok) {
       alert('已送出檢舉，謝謝你的回報！')
@@ -364,7 +367,9 @@ const copyLink = async () => {
   try {
     await navigator.clipboard.writeText(shareUrl.value)
     linkCopied.value = true
-    setTimeout(() => { linkCopied.value = false }, 1500)
+    setTimeout(() => {
+      linkCopied.value = false
+    }, 1500)
   } catch (err) {
     console.error('複製連結失敗：', err)
   }
@@ -373,12 +378,18 @@ const copyLink = async () => {
 // 走各平台自己的分享連結格式，不用串接 API 金鑰
 const shareToLine = async () => {
   await ensureShortUrl()
-  window.open(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(shareUrl.value)}`, '_blank')
+  window.open(
+    `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(shareUrl.value)}`,
+    '_blank',
+  )
   closeShareMenu()
 }
 const shareToFacebook = async () => {
   await ensureShortUrl()
-  window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl.value)}`, '_blank')
+  window.open(
+    `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl.value)}`,
+    '_blank',
+  )
   closeShareMenu()
 }
 
@@ -400,9 +411,9 @@ const similarPosts = ref([])
 const fetchSimilarPosts = async () => {
   try {
     const res = await api.get(`/CommunityPost/similar/${route.params.id}`)
-    similarPosts.value = res.data.map(p => ({
+    similarPosts.value = res.data.map((p) => ({
       communityPostId: p.communityPostId,
-      image: (p.images && p.images.length) ? `${IMAGE_BASE}${p.images[0].imageFileName}` : postImage
+      image: p.images && p.images.length ? `${IMAGE_BASE}${p.images[0].imageFileName}` : postImage,
     }))
   } catch (err) {
     console.error('讀取相似穿搭推薦失敗：', err)
@@ -450,7 +461,9 @@ const fetchComments = async () => {
     const res = await api.get(`/PostComment/post/${route.params.id}`)
     comments.value = res.data.map(c => ({
       ...c,
-      avatar: c.avatar ? `${IMAGE_BASE}${c.avatar}` : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + c.user
+      avatar: c.avatar
+        ? `${IMAGE_BASE}${c.avatar}`
+        : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + c.user,
     }))
   } catch (err) {
     console.error('讀取留言失敗：', err)
@@ -464,7 +477,9 @@ const myFollowId = ref(null)
 
 const fetchFollowStatus = async () => {
   try {
-    const res = await api.get(`/UserFollow/follower/${currentUserId.value}/following/${post.value.userId}`)
+    const res = await api.get(
+      `/UserFollow/follower/${currentUserId.value}/following/${post.value.userId}`,
+    )
     if (res.data) {
       post.value.isFollowing = true
       myFollowId.value = res.data.userFollowId
@@ -491,7 +506,7 @@ const toggleFollow = async () => {
     try {
       await api.post(`/UserFollow`, {
         followerId: currentUserId.value,
-        followingId: post.value.userId
+        followingId: post.value.userId,
       })
     } catch (err) {
       console.error('追蹤失敗：', err)
@@ -509,7 +524,7 @@ const addComment = async () => {
       parentCommentId: replyingTo.value ? replyingTo.value.postCommentId : null,
       communityPostId: post.value.communityPostId,
       userId: currentUserId.value,
-      commentText: newComment.value
+      commentText: newComment.value,
     })
   } catch (err) {
     console.error('送出留言失敗：', err)
@@ -525,11 +540,7 @@ const addComment = async () => {
 </script>
 
 <template>
-  
-
   <div class="community-page min-vh-100 w-100">
-    
-
     <div class="container-fluid container-lg pb-5 pt-4">
 
       <!-- 返回社群按鈕：跟 CreatePostView.vue 的 back-pill 同一顆按鈕、同一套樣式 -->
@@ -547,8 +558,14 @@ const addComment = async () => {
               </div>
             </div>
             <div class="skeleton-block skeleton-main-media"></div>
-            <div class="skeleton-block skeleton-line skeleton-line-90" style="margin-top:1.2rem;"></div>
-            <div class="skeleton-block skeleton-line skeleton-line-60" style="margin-top:.6rem;"></div>
+            <div
+              class="skeleton-block skeleton-line skeleton-line-90"
+              style="margin-top: 1.2rem"
+            ></div>
+            <div
+              class="skeleton-block skeleton-line skeleton-line-60"
+              style="margin-top: 0.6rem"
+            ></div>
           </div>
         </div>
         <div class="col-12 col-lg-4">
@@ -563,12 +580,10 @@ const addComment = async () => {
       </div>
 
       <div class="row g-4" v-else>
-
         <!-- 左側：貼文主體區 (大圖、內文、互動、留言) -->
         <div class="col-12 col-lg-8">
           <div class="post-main-card">
-
-           <!-- 發文者資訊列 -->
+            <!-- 發文者資訊列 -->
             <div class="author-bar">
               <router-link :to="`/community/profile/${post.userId}`" class="author-info text-decoration-none">
                 <img :src="post.user.avatar" class="author-avatar" alt="avatar" @error="onAvatarError($event, post.user.name)" />
@@ -594,12 +609,30 @@ const addComment = async () => {
               <!-- 超過 1 張才顯示箭頭／圓點 -->
               <template v-if="post.images.length > 1">
                 <button class="media-arrow media-arrow-prev" @click="prevImage" aria-label="上一張">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="18"
+                    height="18"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
                     <polyline points="15 18 9 12 15 6"></polyline>
                   </svg>
                 </button>
                 <button class="media-arrow media-arrow-next" @click="nextImage" aria-label="下一張">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="18"
+                    height="18"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
                     <polyline points="9 18 15 12 9 6"></polyline>
                   </svg>
                 </button>
@@ -609,7 +642,10 @@ const addComment = async () => {
                     :key="idx"
                     class="media-dot"
                     :class="{ active: idx === currentImageIndex }"
-                    @click="currentImageIndex = idx; restartAutoplay()"
+                    @click="
+                      currentImageIndex = idx
+                      restartAutoplay()
+                    "
                   ></button>
                 </div>
               </template>
@@ -622,7 +658,10 @@ const addComment = async () => {
                 :key="idx"
                 class="post-thumb-item"
                 :class="{ active: idx === currentImageIndex }"
-                @click="currentImageIndex = idx; restartAutoplay()"
+                @click="
+                  currentImageIndex = idx
+                  restartAutoplay()
+                "
               >
                 <img :src="img.url" alt="縮圖" />
               </button>
@@ -646,9 +685,7 @@ const addComment = async () => {
                 </button>
                 <!-- share-wrapper：position:relative 讓選單相對這個按鈕定位 -->
                 <div class="share-wrapper">
-                  <button class="action-btn" @click="toggleShareMenu">
-                    ↗ 分享
-                  </button>
+                  <button class="action-btn" @click="toggleShareMenu">↗ 分享</button>
 
                   <!-- 透明背景鋪滿全畫面，點選單外面直接關閉，不用另外偵測點擊位置 -->
                   <div v-if="showShareMenu" class="share-menu-backdrop" @click="closeShareMenu"></div>
@@ -664,7 +701,16 @@ const addComment = async () => {
                       系統分享
                     </button>
                     <button type="button" class="share-menu-item" @click="copyLink">
-                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="14"
+                        height="14"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
                         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
                         <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                       </svg>
@@ -682,13 +728,27 @@ const addComment = async () => {
                 <!-- 檢舉：跟分享選單同一種定位邏輯 -->
                 <div class="report-wrapper">
                   <button class="action-btn" @click="toggleReportMenu">
-                    <svg class="icon-inline" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg
+                      class="icon-inline"
+                      viewBox="0 0 24 24"
+                      width="15"
+                      height="15"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
                       <path d="M5 3v18" />
                       <path d="M5 4h13l-3 4 3 4H5" />
                     </svg>
                     檢舉
                   </button>
-                  <div v-if="showReportMenu" class="share-menu-backdrop" @click="closeReportMenu"></div>
+                  <div
+                    v-if="showReportMenu"
+                    class="share-menu-backdrop"
+                    @click="closeReportMenu"
+                  ></div>
                   <div v-if="showReportMenu" class="report-panel">
                     <p class="report-panel-title">檢舉這篇貼文</p>
                     <textarea
@@ -698,8 +758,15 @@ const addComment = async () => {
                       placeholder="請簡短說明檢舉原因（例如：不實廣告、冒犯言論...）"
                     ></textarea>
                     <div class="report-panel-actions">
-                      <button type="button" class="report-btn-cancel" @click="closeReportMenu">取消</button>
-                      <button type="button" class="report-btn-submit" :disabled="!reportReason.trim() || reportSubmitting" @click="submitReport">
+                      <button type="button" class="report-btn-cancel" @click="closeReportMenu">
+                        取消
+                      </button>
+                      <button
+                        type="button"
+                        class="report-btn-submit"
+                        :disabled="!reportReason.trim() || reportSubmitting"
+                        @click="submitReport"
+                      >
                         {{ reportSubmitting ? '送出中...' : '送出檢舉' }}
                       </button>
                     </div>
@@ -708,7 +775,17 @@ const addComment = async () => {
               </div>
               <!-- 收藏按鈕：更新共用收藏清單，UserProfileView.vue 收藏頁籤才看得到 -->
               <button class="action-btn" :class="{ saved: isSaved }" @click="toggleSave">
-                <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" :fill="isSaved ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg
+                  class="icon-inline"
+                  viewBox="0 0 24 24"
+                  width="14"
+                  height="14"
+                  :fill="isSaved ? 'currentColor' : 'none'"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
                   <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
                 </svg>
                 {{ isSaved ? '已收藏' : '收藏' }}
@@ -727,7 +804,8 @@ const addComment = async () => {
                   :key="tag.postTaggedProductId"
                   :to="`/community?tag=${encodeURIComponent(tag.name)}`"
                   class="tag-chip"
-                >#{{ tag.name }}</router-link>
+                  >#{{ tag.name }}</router-link
+                >
               </div>
             </div>
 
@@ -796,7 +874,6 @@ const addComment = async () => {
                 <button class="btn-load-comments" @click="loadMoreComments">查看更多留言 ▾</button>
               </div>
             </div>
-
           </div>
         </div>
 
@@ -840,9 +917,7 @@ const addComment = async () => {
               </router-link>
             </div>
           </div>
-
         </div>
-
       </div>
     </div>
   </div>
@@ -852,171 +927,330 @@ const addComment = async () => {
 .community-page {
   width: 100%;
   min-height: 100vh;
-  background-color: #F9F4F0 !important;
+  background-color: #f9f4f0 !important;
   box-sizing: border-box;
-  --cream:#F9F4F0;
-  --paper:#FFFDFB;
-  --ink:#2A2420;
-  --ink-soft:#7A6E63;
-  --plum:#7A4B54;
-  --plum-deep:#5E3941;
-  --ochre:#B8862E;
-  --hairline:#E4D8CC;
+  --cream: #f9f4f0;
+  --paper: #fffdfb;
+  --ink: #2a2420;
+  --ink-soft: #7a6e63;
+  --plum: #7a4b54;
+  --plum-deep: #5e3941;
+  --ochre: #b8862e;
+  --hairline: #e4d8cc;
   color: var(--ink);
   font-family: 'Noto Sans TC', sans-serif;
 }
 
 /* ---------- 返回社群按鈕 ---------- */
-.back-pill{
-  display:inline-flex; align-items:center; gap:.3rem;
-  border:1px solid var(--ink); border-radius:999px;
-  padding:.35rem 1rem; font-size:.82rem; color:var(--ink);
-  text-decoration:none; margin-bottom:1.2rem;
-  transition:all .18s ease;
+.back-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  padding: 0.35rem 1rem;
+  font-size: 0.82rem;
+  color: var(--ink);
+  text-decoration: none;
+  margin-bottom: 1.2rem;
+  transition: all 0.18s ease;
 }
-.back-pill:hover{ background:var(--ink); color:var(--cream); }
+.back-pill:hover {
+  background: var(--ink);
+  color: var(--cream);
+}
 
 /* ---------- 骨架載入畫面（跟 CommunityView.vue 同一套光斑效果） ---------- */
 @keyframes skeleton-shimmer {
-  0% { background-position: -300px 0; }
-  100% { background-position: 300px 0; }
+  0% {
+    background-position: -300px 0;
+  }
+  100% {
+    background-position: 300px 0;
+  }
 }
-.skeleton-block{
+.skeleton-block {
   background-color: var(--hairline);
-  background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,.55) 50%, rgba(255,255,255,0) 100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
   background-size: 300px 100%;
   background-repeat: no-repeat;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
   border-radius: 6px;
 }
-.skeleton-author-bar{ display:flex; align-items:center; gap:.7rem; margin-bottom:1.1rem; }
-.skeleton-avatar-lg{ width:44px; height:44px; border-radius:50%; flex-shrink:0; }
-.skeleton-author-lines{ display:flex; flex-direction:column; gap:.5rem; flex:1; }
-.skeleton-line{ height:14px; }
-.skeleton-line-40{ width:40%; }
-.skeleton-line-30{ width:30%; }
-.skeleton-line-90{ width:90%; }
-.skeleton-line-60{ width:60%; }
-.skeleton-main-media{ width:100%; height:550px; border-radius:8px; }
-.skeleton-side-card{ width:100%; height:320px; border-radius:16px; }
-@media (max-width: 767px){
-  .skeleton-main-media{ height:340px; }
+.skeleton-author-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 1.1rem;
+}
+.skeleton-avatar-lg {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.skeleton-author-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+}
+.skeleton-line {
+  height: 14px;
+}
+.skeleton-line-40 {
+  width: 40%;
+}
+.skeleton-line-30 {
+  width: 30%;
+}
+.skeleton-line-90 {
+  width: 90%;
+}
+.skeleton-line-60 {
+  width: 60%;
+}
+.skeleton-main-media {
+  width: 100%;
+  height: 550px;
+  border-radius: 8px;
+}
+.skeleton-side-card {
+  width: 100%;
+  height: 320px;
+  border-radius: 16px;
+}
+@media (max-width: 767px) {
+  .skeleton-main-media {
+    height: 340px;
+  }
 }
 
 /* ---------- 找不到貼文 ---------- */
-.not-found-state{
-  background:var(--paper); border:1px dashed var(--hairline); border-radius:16px;
-  padding:3rem 2rem; text-align:center; color:var(--ink-soft);
+.not-found-state {
+  background: var(--paper);
+  border: 1px dashed var(--hairline);
+  border-radius: 16px;
+  padding: 3rem 2rem;
+  text-align: center;
+  color: var(--ink-soft);
 }
-.not-found-state p{ margin-bottom:1rem; }
+.not-found-state p {
+  margin-bottom: 1rem;
+}
 
 /* ---------- 主卡片 ---------- */
-.post-main-card{
-  background:var(--paper);
-  border:1px solid var(--hairline);
-  border-radius:16px;
-  padding:1.6rem;
+.post-main-card {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  padding: 1.6rem;
 }
 
 /* ---------- 發文者列 ---------- */
-.author-bar{
-  display:flex; align-items:center; justify-content:space-between;
-  margin-bottom:1.2rem;
+.author-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.2rem;
 }
-.author-info{ display:flex; align-items:center; gap:.8rem; }
-.author-avatar{
-  width:48px; height:48px; border-radius:50%; object-fit:cover;
-  box-shadow:0 0 0 2px var(--plum);
+.author-info {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
 }
-.author-name{
-  font-family:'Noto Serif TC', serif; font-weight:700; font-size:.98rem;
-  margin:0; color:var(--ink);
+.author-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 2px var(--plum);
 }
-.author-meta{ font-size:.78rem; color:var(--ink-soft); }
+.author-name {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 700;
+  font-size: 0.98rem;
+  margin: 0;
+  color: var(--ink);
+}
+.author-meta {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
 
-.btn-follow-main{
-  background:var(--ink); color:var(--paper);
-  border:none; border-radius:4px;
-  padding:.5rem 1.3rem; font-size:.84rem; font-weight:600;
-  transition:background .18s ease, transform .18s ease;
+.btn-follow-main {
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1.3rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  transition:
+    background 0.18s ease,
+    transform 0.18s ease;
 }
-.btn-follow-main:hover{ background:var(--plum-deep); transform:translateY(-1px); }
-.btn-follow-main.following{ background:var(--hairline); color:var(--ink-soft); }
-.btn-follow-main.following:hover{ background:var(--hairline); transform:none; }
+.btn-follow-main:hover {
+  background: var(--plum-deep);
+  transform: translateY(-1px);
+}
+.btn-follow-main.following {
+  background: var(--hairline);
+  color: var(--ink-soft);
+}
+.btn-follow-main.following:hover {
+  background: var(--hairline);
+  transform: none;
+}
 
 /* ---------- 主圖 ---------- */
-.post-media{
-  position:relative;
-  border-radius:8px;
-  overflow:hidden;
-  background:var(--cream);
-  margin-bottom:1.1rem;
+.post-media {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--cream);
+  margin-bottom: 1.1rem;
 }
-.post-image{
-  width:100%; height:550px; object-fit:contain;
-  display:block; background:var(--paper);
+.post-image {
+  width: 100%;
+  height: 550px;
+  object-fit: contain;
+  display: block;
+  background: var(--paper);
 }
 
-.tag-label{
-  position:absolute; top:16px; left:-6px; z-index:2;
-  background:var(--plum); color:#fff;
-  font-size:.7rem; letter-spacing:.05em; font-weight:600;
-  padding:.3rem .75rem .3rem 1rem;
-  box-shadow:0 4px 10px rgba(0,0,0,.18);
+.tag-label {
+  position: absolute;
+  top: 16px;
+  left: -6px;
+  z-index: 2;
+  background: var(--plum);
+  color: #fff;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  padding: 0.3rem 0.75rem 0.3rem 1rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
 }
-.tag-label::after{
-  content:""; position:absolute; left:0; bottom:-6px;
-  border-width:0 6px 6px 0; border-style:solid;
-  border-color:transparent var(--plum-deep) transparent transparent;
+.tag-label::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -6px;
+  border-width: 0 6px 6px 0;
+  border-style: solid;
+  border-color: transparent var(--plum-deep) transparent transparent;
 }
 
 /* ---------- 主圖輪播：箭頭、圓點 ---------- */
-.media-arrow{
-  position:absolute; top:50%; transform:translateY(-50%); z-index:3;
-  width:36px; height:36px; border-radius:50%;
-  background:rgba(0,0,0,.45); color:#fff; border:none; padding:0;
-  display:flex; align-items:center; justify-content:center;
-  transition:background .18s ease;
+.media-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.18s ease;
 }
-.media-arrow:hover{ background:rgba(0,0,0,.7); }
-.media-arrow-prev{ left:12px; }
-.media-arrow-next{ right:12px; }
+.media-arrow:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+.media-arrow-prev {
+  left: 12px;
+}
+.media-arrow-next {
+  right: 12px;
+}
 
-.media-dots{
-  position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:3;
-  display:flex; gap:.4rem;
+.media-dots {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  gap: 0.4rem;
 }
-.media-dot{
-  width:7px; height:7px; border-radius:50%;
-  background:rgba(255,255,255,.55); border:none; padding:0;
-  transition:background .18s ease, transform .18s ease;
+.media-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  border: none;
+  padding: 0;
+  transition:
+    background 0.18s ease,
+    transform 0.18s ease;
 }
-.media-dot.active{ background:#fff; transform:scale(1.25); }
+.media-dot.active {
+  background: #fff;
+  transform: scale(1.25);
+}
 
 /* ---------- 縮圖列 ---------- */
-.post-thumb-row{ display:flex; gap:.5rem; margin-bottom:1.1rem; }
-.post-thumb-item{
-  width:56px; height:56px; border-radius:6px; overflow:hidden; flex-shrink:0;
-  border:2px solid transparent; padding:0; background:none;
-  transition:border-color .18s ease;
+.post-thumb-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.1rem;
 }
-.post-thumb-item.active{ border-color:var(--plum); }
-.post-thumb-item img{ width:100%; height:100%; object-fit:cover; display:block; }
+.post-thumb-item {
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 2px solid transparent;
+  padding: 0;
+  background: none;
+  transition: border-color 0.18s ease;
+}
+.post-thumb-item.active {
+  border-color: var(--plum);
+}
+.post-thumb-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 
 /* ---------- 互動列 ---------- */
-.action-bar{
-  display:flex; align-items:center; justify-content:space-between;
-  padding:.7rem 0;
-  border-top:1px solid var(--hairline);
-  border-bottom:1px solid var(--hairline);
-  margin-bottom:1.2rem;
+.action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 0;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: 1.2rem;
 }
-.action-left{ display:flex; gap:1.6rem; }
-.action-btn{
-  background:none; border:none; padding:0;
-  font-size:.88rem; color:var(--ink-soft);
-  transition:color .18s ease;
-  display:inline-flex; align-items:center; gap:.4rem;
+.action-left {
+  display: flex;
+  gap: 1.6rem;
+}
+.action-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+  transition: color 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 .action-btn:hover{ color:var(--ink); }
 .action-btn.liked{ color:#B4453A; font-weight:600; }
@@ -1037,12 +1271,19 @@ const addComment = async () => {
   min-width:180px;
   display:flex; flex-direction:column; gap:.15rem;
 }
-.share-menu-item{
-  display:flex; align-items:center; gap:.6rem;
-  background:none; border:none; border-radius:5px;
-  padding:.55rem .7rem; font-size:.84rem; color:var(--ink);
-  text-align:left; cursor:pointer;
-  transition:background .15s ease;
+.share-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.84rem;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
 }
 .share-menu-item:hover{ background:var(--cream); }
 .share-menu-item svg{ width:16px; height:16px; flex-shrink:0; color:var(--ink-soft); }
@@ -1058,67 +1299,131 @@ const addComment = async () => {
   padding:1rem;
   width:260px;
 }
-.report-panel-title{
-  margin:0 0 .6rem; font-size:.86rem; font-weight:700; color:var(--ink);
+.report-panel-title {
+  margin: 0 0 0.6rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--ink);
 }
-.report-textarea{
-  width:100%; border:1px solid var(--hairline); background:var(--cream);
-  border-radius:6px; padding:.6rem .7rem; font-size:.82rem; color:var(--ink);
-  font-family:inherit; resize:vertical;
+.report-textarea {
+  width: 100%;
+  border: 1px solid var(--hairline);
+  background: var(--cream);
+  border-radius: 6px;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.82rem;
+  color: var(--ink);
+  font-family: inherit;
+  resize: vertical;
 }
-.report-textarea:focus{ outline:none; border-color:var(--plum); }
-.report-panel-actions{ display:flex; gap:.5rem; margin-top:.7rem; }
-.report-btn-cancel{
-  flex:1; padding:.45rem; font-size:.78rem;
-  background:transparent; color:var(--ink-soft);
-  border:1px solid var(--hairline); border-radius:4px; cursor:pointer;
+.report-textarea:focus {
+  outline: none;
+  border-color: var(--plum);
 }
-.report-btn-cancel:hover{ border-color:var(--ink); color:var(--ink); }
-.report-btn-submit{
-  flex:1; padding:.45rem; font-size:.78rem; font-weight:600;
-  background:var(--ink); color:var(--paper);
-  border:none; border-radius:4px; cursor:pointer;
-  transition:background .18s ease;
+.report-panel-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
 }
-.report-btn-submit:hover:not(:disabled){ background:var(--plum-deep); }
-.report-btn-submit:disabled{ opacity:.5; cursor:not-allowed; }
+.report-btn-cancel {
+  flex: 1;
+  padding: 0.45rem;
+  font-size: 0.78rem;
+  background: transparent;
+  color: var(--ink-soft);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.report-btn-cancel:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.report-btn-submit {
+  flex: 1;
+  padding: 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+.report-btn-submit:hover:not(:disabled) {
+  background: var(--plum-deep);
+}
+.report-btn-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* ---------- 內文 ---------- */
-.post-content{
-  font-size:.94rem; line-height:1.8; color:var(--ink);
-  margin-bottom:1.2rem;
+.post-content {
+  font-size: 0.94rem;
+  line-height: 1.8;
+  color: var(--ink);
+  margin-bottom: 1.2rem;
 }
 
 /* ---------- 標記商品（貼文下方） ---------- */
-.tagged-products{
-  display:flex; align-items:center; flex-wrap:wrap; gap:.7rem;
-  margin-bottom:1.6rem;
+.tagged-products {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-bottom: 1.6rem;
 }
-.tagged-label{
-  font-size:.8rem; color:var(--ink-soft); font-weight:600; flex-shrink:0;
+.tagged-label {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  font-weight: 600;
+  flex-shrink: 0;
 }
-.tagged-products .tag-cloud{ display:flex; flex-wrap:wrap; gap:.5rem; }
-.tagged-products .tag-chip{
-  font-size:.78rem; padding:.32rem .8rem; border-radius:999px;
-  background:var(--cream); border:1px solid var(--hairline); color:var(--plum);
-  text-decoration:none; font-weight:600;
-  transition:all .18s ease;
+.tagged-products .tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
-.tagged-products .tag-chip:hover{ border-color:var(--plum); background:var(--paper); }
+.tagged-products .tag-chip {
+  font-size: 0.78rem;
+  padding: 0.32rem 0.8rem;
+  border-radius: 999px;
+  background: var(--cream);
+  border: 1px solid var(--hairline);
+  color: var(--plum);
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.18s ease;
+}
+.tagged-products .tag-chip:hover {
+  border-color: var(--plum);
+  background: var(--paper);
+}
 
 /* ---------- 留言區 ---------- */
-.comment-block{
-  background:var(--cream);
-  border-radius:8px;
-  padding:1.3rem;
+.comment-block {
+  background: var(--cream);
+  border-radius: 8px;
+  padding: 1.3rem;
 }
-.comment-title{
-  font-family:'Noto Serif TC', serif; font-weight:700; font-size:.95rem;
-  display:flex; align-items:center; gap:.5rem;
-  margin-bottom:1rem; color:var(--ink);
+.comment-title {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  color: var(--ink);
 }
-.comment-title .dot, .side-title .dot{
-  width:6px; height:6px; border-radius:50%; background:var(--ochre);
+.comment-title .dot,
+.side-title .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ochre);
 }
 
 .comments-list{ display:flex; flex-direction:column; gap:1rem; margin-bottom:1.1rem; }
@@ -1155,65 +1460,114 @@ const addComment = async () => {
   background:none; border:none; padding:0;
   font-size:.78rem; color:var(--ink-soft); cursor:pointer;
 }
-.btn-reply:hover{ color:var(--plum); }
-.reply-count{ font-size:.76rem; color:var(--ochre); font-weight:600; width:100%; }
+.btn-reply:hover {
+  color: var(--plum);
+}
+.reply-count {
+  font-size: 0.76rem;
+  color: var(--ochre);
+  font-weight: 600;
+  width: 100%;
+}
 
-.replying-to-row{
-  display:flex; align-items:center; gap:.5rem;
-  font-size:.8rem; color:var(--ink-soft);
-  margin-bottom:.5rem;
+.replying-to-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin-bottom: 0.5rem;
 }
-.btn-cancel-reply{
-  border:none; background:var(--hairline); color:var(--ink-soft);
-  width:18px; height:18px; border-radius:50%;
-  font-size:.68rem; line-height:1;
-  display:flex; align-items:center; justify-content:center;
-  transition:background .18s ease,color .18s ease;
+.btn-cancel-reply {
+  border: none;
+  background: var(--hairline);
+  color: var(--ink-soft);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 0.68rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease;
 }
-.btn-cancel-reply:hover{ background:var(--plum); color:#fff; }
+.btn-cancel-reply:hover {
+  background: var(--plum);
+  color: #fff;
+}
 
-.comment-input-row{ display:flex; gap:.6rem; margin-bottom:1.3rem; }
-.comment-input{
-  flex:1;
-  border:1px solid var(--hairline);
-  background:var(--paper);
-  border-radius:4px;
-  padding:.6rem 1rem;
-  font-size:.86rem; color:var(--ink);
-  outline:none;
-  transition:border-color .18s ease;
+.comment-input-row {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 1.3rem;
 }
-.comment-input:focus{ border-color:var(--plum); }
-.comment-input::placeholder{ color:var(--ink-soft); }
-.btn-send{
-  background:var(--ink); color:var(--paper);
-  border:none; border-radius:4px;
-  padding:.6rem 1.4rem; font-size:.85rem; font-weight:600;
-  white-space:nowrap;
-  transition:background .18s ease;
+.comment-input {
+  flex: 1;
+  border: 1px solid var(--hairline);
+  background: var(--paper);
+  border-radius: 4px;
+  padding: 0.6rem 1rem;
+  font-size: 0.86rem;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.18s ease;
 }
-.btn-send:hover{ background:var(--plum-deep); }
+.comment-input:focus {
+  border-color: var(--plum);
+}
+.comment-input::placeholder {
+  color: var(--ink-soft);
+}
+.btn-send {
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 4px;
+  padding: 0.6rem 1.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.18s ease;
+}
+.btn-send:hover {
+  background: var(--plum-deep);
+}
 
 /* ---------- 側邊欄 ---------- */
-.side-card{
-  background:var(--paper);
-  border:1px solid var(--hairline);
-  border-radius:16px;
-  padding:1.4rem 1.3rem;
-  margin-bottom:1.5rem;
+.side-card {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  padding: 1.4rem 1.3rem;
+  margin-bottom: 1.5rem;
 }
-.side-title{
-  font-family:'Noto Serif TC', serif; font-weight:700; font-size:1.02rem;
-  display:flex; align-items:center; gap:.5rem;
-  margin-bottom:1.1rem; color:var(--ink);
+.side-title {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 700;
+  font-size: 1.02rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.1rem;
+  color: var(--ink);
 }
 
-.product-list{ display:flex; flex-direction:column; gap:.8rem; margin-bottom:1.2rem; }
-.product-row{
-  display:flex; align-items:center; gap:.7rem;
-  background:var(--cream);
-  border-radius:8px;
-  padding:.55rem;
+.product-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  margin-bottom: 1.2rem;
+}
+.product-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  background: var(--cream);
+  border-radius: 8px;
+  padding: 0.55rem;
 }
 /* router-link 但視覺上不像連結（不變色、不加底線） */
 .product-link{
@@ -1221,30 +1575,62 @@ const addComment = async () => {
   flex:1; min-width:0;
   color:inherit; text-decoration:none;
 }
-.product-thumb{ width:56px; height:56px; border-radius:6px; object-fit:cover; flex-shrink:0; }
-.product-info{ flex:1; min-width:0; }
-.product-name{
-  font-size:.83rem; font-weight:700; color:var(--ink);
-  margin:0 0 .2rem;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+.product-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
 }
-.product-price{ font-size:.8rem; color:var(--ochre); font-weight:600; margin:0; }
-.similar-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:.6rem; }
-.similar-thumb{
-  display:block;
-  aspect-ratio:3/4; border-radius:6px; overflow:hidden;
-  background:var(--cream);
-  cursor:pointer;
+.product-info {
+  flex: 1;
+  min-width: 0;
 }
-.similar-thumb img{
-  width:100%; height:100%; object-fit:cover;
-  transition:transform .3s ease;
+.product-name {
+  font-size: 0.83rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 0.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.similar-thumb:hover img{ transform:scale(1.06); }
+.product-price {
+  font-size: 0.8rem;
+  color: var(--ochre);
+  font-weight: 600;
+  margin: 0;
+}
+.similar-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+}
+.similar-thumb {
+  display: block;
+  aspect-ratio: 3/4;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--cream);
+  cursor: pointer;
+}
+.similar-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+.similar-thumb:hover img {
+  transform: scale(1.06);
+}
 
-@media (max-width: 767px){
-  .post-image{ height:380px; }
-  .post-main-card{ padding:1.1rem; }
+@media (max-width: 767px) {
+  .post-image {
+    height: 380px;
+  }
+  .post-main-card {
+    padding: 1.1rem;
+  }
 }
 </style>
 
@@ -1255,6 +1641,6 @@ const addComment = async () => {
 -->
 <style>
 body {
-  background-color: #F9F4F0 !important;
+  background-color: #f9f4f0 !important;
 }
 </style>

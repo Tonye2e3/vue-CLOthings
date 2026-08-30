@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import api from '@/services/api'
+import api from '@/api/api'
 
 const route = useRoute()
 const order = ref(null) // 訂單詳情，先空的
@@ -35,6 +35,7 @@ async function confirmReceipt() {
   try {
     await api.put(`/order/${order.value.orderId}/complete`)
     order.value.status = '已完成' // 更新畫面
+    order.value.status = '已完成' // 更新畫面
     alert('已確認收貨！')
   } catch (error) {
     console.error('確認收貨失敗：', error)
@@ -44,6 +45,7 @@ async function confirmReceipt() {
 
 // 評價彈窗狀態
 const showReviewModal = ref(false)
+const reviewTarget = ref(null) // 要評價哪筆明細
 const reviewTarget = ref(null) // 要評價哪筆明細
 const reviewRating = ref(5)
 const reviewComment = ref('')
@@ -283,6 +285,8 @@ async function submitReview() {
   border-radius: 8px;
   width: 90%;
   max-width: 400px;
+  position: relative; /* 加這行 */
+  z-index: 1001; /* 加這行，比 overlay 高 */
   position: relative; /* 加這行 */
   z-index: 1001; /* 加這行，比 overlay 高 */
 }

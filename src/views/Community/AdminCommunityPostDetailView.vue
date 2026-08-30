@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import api from '@/services/api'
+import api from '@/api/api'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
@@ -68,14 +68,14 @@ const saveStatus = async () => {
       userId: post.value.userId,
       content: post.value.content,
       status: selectedStatus.value,
-      images: post.value.images.map(img => ({
+      images: post.value.images.map((img) => ({
         imageFileName: img.imageFileName,
-        sortOrder: img.sortOrder
+        sortOrder: img.sortOrder,
       })),
-      taggedProducts: post.value.taggedProducts.map(t => ({
+      taggedProducts: post.value.taggedProducts.map((t) => ({
         productId: t.productId,
-        productRoute: t.productRoute
-      }))
+        productRoute: t.productRoute,
+      })),
     })
   } catch (err) {
     console.error('儲存狀態失敗：', err)
@@ -96,13 +96,18 @@ const deleteComment = async (comment) => {
     alert('刪除失敗，請稍後再試一次！')
     return
   }
-  comments.value = comments.value.filter(c => c.postCommentId !== comment.postCommentId)
+  comments.value = comments.value.filter((c) => c.postCommentId !== comment.postCommentId)
   post.value.commentsCount -= 1
 }
 
 // deletePost：整篇貼文一起刪掉，刪完直接導回列表頁。
 const deletePost = async () => {
-  if (!confirm(`確定要刪除貼文編號 #${post.value.communityPostId} 嗎？刪除後資料無法復原，圖片、標記商品、留言等關聯紀錄都會一併刪除。`)) return
+  if (
+    !confirm(
+      `確定要刪除貼文編號 #${post.value.communityPostId} 嗎？刪除後資料無法復原，圖片、標記商品、留言等關聯紀錄都會一併刪除。`,
+    )
+  )
+    return
   try {
     await api.delete(`/CommunityPost/${post.value.communityPostId}`)
   } catch (err) {
@@ -124,7 +129,6 @@ const statusLabel = (status) => {
 <template>
   <div class="admin-page">
     <div class="admin-container">
-
       <div class="admin-breadcrumb">
         <router-link to="/admin/community/posts">Admin / 社群貼文管理</router-link> / 貼文詳情
       </div>
@@ -144,7 +148,9 @@ const statusLabel = (status) => {
           <div class="meta-row">
             <div>
               <span class="meta-label">發布使用者</span>
-              <router-link :to="`/community/profile/${post.userId}`">{{ post.user ? post.user.name : post.userId }}</router-link>
+              <router-link :to="`/community/profile/${post.userId}`">{{
+                post.user ? post.user.name : post.userId
+              }}</router-link>
             </div>
             <div>
               <span class="meta-label">發布時間</span>
@@ -152,7 +158,9 @@ const statusLabel = (status) => {
             </div>
             <div>
               <span class="meta-label">目前狀態</span>
-              <span class="status-badge" :class="`badge-${post.status}`">{{ statusLabel(post.status) }}</span>
+              <span class="status-badge" :class="`badge-${post.status}`">{{
+                statusLabel(post.status)
+              }}</span>
             </div>
           </div>
 
@@ -161,7 +169,12 @@ const statusLabel = (status) => {
 
           <div class="field-label">貼文圖片：</div>
           <div class="image-row">
-            <img v-for="img in post.images" :key="img.postImageId" :src="`${IMAGE_BASE}${img.imageFileName}`" alt="貼文圖片" />
+            <img
+              v-for="img in post.images"
+              :key="img.postImageId"
+              :src="`${IMAGE_BASE}${img.imageFileName}`"
+              alt="貼文圖片"
+            />
           </div>
         </div>
 
@@ -169,7 +182,12 @@ const statusLabel = (status) => {
         <div class="admin-card" v-if="post.taggedProducts.length">
           <div class="section-head section-head-cyan">標記商品</div>
           <div>
-            <span v-for="t in post.taggedProducts" :key="t.postTaggedProductId" class="tag-chip-big">{{ t.name }}</span>
+            <span
+              v-for="t in post.taggedProducts"
+              :key="t.postTaggedProductId"
+              class="tag-chip-big"
+              >{{ t.name }}</span
+            >
           </div>
         </div>
 
@@ -183,7 +201,8 @@ const statusLabel = (status) => {
             <option value="check">check（審核中）</option>
           </select>
           <p class="status-hint">
-            說明：public 為前台正常公開；若有爭議需釐清請設為 check（審核中）；若確認違規請設為 hide（強制下架）。
+            說明：public 為前台正常公開；若有爭議需釐清請設為 check（審核中）；若確認違規請設為
+            hide（強制下架）。
           </p>
           <div class="admin-actions">
             <button class="btn-save" @click="saveStatus">儲存變更</button>
@@ -194,105 +213,308 @@ const statusLabel = (status) => {
 
         <!-- 留言管理 -->
         <div class="admin-card">
-          <div class="section-head section-head-dark">💬 貼文留言管理<span class="comment-count">共 {{ comments.length }} 則</span></div>
+          <div class="section-head section-head-dark">
+            💬 貼文留言管理<span class="comment-count">共 {{ comments.length }} 則</span>
+          </div>
           <div v-if="!comments.length" class="admin-loading">目前沒有留言。</div>
           <div v-for="c in comments" :key="c.postCommentId" class="comment-row">
             <div class="comment-top">
               <router-link :to="`/community/profile/${c.userId}`">{{ c.user }}</router-link>
-              <span class="comment-date">{{ new Date(c.commentDate).toLocaleString('zh-TW') }}</span>
+              <span class="comment-date">{{
+                new Date(c.commentDate).toLocaleString('zh-TW')
+              }}</span>
               <button class="btn-delete-comment" @click="deleteComment(c)">🗑 刪除留言</button>
             </div>
             <div class="comment-text">{{ c.commentText }}</div>
           </div>
         </div>
       </template>
-
     </div>
   </div>
 </template>
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
-.admin-page{
-  width:100%; min-height:100vh;
-  background-color:#F9F4F0 !important;
-  padding:2rem 0;
-  --cream:#F9F4F0; --paper:#FFFDFB; --ink:#2A2420; --ink-soft:#7A6E63;
-  --plum:#7A4B54; --plum-deep:#5E3941; --ochre:#B8862E; --hairline:#E4D8CC;
-  font-family:'Noto Sans TC', sans-serif;
-  color:var(--ink);
+.admin-page {
+  width: 100%;
+  min-height: 100vh;
+  background-color: #f9f4f0 !important;
+  padding: 2rem 0;
+  --cream: #f9f4f0;
+  --paper: #fffdfb;
+  --ink: #2a2420;
+  --ink-soft: #7a6e63;
+  --plum: #7a4b54;
+  --plum-deep: #5e3941;
+  --ochre: #b8862e;
+  --hairline: #e4d8cc;
+  font-family: 'Noto Sans TC', sans-serif;
+  color: var(--ink);
 }
-.admin-container{ max-width:900px; margin:0 auto; padding:0 1.5rem; }
-.admin-breadcrumb{ font-size:.8rem; color:var(--ink-soft); margin-bottom:.3rem; }
-.admin-breadcrumb a{ color:var(--ink-soft); text-decoration:none; }
-.admin-breadcrumb a:hover{ color:var(--plum); }
-.admin-loading{ padding:2rem; text-align:center; color:var(--ink-soft); }
-
-.admin-title-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:1.2rem; }
-.admin-title{ font-family:'Noto Serif TC', serif; font-weight:900; font-size:1.4rem; margin:0; color:var(--ink); }
-.post-id-badge{ background:var(--ink); color:var(--paper); font-size:.8rem; padding:.3rem .8rem; border-radius:6px; }
-
-.admin-card{
-  background:var(--paper); border:1px solid var(--hairline); border-radius:16px;
-  padding:1.3rem; margin-bottom:1.2rem; overflow:hidden;
+.admin-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
 }
-.section-head{
-  background:var(--plum); color:#fff; font-weight:700; font-size:.9rem;
-  padding:.6rem 1rem; margin:-1.3rem -1.3rem 1rem; display:flex; justify-content:space-between;
-  font-family:'Noto Serif TC', serif;
+.admin-breadcrumb {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin-bottom: 0.3rem;
 }
-.section-head-cyan{ background:var(--ochre); }
-.section-head-blue{ background:var(--plum-deep); }
-.section-head-dark{ background:var(--ink); }
-.comment-count{ background:rgba(255,255,255,.2); padding:.15rem .6rem; border-radius:999px; font-size:.75rem; }
-
-.meta-row{ display:flex; gap:2rem; flex-wrap:wrap; margin-bottom:1rem; font-size:.86rem; }
-.meta-row a{ color:var(--plum); text-decoration:none; font-weight:600; }
-.meta-row a:hover{ text-decoration:underline; }
-.meta-label{ display:block; font-size:.72rem; color:var(--ink-soft); margin-bottom:.15rem; }
-
-.field-label{ font-family:'Noto Serif TC', serif; font-weight:700; font-size:.86rem; margin:1rem 0 .5rem; color:var(--ink); }
-.readonly-box{
-  border:1px solid var(--hairline); border-radius:6px; padding:.8rem;
-  font-size:.86rem; background:var(--cream);
+.admin-breadcrumb a {
+  color: var(--ink-soft);
+  text-decoration: none;
 }
-.image-row{ display:flex; gap:.6rem; flex-wrap:wrap; }
-.image-row img{ width:110px; height:110px; object-fit:cover; border-radius:6px; }
-
-.tag-chip-big{
-  display:inline-block; background:var(--cream); color:var(--plum);
-  border:1px solid var(--hairline);
-  font-size:.8rem; padding:.35rem .8rem; border-radius:999px; margin:.2rem .3rem .2rem 0;
-  font-weight:600;
+.admin-breadcrumb a:hover {
+  color: var(--plum);
+}
+.admin-loading {
+  padding: 2rem;
+  text-align: center;
+  color: var(--ink-soft);
 }
 
-.status-select{
-  width:100%; border:1px solid var(--hairline); border-radius:6px;
-  padding:.6rem .8rem; font-size:.88rem; color:var(--ink); background:var(--paper);
+.admin-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.2rem;
 }
-.status-select:focus{ outline:none; border-color:var(--plum); }
-.status-hint{ font-size:.78rem; color:var(--ink-soft); margin:.6rem 0 0; }
+.admin-title {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 900;
+  font-size: 1.4rem;
+  margin: 0;
+  color: var(--ink);
+}
+.post-id-badge {
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 0.8rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 6px;
+}
 
-.admin-actions{ display:flex; gap:.6rem; margin-top:1.2rem; flex-wrap:wrap; }
-.btn-save{ background:var(--ink); color:var(--paper); border:none; border-radius:6px; padding:.55rem 1.2rem; font-size:.86rem; font-weight:600; transition:background .18s ease; }
-.btn-save:hover{ background:var(--plum-deep); }
-.btn-delete-big{ background:transparent; color:#B4453A; border:1px solid #B4453A; border-radius:6px; padding:.55rem 1.2rem; font-size:.86rem; font-weight:600; transition:all .18s ease; }
-.btn-delete-big:hover{ background:#B4453A; color:#fff; }
-.btn-back{ background:transparent; color:var(--ink-soft); border:1px solid var(--hairline); border-radius:6px; padding:.55rem 1.2rem; font-size:.86rem; text-decoration:none; transition:all .18s ease; }
-.btn-back:hover{ border-color:var(--ink); color:var(--ink); }
+.admin-card {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  padding: 1.3rem;
+  margin-bottom: 1.2rem;
+  overflow: hidden;
+}
+.section-head {
+  background: var(--plum);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 0.6rem 1rem;
+  margin: -1.3rem -1.3rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  font-family: 'Noto Serif TC', serif;
+}
+.section-head-cyan {
+  background: var(--ochre);
+}
+.section-head-blue {
+  background: var(--plum-deep);
+}
+.section-head-dark {
+  background: var(--ink);
+}
+.comment-count {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
 
-.status-badge{ display:inline-block; padding:.2rem .6rem; border-radius:999px; font-size:.76rem; font-weight:700; color:#fff; }
-.badge-public{ background:#5E8C61; }
-.badge-hide{ background:var(--ink-soft); }
-.badge-check{ background:var(--ochre); }
+.meta-row {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  font-size: 0.86rem;
+}
+.meta-row a {
+  color: var(--plum);
+  text-decoration: none;
+  font-weight: 600;
+}
+.meta-row a:hover {
+  text-decoration: underline;
+}
+.meta-label {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  margin-bottom: 0.15rem;
+}
 
-.comment-row{ border-bottom:1px solid var(--hairline); padding:.8rem 0; }
-.comment-row:last-child{ border-bottom:none; }
-.comment-top{ display:flex; align-items:center; gap:.8rem; font-size:.82rem; margin-bottom:.3rem; }
-.comment-top a{ color:var(--plum); text-decoration:none; font-weight:600; }
-.comment-top a:hover{ text-decoration:underline; }
-.comment-date{ color:var(--ink-soft); }
-.btn-delete-comment{ margin-left:auto; background:transparent; color:#B4453A; border:1px solid #B4453A; border-radius:4px; padding:.25rem .6rem; font-size:.74rem; transition:all .18s ease; }
-.btn-delete-comment:hover{ background:#B4453A; color:#fff; }
-.comment-text{ font-size:.86rem; }
+.field-label {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 700;
+  font-size: 0.86rem;
+  margin: 1rem 0 0.5rem;
+  color: var(--ink);
+}
+.readonly-box {
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 0.8rem;
+  font-size: 0.86rem;
+  background: var(--cream);
+}
+.image-row {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.image-row img {
+  width: 110px;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.tag-chip-big {
+  display: inline-block;
+  background: var(--cream);
+  color: var(--plum);
+  border: 1px solid var(--hairline);
+  font-size: 0.8rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  margin: 0.2rem 0.3rem 0.2rem 0;
+  font-weight: 600;
+}
+
+.status-select {
+  width: 100%;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.88rem;
+  color: var(--ink);
+  background: var(--paper);
+}
+.status-select:focus {
+  outline: none;
+  border-color: var(--plum);
+}
+.status-hint {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  margin: 0.6rem 0 0;
+}
+
+.admin-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1.2rem;
+  flex-wrap: wrap;
+}
+.btn-save {
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 6px;
+  padding: 0.55rem 1.2rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  transition: background 0.18s ease;
+}
+.btn-save:hover {
+  background: var(--plum-deep);
+}
+.btn-delete-big {
+  background: transparent;
+  color: #b4453a;
+  border: 1px solid #b4453a;
+  border-radius: 6px;
+  padding: 0.55rem 1.2rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  transition: all 0.18s ease;
+}
+.btn-delete-big:hover {
+  background: #b4453a;
+  color: #fff;
+}
+.btn-back {
+  background: transparent;
+  color: var(--ink-soft);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 0.55rem 1.2rem;
+  font-size: 0.86rem;
+  text-decoration: none;
+  transition: all 0.18s ease;
+}
+.btn-back:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #fff;
+}
+.badge-public {
+  background: #5e8c61;
+}
+.badge-hide {
+  background: var(--ink-soft);
+}
+.badge-check {
+  background: var(--ochre);
+}
+
+.comment-row {
+  border-bottom: 1px solid var(--hairline);
+  padding: 0.8rem 0;
+}
+.comment-row:last-child {
+  border-bottom: none;
+}
+.comment-top {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-size: 0.82rem;
+  margin-bottom: 0.3rem;
+}
+.comment-top a {
+  color: var(--plum);
+  text-decoration: none;
+  font-weight: 600;
+}
+.comment-top a:hover {
+  text-decoration: underline;
+}
+.comment-date {
+  color: var(--ink-soft);
+}
+.btn-delete-comment {
+  margin-left: auto;
+  background: transparent;
+  color: #b4453a;
+  border: 1px solid #b4453a;
+  border-radius: 4px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.74rem;
+  transition: all 0.18s ease;
+}
+.btn-delete-comment:hover {
+  background: #b4453a;
+  color: #fff;
+}
+.comment-text {
+  font-size: 0.86rem;
+}
 </style>
