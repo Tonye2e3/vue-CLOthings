@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-// api：跟 Community 那幾個頁面共用同一個 axios 實例（src/services/api.js），
+// api：跟 Community 那幾個頁面共用同一個 axios 實例（src/api/api.js），
 // 會自動把登入後的 JWT token 帶進 Authorization header。
 import api from '@/api/api'
 

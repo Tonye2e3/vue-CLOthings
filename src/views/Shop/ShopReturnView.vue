@@ -9,9 +9,6 @@ const router = useRouter()
 const order = ref(null) // 訂單資料
 const reason = ref('') // 退貨原因
 const returnItems = ref([]) // 每筆商品的「勾選 + 退貨數量」狀態
-const order = ref(null) // 訂單資料
-const reason = ref('') // 退貨原因
-const returnItems = ref([]) // 每筆商品的「勾選 + 退貨數量」狀態
 
 const API_BASE = import.meta.env.VITE_API_URL
 
@@ -210,20 +207,9 @@ async function submitReturn() {
 }
 .btn-cancel,
 .btn-submit {
-.btn-cancel,
-.btn-submit {
   padding: 10px 24px;
   border-radius: 6px;
   cursor: pointer;
-}
-.btn-cancel {
-  border: 1px solid #ccc;
-  background: #fff;
-}
-.btn-submit {
-  border: none;
-  background: #111;
-  color: #fff;
 }
 .btn-cancel {
   border: 1px solid #ccc;

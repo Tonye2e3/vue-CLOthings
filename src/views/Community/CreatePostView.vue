@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 // useRouter：Vue Router 提供的功能，讓我們可以在 <script> 裡面「用程式的方式」
 // 切換網址（例如發文成功後自動跳轉回社群頁），而不是只能靠使用者自己點連結。
 import { useRouter } from 'vue-router'
-// api：跟其他頁面共用同一個 axios 實例（src/services/api.js），會自動把登入後的 JWT
+// api：跟其他頁面共用同一個 axios 實例（src/api/api.js），會自動把登入後的 JWT
 // token 帶進 Authorization header，跟直接 import axios from 'axios' 不一樣。
 import api from '@/api/api'
 

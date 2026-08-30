@@ -46,7 +46,6 @@ async function confirmReceipt() {
 // 評價彈窗狀態
 const showReviewModal = ref(false)
 const reviewTarget = ref(null) // 要評價哪筆明細
-const reviewTarget = ref(null) // 要評價哪筆明細
 const reviewRating = ref(5)
 const reviewComment = ref('')
 

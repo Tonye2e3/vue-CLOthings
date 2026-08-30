@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
-import api from '@/services/api'
+import api from '@/api/api'
 
 // LINE/Facebook 分享圖示改用專案自己的 SVG 元件，不再依賴 Font Awesome CDN
 import IconFacebook from '@/components/icons/IconFacebook.vue'
@@ -643,8 +643,8 @@ const addComment = async () => {
                     class="media-dot"
                     :class="{ active: idx === currentImageIndex }"
                     @click="
-                      currentImageIndex = idx
-                      restartAutoplay()
+                      currentImageIndex = idx;
+                      restartAutoplay();
                     "
                   ></button>
                 </div>
@@ -659,8 +659,8 @@ const addComment = async () => {
                 class="post-thumb-item"
                 :class="{ active: idx === currentImageIndex }"
                 @click="
-                  currentImageIndex = idx
-                  restartAutoplay()
+                  currentImageIndex = idx;
+                  restartAutoplay();
                 "
               >
                 <img :src="img.url" alt="縮圖" />

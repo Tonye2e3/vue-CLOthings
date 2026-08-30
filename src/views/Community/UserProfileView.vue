@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, watch, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
-import api from '@/services/api'
+import api from '@/api/api'
 // anime.js：編輯彈窗的開關動畫
 import { animate } from 'animejs'
 

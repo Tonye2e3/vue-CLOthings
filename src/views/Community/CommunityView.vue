@@ -16,7 +16,7 @@
 // 這樣兩個檔案就能共用同一份資料，而不是各自擁有一份自己的假資料。
 // ============================================================
 import { reactive, ref } from 'vue'
-// api：跟其他頁面共用同一個 axios 實例（src/services/api.js），
+// api：跟其他頁面共用同一個 axios 實例（src/api/api.js），
 // 這個實例會自動把登入後的 JWT token 帶進 Authorization header，
 // 跟直接 import axios from 'axios' 不一樣——那樣打 API 不會帶 token，
 // 登入後也一樣會被 [Authorize] 擋下來（401）。
