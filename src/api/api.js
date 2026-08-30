@@ -1,7 +1,5 @@
 import axios from 'axios'
-import {
-  useAuthStore
-} from '@/stores/auth'
+import { useAuthStore } from '@/stores/auth'
 
 // ======================================================
 // Axios 實例
@@ -17,6 +15,8 @@ const api = axios.create({
 
 // 確保同一時間只會有一個 refresh request
 let refreshPromise = null
+// 確保同一時間只會有一個 session expired 處理
+let sessionExpiredHandled = false
 
 // 🟢 統一處理登入失效
 // 原本 clearAuth、alert、跳轉登入頁的程式碼
@@ -26,11 +26,19 @@ let refreshPromise = null
 function handleSessionExpired() {
   const authStore = useAuthStore()
 
-  authStore.clearAuth()
+  if (!sessionExpiredHandled) {
+    sessionExpiredHandled = true
 
-  alert('登入已過期，請重新登入')
+    authStore.clearAuth()
 
-  window.location.href = '/login'
+    alert('登入已過期，請重新登入')
+
+    window.location.href = '/login'
+  }
+}
+
+export function resetSessionExpiredState() {
+  sessionExpiredHandled = false
 }
 
 // ======================================================
@@ -144,7 +152,6 @@ api.interceptors.response.use(
         // ==============================================
 
         return api(originalRequest)
-
       } catch (refreshError) {
         // 統一交給 handleSessionExpired()
         handleSessionExpired()

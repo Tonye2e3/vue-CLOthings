@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import api from '@/services/api'
+import api from '@/api/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -24,6 +24,9 @@ onMounted(async () => {
       productName: item.productName,
       color: item.color,
       size: item.size,
+      maxQuantity: item.quantity, // 最多能退幾件（買的數量）
+      selected: false, // 有沒有勾選要退
+      returnQuantity: 1, // 要退幾件（預設 1）
       maxQuantity: item.quantity, // 最多能退幾件（買的數量）
       selected: false, // 有沒有勾選要退
       returnQuantity: 1, // 要退幾件（預設 1）
@@ -148,6 +151,9 @@ async function submitReturn() {
 .block {
   margin-bottom: 32px;
 }
+.block {
+  margin-bottom: 32px;
+}
 .block-title {
   font-size: 1.1rem;
   font-weight: 700;
@@ -161,6 +167,16 @@ async function submitReturn() {
   gap: 16px;
   padding: 12px 0;
   border-bottom: 1px solid #eee;
+}
+.item-info {
+  flex: 1;
+}
+.item-name {
+  font-weight: 600;
+}
+.item-spec {
+  color: #888;
+  font-size: 0.85rem;
 }
 .item-info {
   flex: 1;

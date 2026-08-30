@@ -1,6 +1,6 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import api from '@/services/api'
+import api from '@/api/api'
 // 圖片裁切套件
 import { Cropper, CircleStencil } from 'vue-advanced-cropper'
 import 'vue-advanced-cropper/dist/style.css'
@@ -77,11 +77,7 @@ const handleAvatarChange = (event) => {
   }
 
   // 限制圖片格式
-  const allowedTypes = [
-    'image/jpeg',
-    'image/png',
-    'image/webp'
-  ]
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
 
   if (!allowedTypes.includes(file.type)) {
     alert('只允許 JPG、PNG、WEBP')
@@ -123,13 +119,7 @@ const applyAvatarCrop = () => {
 
   const context = outputCanvas.getContext('2d')
 
-  context.drawImage(
-    canvas,
-    0,
-    0,
-    512,
-    512
-  )
+  context.drawImage(canvas, 0, 0, 512, 512)
 
   // Canvas → Blob
   outputCanvas.toBlob(
@@ -139,13 +129,9 @@ const applyAvatarCrop = () => {
       }
 
       // Blob → File
-      const file = new File(
-        [blob],
-        'avatar.webp',
-        {
-          type: 'image/webp'
-        }
-      )
+      const file = new File([blob], 'avatar.webp', {
+        type: 'image/webp',
+      })
 
       // 這才是真正準備上傳的圖片
       selectedAvatarFile.value = file
@@ -162,7 +148,7 @@ const applyAvatarCrop = () => {
       showAvatarCropper.value = false
     },
     'image/webp',
-    0.9
+    0.9,
   )
 }
 
@@ -211,7 +197,6 @@ const save = async () => {
     alert('個人資料修改成功')
 
     isEditing.value = false
-
   } catch (error) {
     console.error('修改個人資料失敗：', error)
     alert('個人資料修改失敗')
@@ -251,7 +236,12 @@ const cancel = () => {
     <div v-if="!isEditing">
       <div class="profile-summary">
         <div class="avatar-wrapper">
-          <img v-if="profileData.avatar" :src="getAvatarUrl()" alt="會員頭像" class="profile-avatar" />
+          <img
+            v-if="profileData.avatar"
+            :src="getAvatarUrl()"
+            alt="會員頭像"
+            class="profile-avatar"
+          />
 
           <div v-else class="profile-avatar avatar-placeholder">
             {{ profileData.lastName?.charAt(0) || 'U' }}
@@ -308,8 +298,12 @@ const cancel = () => {
     <!-- 編輯模式 -->
     <div v-else>
       <div class="avatar-edit-area">
-        <img v-if="profileData.avatar || avatarPreviewUrl" :src="getEditingAvatarUrl()" alt="會員頭像"
-          class="profile-avatar avatar-large" />
+        <img
+          v-if="profileData.avatar || avatarPreviewUrl"
+          :src="getEditingAvatarUrl()"
+          alt="會員頭像"
+          class="profile-avatar avatar-large"
+        />
 
         <div v-else class="avatar avatar-large avatar-placeholder">U</div>
 
@@ -327,12 +321,22 @@ const cancel = () => {
       <div class="user-form-grid">
         <div class="user-form-group">
           <label>姓氏</label>
-          <input v-model="profileData.lastName" type="text" class="form-control" placeholder="請輸入姓氏" />
+          <input
+            v-model="profileData.lastName"
+            type="text"
+            class="form-control"
+            placeholder="請輸入姓氏"
+          />
         </div>
 
         <div class="user-form-group">
           <label>名字</label>
-          <input v-model="profileData.firstName" type="text" class="form-control" placeholder="請輸入名字" />
+          <input
+            v-model="profileData.firstName"
+            type="text"
+            class="form-control"
+            placeholder="請輸入名字"
+          />
         </div>
 
         <div class="user-form-group">
@@ -351,14 +355,24 @@ const cancel = () => {
 
         <div class="user-form-group user-form-group-full">
           <label>穿搭標籤</label>
-          <input v-model="profileData.styleTag" type="text" maxlength="100" class="form-control"
-            placeholder="例如：Cyberpunk、Streetwear" />
+          <input
+            v-model="profileData.styleTag"
+            type="text"
+            maxlength="100"
+            class="form-control"
+            placeholder="例如：Cyberpunk、Streetwear"
+          />
         </div>
 
         <div class="user-form-group user-form-group-full">
           <label>自我介紹</label>
-          <textarea v-model="profileData.intro" rows="4" maxlength="500" class="form-control"
-            placeholder="介紹一下你的風格..."></textarea>
+          <textarea
+            v-model="profileData.intro"
+            rows="4"
+            maxlength="500"
+            class="form-control"
+            placeholder="介紹一下你的風格..."
+          ></textarea>
 
           <small class="char-count"> {{ profileData.intro?.length || 0 }} / 500 </small>
         </div>
@@ -375,25 +389,27 @@ const cancel = () => {
   <!-- 🟢【新增】頭像裁切視窗 -->
   <div v-if="showAvatarCropper" class="cropper-overlay">
     <div class="cropper-modal">
-
       <div class="cropper-header">
         <h3>調整頭像</h3>
 
-        <button type="button" class="cropper-close" @click="cancelAvatarCrop">
-          ×
-        </button>
+        <button type="button" class="cropper-close" @click="cancelAvatarCrop">×</button>
       </div>
 
-      <p class="cropper-description">
-        拖曳圖片調整位置，滾輪或手勢可以調整大小。
-      </p>
+      <p class="cropper-description">拖曳圖片調整位置，滾輪或手勢可以調整大小。</p>
 
       <div class="cropper-container">
-        <Cropper ref="cropper" :src="avatarPreviewUrl" :stencil-component="CircleStencil" :stencil-props="{
-          aspectRatio: 1
-        }" :resize-image="{
-          adjustStencil: false
-        }" image-restriction="stencil" />
+        <Cropper
+          ref="cropper"
+          :src="avatarPreviewUrl"
+          :stencil-component="CircleStencil"
+          :stencil-props="{
+            aspectRatio: 1,
+          }"
+          :resize-image="{
+            adjustStencil: false,
+          }"
+          image-restriction="stencil"
+        />
       </div>
 
       <div class="cropper-actions">
@@ -405,7 +421,6 @@ const cancel = () => {
           套用頭像
         </button>
       </div>
-
     </div>
   </div>
 </template>
@@ -529,8 +544,7 @@ const cancel = () => {
   background: #ffffff;
   border-radius: 16px;
 
-  box-shadow:
-    0 20px 60px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
 }
 
 .cropper-header {
@@ -589,7 +603,6 @@ const cancel = () => {
 }
 
 @media (max-width: 700px) {
-
   .profile-summary,
   .avatar-edit-area {
     flex-direction: column;

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import api from '@/services/api'
+import api from '@/api/api'
 
 const route = useRoute()
 
@@ -60,15 +60,23 @@ onMounted(async () => {
       <RouterLink :to="{ query: {} }" class="cat-btn" :class="{ active: !selectedCategoryId }">
         全部
       </RouterLink>
-      <RouterLink v-for="cat in categories" :key="cat.productCategoryId"
-        :to="{ query: { categoryId: cat.productCategoryId } }" class="cat-btn"
-        :class="{ active: selectedCategoryId === cat.productCategoryId }">
+      <RouterLink
+        v-for="cat in categories"
+        :key="cat.productCategoryId"
+        :to="{ query: { categoryId: cat.productCategoryId } }"
+        class="cat-btn"
+        :class="{ active: selectedCategoryId === cat.productCategoryId }"
+      >
         {{ cat.categoryName }}
       </RouterLink>
     </div>
     <div class="grid">
-      <RouterLink v-for="p in filteredProducts" :key="p.productId"
-        :to="{ name: 'product', params: { id: p.productId } }" class="card">
+      <RouterLink
+        v-for="p in filteredProducts"
+        :key="p.productId"
+        :to="{ name: 'product', params: { id: p.productId } }"
+        class="card"
+      >
         <div class="card-image">
           <span class="card-tag">{{ p.status }}</span>
           <img :src="getImageUrl(p.productImgFile)" :alt="p.productName" class="product-img" />
