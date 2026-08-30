@@ -34,7 +34,7 @@ async function goPay() {
 async function confirmReceipt() {
   try {
     await api.put(`/order/${order.value.orderId}/complete`)
-    order.value.status = '已完成'   // 更新畫面
+    order.value.status = '已完成' // 更新畫面
     alert('已確認收貨！')
   } catch (error) {
     console.error('確認收貨失敗：', error)
@@ -44,7 +44,7 @@ async function confirmReceipt() {
 
 // 評價彈窗狀態
 const showReviewModal = ref(false)
-const reviewTarget = ref(null)   // 要評價哪筆明細
+const reviewTarget = ref(null) // 要評價哪筆明細
 const reviewRating = ref(5)
 const reviewComment = ref('')
 
@@ -75,91 +75,159 @@ async function submitReview() {
 </script>
 
 <template>
-  <!-- 資料還沒來 → 載入中 -->
-  <div v-if="!order" class="order-detail-view">載入中...</div>
+  <div class="container">
+    <!-- 資料還沒來 → 載入中 -->
+    <div v-if="!order" class="order-detail-view">載入中...</div>
 
-  <!-- 資料來了 → 顯示 -->
-  <div v-else class="order-detail-view">
-    <h1 class="page-title">訂單 #{{ order.orderId }}</h1>
+    <!-- 資料來了 → 顯示 -->
+    <div v-else class="order-detail-view">
+      <h1 class="page-title">訂單 #{{ order.orderId }}</h1>
 
-    <!-- 訂單基本資訊 -->
-    <section class="info-block">
-      <h2 class="section-title">訂單資訊</h2>
-      <div class="info-row">
-        <span>狀態</span><span class="status">{{ order.status }}</span>
-      </div>
-      <div class="info-row">
-        <span>下單日期</span><span>{{ formatDate(order.orderDate) }}</span>
-      </div>
-      <div class="info-row">
-        <span>收件人</span><span>{{ order.shipName }}</span>
-      </div>
-      <div class="info-row">
-        <span>收件地址</span><span>{{ order.shipAddress }}</span>
-      </div>
-      <div class="info-row">
-        <span>聯絡電話</span><span>{{ order.shipPhone }}</span>
-      </div>
-    </section>
-
-    <!-- 商品明細 -->
-    <section class="info-block">
-      <h2 class="section-title">商品明細</h2>
-      <div v-for="(item, index) in order.items" :key="index" class="item-row">
-            
-        <div class="item-name">
-          {{ item.productName }}
-          <span class="item-spec">{{ item.color }} / {{ item.size }}</span>
+      <!-- 訂單基本資訊 -->
+      <section class="info-block">
+        <h2 class="section-title">訂單資訊</h2>
+        <div class="info-row">
+          <span>狀態</span><span class="status">{{ order.status }}</span>
         </div>
-        <div class="item-qty">× {{ item.quantity }}</div>
-        <div class="item-price">NT$ {{ (item.price * item.quantity).toLocaleString() }}</div>
-        <p>　</p>
-    <button v-if="order.status === '已完成'" @click="openReview(item)" class="btn-review">
-          評價
-        </button>
-      </div>
-    </section>
+        <div class="info-row">
+          <span>下單日期</span><span>{{ formatDate(order.orderDate) }}</span>
+        </div>
+        <div class="info-row">
+          <span>收件人</span><span>{{ order.shipName }}</span>
+        </div>
+        <div class="info-row">
+          <span>收件地址</span><span>{{ order.shipAddress }}</span>
+        </div>
+        <div class="info-row">
+          <span>聯絡電話</span><span>{{ order.shipPhone }}</span>
+        </div>
+      </section>
 
-    <!-- 總計 -->
-    <section class="total-block">
-      <span>總計</span>
-      <span class="total-amount">NT$ {{ order.total.toLocaleString() }}</span>
-    </section>
+      <!-- 商品明細 -->
+      <section class="info-block">
+        <h2 class="section-title">商品明細</h2>
+        <div v-for="(item, index) in order.items" :key="index" class="item-row">
+          <div class="item-name">
+            {{ item.productName }}
+            <span class="item-spec">{{ item.color }} / {{ item.size }}</span>
+          </div>
+          <div class="item-qty">× {{ item.quantity }}</div>
+          <div class="item-price">NT$ {{ (item.price * item.quantity).toLocaleString() }}</div>
+          <p>　</p>
+          <button v-if="order.status === '已完成'" @click="openReview(item)" class="btn-review">
+            評價
+          </button>
+        </div>
+      </section>
 
-    <button class="btn-back me-3" @click="$router.push({ name: 'orders' })">← 回訂單列表</button>
-    <!-- 訂單詳情頁加這個按鈕 -->
-    <button v-if="order.status === '待付款'" @click="goPay" class="btn-pay me-3">前往付款</button>
-    <button v-if="order.status === '待出貨'" @click="confirmReceipt" class="btn-complete me-3">
-      確認收貨
-    </button>
+      <!-- 總計 -->
+      <section class="total-block">
+        <span>總計</span>
+        <span class="total-amount">NT$ {{ order.total.toLocaleString() }}</span>
+      </section>
 
-    <button class="btn-back" @click="$router.push({ name: 'return', params: { id: order.orderId } })">
-      申請退貨
-    </button>
-    <Teleport to="body">
-  <div
-    v-if="showReviewModal"
-    @click.self="showReviewModal = false"
-    style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;"
-  >
-    <div style="background: #fff; padding: 24px; border-radius: 8px; width: 90%; max-width: 400px;">
-      <h3>評價 - {{ reviewTarget.productName }}</h3>
-      <div class="rating-row">
-        <span>評分：</span>
-        <span v-for="n in 5" :key="n" class="star" :class="{ active: n <= reviewRating }" @click="reviewRating = n" style="font-size: 1.5rem; cursor: pointer;" :style="{ color: n <= reviewRating ? '#e6a817' : '#ddd' }">★</span>
-      </div>
-      <textarea v-model="reviewComment" rows="4" placeholder="分享您的使用心得..." style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; margin: 12px 0;"></textarea>
-      <div style="display: flex; gap: 12px; justify-content: flex-end;">
-        <button @click="showReviewModal = false" style="padding: 8px 20px; border: 1px solid #ccc; background: #fff; border-radius: 6px; cursor: pointer;">取消</button>
-        <button @click="submitReview" style="padding: 8px 20px; border: none; background: #111; color: #fff; border-radius: 6px; cursor: pointer;">送出評價</button>
-      </div>
+      <button class="btn-back me-3" @click="$router.push({ name: 'orders' })">← 回訂單列表</button>
+      <!-- 訂單詳情頁加這個按鈕 -->
+      <button v-if="order.status === '待付款'" @click="goPay" class="btn-pay me-3">前往付款</button>
+      <button v-if="order.status === '待出貨'" @click="confirmReceipt" class="btn-complete me-3">
+        確認收貨
+      </button>
+
+      <button
+        class="btn-back"
+        @click="$router.push({ name: 'return', params: { id: order.orderId } })"
+      >
+        申請退貨
+      </button>
+      <Teleport to="body">
+        <div
+          v-if="showReviewModal"
+          @click.self="showReviewModal = false"
+          style="
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+          "
+        >
+          <div
+            style="
+              background: #fff;
+              padding: 24px;
+              border-radius: 8px;
+              width: 90%;
+              max-width: 400px;
+            "
+          >
+            <h3>評價 - {{ reviewTarget.productName }}</h3>
+            <div class="rating-row">
+              <span>評分：</span>
+              <span
+                v-for="n in 5"
+                :key="n"
+                class="star"
+                :class="{ active: n <= reviewRating }"
+                @click="reviewRating = n"
+                style="font-size: 1.5rem; cursor: pointer"
+                :style="{ color: n <= reviewRating ? '#e6a817' : '#ddd' }"
+                >★</span
+              >
+            </div>
+            <textarea
+              v-model="reviewComment"
+              rows="4"
+              placeholder="分享您的使用心得..."
+              style="
+                width: 100%;
+                padding: 12px;
+                border: 1px solid #ccc;
+                border-radius: 6px;
+                margin: 12px 0;
+              "
+            ></textarea>
+            <div style="display: flex; gap: 12px; justify-content: flex-end">
+              <button
+                @click="showReviewModal = false"
+                style="
+                  padding: 8px 20px;
+                  border: 1px solid #ccc;
+                  background: #fff;
+                  border-radius: 6px;
+                  cursor: pointer;
+                "
+              >
+                取消
+              </button>
+              <button
+                @click="submitReview"
+                style="
+                  padding: 8px 20px;
+                  border: none;
+                  background: #111;
+                  color: #fff;
+                  border-radius: 6px;
+                  cursor: pointer;
+                "
+              >
+                送出評價
+              </button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
     </div>
-  </div>
-</Teleport>
   </div>
 </template>
 
 <style scoped>
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
 .btn-back {
   margin-top: 24px;
   padding: 10px 20px;
@@ -215,8 +283,8 @@ async function submitReview() {
   border-radius: 8px;
   width: 90%;
   max-width: 400px;
-  position: relative;   /* 加這行 */
-  z-index: 1001;        /* 加這行，比 overlay 高 */
+  position: relative; /* 加這行 */
+  z-index: 1001; /* 加這行，比 overlay 高 */
 }
 
 .rating-row {
@@ -345,4 +413,3 @@ async function submitReview() {
   color: #e60012;
 }
 </style>
-

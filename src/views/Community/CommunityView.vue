@@ -850,23 +850,7 @@ const toggleFollow = async (creator) => {
           >追蹤中</button>
         </div>
 
-        <div class="d-flex align-items-center gap-2">
-          <!-- 管理後台入口：只有登入者是管理員才會出現。放在這裡（社群首頁）是因為
-               管理員帳號沒有自己的個人頁可以放這顆按鈕，但每個登入的人本來就會經過這頁。
-               原本這裡是用 emoji（🛠）當圖示，跟之前 ChatView.vue 相機按鈕、
-               UserProfileView.vue 收藏空狀態圖示消失是同一類風險：emoji 靠字型渲染，
-               換一台電腦、換個瀏覽器字型設定就可能跑掉或消失。這裡也一起換成 SVG
-               扳手圖示，統一整個 Community 的圖示風格。 -->
-          <router-link
-            v-if="authStore.isAdmin"
-            to="/admin/community/posts"
-            class="btn-admin-entry text-decoration-none"
-          >
-            <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.8 2.8-2-2 2.8-2.8z" />
-            </svg>
-            管理後台
-          </router-link>
+        <div class="d-flex align-items-center gap-2">         
           <router-link to="/community/create" class="btn-share text-decoration-none">
             ＋ 分享我的穿搭
           </router-link>
@@ -982,12 +966,12 @@ const toggleFollow = async (creator) => {
                   </svg>
                   {{ formatCount(featurePost.likesCount) }}
                 </button>
-                <span>
+                <router-link :to="`/community/post/${featurePost.communityPostId}#comments`" class="text-decoration-none">
                   <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" />
                   </svg>
                   {{ formatCount(featurePost.commentsCount) }}
-                </span>
+                </router-link>
               </div>
             </div>
           </div>
@@ -1078,12 +1062,12 @@ const toggleFollow = async (creator) => {
                     </svg>
                     {{ formatCount(post.likesCount) }}
                   </button>
-                  <span>
+                  <router-link :to="`/community/post/${post.communityPostId}#comments`" class="text-decoration-none">
                     <svg class="icon-inline" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" />
                     </svg>
                     {{ formatCount(post.commentsCount) }}
-                  </span>
+                  </router-link>
                 </div>
               </div>
             </div>
@@ -1152,10 +1136,6 @@ const toggleFollow = async (creator) => {
 </template>
 
 <style scoped>
-/*
-  這個 <style> 標籤有加 scoped，代表這裡的 CSS 只會套用在這個檔案自己的 HTML 上，
-  不會不小心影響到其他頁面。詳細原理可以參考 UserProfileView.vue 裡的說明。
-*/
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
 
 .community-page {
@@ -1267,14 +1247,6 @@ const toggleFollow = async (creator) => {
 }
 .btn-share:hover{ background:var(--plum-deep); transform:translateY(-1px); }
 
-.btn-admin-entry{
-  background:var(--ochre); color:#fff !important; border:none;
-  border-radius:999px; padding:.6rem 1.2rem; font-size:.88rem; font-weight:600;
-  display:inline-flex; align-items:center; gap:.4rem;
-  transition:opacity .18s ease;
-}
-.btn-admin-entry:hover{ opacity:.85; }
-
 /* ---------- 封面故事卡 ---------- */
 .feature-card{
   background:var(--paper);
@@ -1292,11 +1264,7 @@ const toggleFollow = async (creator) => {
 .feature-media img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform .6s ease; }
 .feature-card:hover .feature-media img{ transform:scale(1.04); }
 
-/*
-  media-arrow／media-dots：跟 PostDetailView.vue 主圖輪播是同一套樣式（尺寸、位置、
-  互動效果都一樣），這裡複製一份過來是因為兩個檔案是各自獨立的 <style scoped>，
-  樣式不會互相共用。
-*/
+/* media-arrow／media-dots：跟 PostDetailView.vue 主圖輪播同一套樣式，各自 scoped 無法共用 */
 .media-arrow{
   position:absolute; top:50%; transform:translateY(-50%); z-index:3;
   width:36px; height:36px; border-radius:50%;
@@ -1337,9 +1305,6 @@ const toggleFollow = async (creator) => {
   font-family:var(--font-serif);
   font-size:1.3rem; font-weight:700; line-height:1.5; margin-bottom:.6rem;
   flex:1;
-  /* content 是合併過的完整內文，原本用 line-clamp:5 讓封面故事卡看起來還是塞了一大段文字，
-     跟旁邊 line-clamp-2 的網格卡片比起來重點不夠突出——改成一樣只顯示前 2 行，
-     完整內容点進貼文詳情頁看就好，卡片這裡只留一眼看得完的重點。 */
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
 }
 
@@ -1348,10 +1313,8 @@ const toggleFollow = async (creator) => {
   border-top:1px dashed var(--hairline); padding-top:1rem; margin-top:1rem;
   font-size:.85rem; color:var(--ink-soft);
 }
-.stat-row span{ display:inline-flex; align-items:center; gap:.3rem; }
-/* stat-like-btn：跟旁邊 <span> 留言數字視覺上要對齊，但這個是可以點的 <button>，
-   要先把瀏覽器預設的按鈕樣式（邊框、底色、內距）都歸零，只留下跟 span 一樣的排版。
-   已讚時整體套用跟 PostDetailView.vue 一樣的紅色（#B4453A），呼應同一個「已按讚」的視覺語言。 */
+.stat-row span, .stat-row a{ display:inline-flex; align-items:center; gap:.3rem; color:inherit; }
+/* stat-like-btn：按鈕歸零預設樣式、對齊旁邊的 span；已讚顏色跟 PostDetailView.vue 一致 */
 .stat-like-btn{
   display:inline-flex; align-items:center; gap:.3rem;
   background:none; border:none; padding:0; margin:0;
@@ -1360,10 +1323,7 @@ const toggleFollow = async (creator) => {
 }
 .stat-like-btn:hover{ color:#B4453A; }
 .stat-like-btn.liked{ color:#B4453A; font-weight:600; }
-.stat-row .link-out{ margin-left:auto; color:var(--plum); font-weight:600; text-decoration:none; border-bottom:1px solid var(--plum); }
-/* icon-inline：跟文字並排的小圖示共用樣式（心形、對話框、扳手），顏色跟著所在文字的
-   顏色走（currentColor），不用每個地方各自寫一次顏色。 */
-.icon-inline{ flex-shrink:0; }
+.icon-inline{ flex-shrink:0; } /* 小圖示跟隨文字顏色（currentColor） */
 
 /* ---------- 貼文網格 ---------- */
 .post-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:1.4rem; }
@@ -1403,12 +1363,7 @@ const toggleFollow = async (creator) => {
 }
 
 /* ---------- 骨架載入畫面 ---------- */
-/*
-  skeleton-shimmer：灰色區塊上有一道淺色光斑，從左往右不斷掃過，是最常見的骨架畫面效果
-  （很多 App 讀取資料時都看得到）。做法是背景疊兩層：底色 var(--hairline) 加一個
-  用 linear-gradient 畫出來的「光斑」，用 background-position 的動畫讓光斑左右移動，
-  製造出「正在讀取」的感覺，比整塊灰色靜止不動更有生氣、更明確傳達「這裡還在忙」。
-*/
+/* skeleton-shimmer：底色疊一道會左右移動的光斑，做出常見的骨架讀取效果 */
 @keyframes skeleton-shimmer {
   0% { background-position: -300px 0; }
   100% { background-position: 300px 0; }
@@ -1422,8 +1377,7 @@ const toggleFollow = async (creator) => {
   border-radius: 6px;
 }
 
-/* 骨架版的封面故事卡：跟 .feature-card 用同一組尺寸（22px 圓角、320px 最小高度），
-   佔位期間版面高度盡量跟真正內容一致，資料回來後畫面不會突然跳動。 */
+/* 骨架版封面故事卡：尺寸比照 .feature-card，避免資料回來後版面跳動 */
 .skeleton-feature{
   background:var(--paper); border:1px solid var(--hairline); border-radius:22px;
   overflow:hidden; margin-bottom:1.6rem;
@@ -1439,7 +1393,7 @@ const toggleFollow = async (creator) => {
 .skeleton-line-90{ width:90%; }
 .skeleton-line-70{ width:70%; }
 
-/* 骨架版的網格卡片：跟 .post-grid／.post-card 同一組欄數、圓角、間距。 */
+/* 骨架版網格卡片：欄數、圓角、間距比照 .post-grid／.post-card */
 .skeleton-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:1.4rem; }
 .skeleton-card{
   background:var(--paper); border:1px solid var(--hairline); border-radius:16px; overflow:hidden;

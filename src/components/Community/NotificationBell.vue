@@ -12,7 +12,7 @@ import { currentUserId, loadCurrentUserId } from '@/views/Community/CommunityVie
 
 const router = useRouter()
 
-const IMAGE_BASE = import.meta.env.VITE_API_URL
+const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
 const avatarUrl = (avatarPath, username) => {
   return avatarPath
     ? `${IMAGE_BASE}${avatarPath}`
@@ -58,8 +58,12 @@ const fetchNotifications = async () => {
   }
 }
 
-// togglePanel：點鈴鐺時執行。打開的當下順便抓完整清單、並且把「全部標成已讀」，
-// 跟大部分 App 的邏輯一樣：使用者點開通知，就代表看過了，未讀數字歸零。
+// togglePanel：點鈴鐺時執行。打開的當下順便抓最新清單、並且把「畫面上看得到的」標成已讀。
+//
+// 後端 mark-all-read 現在只會標記「最新 20 則」裡面還沒讀的，如果未讀數超過 20，
+// 會有一部分（使用者根本沒看到的那些）繼續維持未讀，所以這裡不能再像以前那樣
+// 直接把 unreadCount 寫死成 0——標記完之後要重新問一次後端「現在真正還有幾則未讀」，
+// 角標數字才會準確反映「還有沒看過的通知」，而不是不管三七二十一都歸零。
 const togglePanel = async () => {
   showPanel.value = !showPanel.value
   if (showPanel.value) {
@@ -67,7 +71,11 @@ const togglePanel = async () => {
     if (unreadCount.value > 0) {
       try {
         await api.put(`/Notification/mark-all-read/${currentUserId.value}`)
-        unreadCount.value = 0
+        // 重新抓一次真正的未讀數量，不要自己假設「標記已讀＝一定變成 0」。
+        await fetchUnreadCount()
+        // 這次抓回來的 notifications 清單，本來就是 mark-all-read 剛剛標記的那批
+        // （同樣是「最新 20 則」），所以這裡直接把畫面上這份清單全部標成已讀顯示沒問題，
+        // 不會有「畫面上顯示已讀，但其實後端還是未讀」的落差。
         notifications.value.forEach(n => { n.isRead = true })
       } catch (err) {
         console.error('標記已讀失敗：', err)
@@ -84,6 +92,7 @@ const formatNotificationText = (n) => {
   if (n.type === 'follow') return `${n.fromUsername} 追蹤了你`
   if (n.type === 'like') return `${n.fromUsername} 對你的貼文按了讚`
   if (n.type === 'comment') return `${n.fromUsername} 在你的貼文留言了`
+  if (n.type === 'message') return `${n.fromUsername} 傳了訊息給你`
   return `${n.fromUsername} 有新的動態`
 }
 
@@ -99,21 +108,22 @@ const formatTime = (dateStr) => {
 }
 
 // goToNotification：點某一則通知時執行——追蹤類型帶去對方的個人頁，
-// 按讚／留言類型帶去那篇貼文的詳情頁。
+// 訊息類型帶去跟對方的聊天室，按讚／留言類型帶去那篇貼文的詳情頁。
 const goToNotification = (n) => {
   closePanel()
   if (n.type === 'follow') {
     router.push(`/community/profile/${n.fromUserId}`)
+  } else if (n.type === 'message') {
+    router.push(`/community/messages/${n.fromUserId}`)
   } else if (n.communityPostId) {
     router.push(`/community/post/${n.communityPostId}`)
   }
 }
 
-// pollTimer：每隔一段時間重新問一次未讀數量，不用使用者自己重新整理頁面
+// pollTimer：每 15 秒重新問一次未讀數量，不用使用者自己重新整理頁面
 // 才會看到「有新通知」的紅點——跟聊天室用 WebSocket 即時推播比起來陽春一點，
-// 但通知這種「不用馬上跳出來、晚個幾十秒看到也沒差」的場景，定時輪詢就夠用，
-// 不需要為了這個再另外接一條 WebSocket 通道。
-const POLL_INTERVAL = 30000
+// 但通知這種場景，定時輪詢就夠用，不需要為了這個再另外接一條 WebSocket 通道。
+const POLL_INTERVAL = 15000
 let pollTimer = null
 
 onMounted(async () => {
@@ -173,12 +183,17 @@ onUnmounted(() => {
   display:inline-flex; align-items:center; justify-content:center;
   width:36px; height:36px; border-radius:50%;
   border:none; background:transparent;
-  color:var(--home-text, var(--ink));
+  /* 不加自己的備援值（例如 var(--ink)）：直接跟旁邊搜尋、收藏、帳號那些圖示
+     用一模一樣的 var(--home-text)，不管在哪個頁面、亮色或深色模式，
+     這個變數解析出來是什麼顏色，鈴鐺就自動跟著變成什麼顏色——
+     真正做到「跟其他圖示共用同一套顏色邏輯」，而不是自己另外帶一份、
+     只是碰巧在亮色模式看起來差不多而已。 */
+  color:var(--home-text);
   cursor:pointer;
   transition:background-color .2s ease, transform .15s ease;
 }
 .notif-bell-btn:hover{
-  background:var(--home-bg-soft, var(--cream));
+  background:var(--home-bg-soft);
   transform:translateY(-1px);
 }
 .notif-badge{

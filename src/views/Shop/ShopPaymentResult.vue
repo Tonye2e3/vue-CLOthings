@@ -10,7 +10,7 @@ const success = computed(() => route.query.success === '1')
 </script>
 
 <template>
-  <div class="result-view">
+  <div class="result-view container">
     <div v-if="success" class="result success">
       <div class="icon">✅</div>
       <h1>付款成功！</h1>
@@ -35,6 +35,11 @@ const success = computed(() => route.query.success === '1')
 </template>
 
 <style scoped>
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
 .result-view {
   max-width: 500px;
   margin: 60px auto;
