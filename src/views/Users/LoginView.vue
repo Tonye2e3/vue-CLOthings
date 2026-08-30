@@ -7,7 +7,7 @@ import { ref } from 'vue'
 const account = ref('')
 const password = ref('')
 
-import api from '@/api/api'
+import api, { resetSessionExpiredState } from '@/api/api'
 import { useAuthStore } from '@/stores/auth'
 const authStore = useAuthStore()
 
@@ -26,6 +26,9 @@ async function login() {
     console.log('Pinia 登入資料', authStore)
 
     authStore.setAuth(resp.data)
+
+    // 登入成功後重設 Session Expired 狀態
+    resetSessionExpiredState()
 
     //測試get me功能
     // const meResp = await api.get('/User/me')

@@ -8,6 +8,7 @@ const userData = reactive({
   username: '',
   account: '',
   email: '',
+  emailVerified: false,
   phone: '',
   countryCode: '',
   twoFactorEnabled: false,
@@ -36,6 +37,28 @@ async function getUserData() {
     Object.assign(userData, resp.data)
   } catch (error) {
     console.error('取得帳戶資料失敗：', error)
+  }
+}
+
+// ==============================
+// 重新寄送 Email 驗證信
+// POST /api/User/resend-verification-email
+// ==============================
+
+async function resendVerificationEmail() {
+  try {
+    await api.post('/User/resend-verification-email')
+
+    alert('驗證信已重新寄出，請至 Email 收件匣確認')
+  } catch (error) {
+    console.error('重新寄送驗證信失敗：', error)
+
+    if (error.response?.status === 400) {
+      alert(error.response.data || '此 Email 已完成驗證')
+      return
+    }
+
+    alert('驗證信寄送失敗，請稍後再試')
   }
 }
 
@@ -90,6 +113,8 @@ const save = async () => {
 
   try {
     await api.put('/User/me', data)
+
+    await getUserData() // 重新取得最新資料，確保畫面顯示正確
 
     // 儲存成功後更新備份
     Object.assign(backupData, userData)
@@ -224,13 +249,34 @@ const changePassword = async () => {
         <!-- Email -->
 
         <div class="user-info-item">
-          <span class="user-info-label"> Email </span>
+          <span class="user-info-label">Email</span>
 
-          <span class="user-info-value">
-            {{ userData.email || '未設定' }}
-          </span>
+          <div class="email-info">
+            <span class="user-info-value">
+              {{ userData.email || '未設定' }}
+            </span>
+
+            <!-- 已驗證 -->
+            <span
+              v-if="userData.email && userData.emailVerified"
+              class="email-status email-status-verified"
+            >
+              ✓ 已驗證
+            </span>
+
+            <!-- 尚未驗證 -->
+            <template v-if="userData.email && !userData.emailVerified">
+              <button
+                type="button"
+                class="email-resend-btn"
+                title="點擊寄送驗證信"
+                @click="resendVerificationEmail"
+              >
+                <span class="email-status email-status-unverified"> 立即驗證 </span>
+              </button>
+            </template>
+          </div>
         </div>
-
         <!-- 電話 -->
 
         <div class="user-info-item">
@@ -450,7 +496,38 @@ const changePassword = async () => {
   color: #dc3545;
   font-size: 12px;
 }
+.email-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 
+.email-status {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.email-status-verified {
+  color: #198754;
+}
+
+.email-status-unverified {
+  color: #dc3545;
+}
+
+.email-resend-btn {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #555555;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.email-resend-btn:hover {
+  color: #000000;
+}
 @media (max-width: 576px) {
   .password-header {
     align-items: stretch;

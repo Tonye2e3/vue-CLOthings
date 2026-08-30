@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import api from '@/api/api'
+import api, { resetSessionExpiredState } from '@/api/api'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -29,6 +29,9 @@ onMounted(async () => {
 
     // ④ 寫入 Pinia
     authStore.setAuth(response.data)
+
+    // 登入成功後重設 Session Expired 狀態
+    resetSessionExpiredState()
 
     // ⑤ 登入成功，回首頁
     router.replace('/user')
