@@ -37,6 +37,11 @@ const demoAccounts = [
     account: 'user005',
     password: 'Aa12345',
   },
+  {
+    label: 'TestDemo',
+    account: 'TestDemo',
+    password: 'Aa12345',
+  },
 ]
 
 function selectDemoAccount(event) {
