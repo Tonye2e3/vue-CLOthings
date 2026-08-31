@@ -31,16 +31,16 @@ const touched = ref({
 // 測試帳號
 const demoAccounts = [
   {
-    label: 'TestTony',
-    account: 'TestTony',
-    username: 'TestTony',
+    label: 'TestDemo',
+    account: 'TestDemo',
+    username: 'TestDemo',
     email: 's39268989@gmail.com',
-    password: 'TestTony',
-    confirmPassword: 'TestTony',
+    password: 'TestDemo',
+    confirmPassword: 'TestDemo',
     phone: '0912345678',
   },
 ]
-// 測試快速登入
+// 測試快速註冊
 function selectDemoAccount(event) {
   const selected = demoAccounts[event.target.value]
 
