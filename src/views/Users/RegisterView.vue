@@ -1,13 +1,25 @@
 <script setup>
 import { isValidAccount, isValidPassword, isValidPhone, isValidEmail } from '@/utils/UserValidator'
 import { ref, reactive } from 'vue'
-import api from '@/services/api'
+import api from '@/api/api'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const title = ref('會員註冊')
 const agree = ref(false)
 
+// 🟢 新增：確認密碼驗證
+function isValidConfirmPassword(password, confirmPassword) {
+  if (!confirmPassword) {
+    return '請再次輸入密碼'
+  }
+
+  if (password !== confirmPassword) {
+    return '兩次輸入的密碼不一致'
+  }
+
+  return ''
+}
 async function register() {
   const accountError = isValidAccount(member.account)
   const passwordError = isValidPassword(member.password)
@@ -15,7 +27,7 @@ async function register() {
   const emailError = isValidEmail(member.email)
 
   if (accountError || passwordError || phoneError || emailError) {
-    alert('請先修正表單錯誤')
+    alert('請檢查輸入的資料是否正確')
     return
   }
 
@@ -38,7 +50,7 @@ async function register() {
   }
 
   try {
-    await api.post('/User', data)
+    await api.post('/User/register', data)
 
     alert('註冊成功')
 
@@ -62,6 +74,15 @@ const member = reactive({
   confirmPassword: '',
   phone: '',
 })
+
+const touched = ref({
+  account: false,
+  username: false,
+  email: false,
+  password: false,
+  confirmPassword: false,
+  phone: false,
+})
 </script>
 
 <template>
@@ -70,23 +91,53 @@ const member = reactive({
 
     <!-- 表單區 -->
     <div class="form-floating mb-3">
-      <input type="text" class="form-control" placeholder="帳號" v-model="member.account" />
+      <input
+        type="text"
+        class="form-control"
+        placeholder="帳號"
+        v-model="member.account"
+        @blur="touched.account = true"
+      />
       <label class="form-label">帳號</label>
-      <span class="form-text text-danger">{{ isValidAccount(member.account) }}</span>
+      <span v-if="touched.account" class="form-text text-danger">{{
+        isValidAccount(member.account)
+      }}</span>
     </div>
     <div class="form-floating mb-3">
-      <input type="text" class="form-control" placeholder="暱稱" v-model="member.username" />
+      <input
+        type="text"
+        class="form-control"
+        placeholder="暱稱"
+        v-model="member.username"
+        @blur="touched.username = true"
+      />
       <label class="form-label">暱稱</label>
     </div>
     <div class="form-floating mb-3">
-      <input type="text" class="form-control" placeholder="郵件" v-model="member.email" />
+      <input
+        type="text"
+        class="form-control"
+        placeholder="郵件"
+        v-model="member.email"
+        @blur="touched.email = true"
+      />
       <label class="form-label">郵件</label>
-      <span class="form-text text-danger">{{ isValidEmail(member.email) }}</span>
+      <span v-if="touched.email" class="form-text text-danger">{{
+        isValidEmail(member.email)
+      }}</span>
     </div>
     <div class="form-floating mb-3">
-      <input type="password" class="form-control" placeholder="密碼" v-model="member.password" />
+      <input
+        type="password"
+        class="form-control"
+        placeholder="密碼"
+        v-model="member.password"
+        @blur="touched.password = true"
+      />
       <label class="form-label">密碼</label>
-      <span class="form-text text-danger">{{ isValidPassword(member.password) }}</span>
+      <span v-if="touched.password" class="form-text text-danger">{{
+        isValidPassword(member.password)
+      }}</span>
     </div>
     <div class="form-floating mb-3">
       <input
@@ -94,8 +145,12 @@ const member = reactive({
         class="form-control"
         placeholder="確認密碼"
         v-model="member.confirmPassword"
+        @blur="touched.confirmPassword = true"
       />
       <label class="form-label">確認密碼</label>
+      <span v-if="touched.confirmPassword" class="form-text text-danger">{{
+        isValidConfirmPassword(member.password, member.confirmPassword)
+      }}</span>
     </div>
     <div class="form-floating mb-3">
       <input
@@ -104,9 +159,12 @@ const member = reactive({
         class="form-control"
         placeholder="電話"
         v-model="member.phone"
+        @blur="touched.phone = true"
       />
       <label class="form-label">電話</label>
-      <span class="form-text text-danger">{{ isValidPhone(member.phone) }}</span>
+      <span v-if="touched.phone" class="form-text text-danger">{{
+        isValidPhone(member.phone)
+      }}</span>
     </div>
     <div class="form-check mb-4">
       <input class="form-check-input" type="checkbox" id="agreeCheck" v-model="agree" />

@@ -5,7 +5,7 @@ import { useCartStore } from '@/stores/ShopCart'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useBuyNowStore } from '@/stores/ShopBuyNow'
-import api from '@/services/api'
+import api from '@/api/api'
 const cartStore = useCartStore()
 const router = useRouter()
 const route = useRoute()
@@ -68,7 +68,9 @@ async function submitOrder() {
     const response = await api.post('/order', orderData)
     if (isBuyNow.value) {
       buyNowStore.clear() // 清立即購買暫存
+      buyNowStore.clear() // 清立即購買暫存
     } else {
+      await cartStore.loadCart() // 重新載入購物車（後端已清，前端同步）
       await cartStore.loadCart() // 重新載入購物車（後端已清，前端同步）
     }
     alert('訂單建立成功！訂單編號：' + response.data.orderId)
