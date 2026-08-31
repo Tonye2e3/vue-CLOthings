@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import api from '@/services/api'
+import api from '@/api/api'
 
 const form = ref({ name: '', email: '', phone: '', title: '', content: '' })
 const sent = ref(false)

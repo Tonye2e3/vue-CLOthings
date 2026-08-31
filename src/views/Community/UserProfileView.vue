@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, watch, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
-import api from '@/services/api'
+import api from '@/api/api'
 // anime.js：編輯彈窗的開關動畫
 import { animate } from 'animejs'
 
@@ -98,9 +98,9 @@ const availableProducts = ref([])
 const fetchProducts = async () => {
   try {
     const res = await api.get('/Product')
-    availableProducts.value = res.data.map(p => ({
+    availableProducts.value = res.data.map((p) => ({
       productId: p.productId,
-      name: p.productName
+      name: p.productName,
     }))
   } catch (err) {
     console.error('讀取商品清單失敗：', err)
@@ -114,7 +114,7 @@ const filteredProducts = computed(() => {
     // 沒搜尋時只列前 5 個熱門標籤，避免標籤區塊被拉長
     return availableProducts.value.slice(0, 5)
   }
-  return availableProducts.value.filter(p => p.name.toLowerCase().includes(q))
+  return availableProducts.value.filter((p) => p.name.toLowerCase().includes(q))
 })
 
 const toggleEditProduct = (name) => {
@@ -136,13 +136,13 @@ const startEdit = (post) => {
   editForm.value = {
     content: post.content,
     status: post.status || 'public',
-    images: (post.images || []).map(img => ({
+    images: (post.images || []).map((img) => ({
       imageFileName: img.imageFileName,
       sortOrder: img.sortOrder,
       url: `${IMAGE_BASE}${img.imageFileName}`,
-      isNew: false
+      isNew: false,
     })),
-    taggedProducts: (post.taggedProducts || []).map(t => t.name)
+    taggedProducts: (post.taggedProducts || []).map((t) => t.name),
   }
 }
 
@@ -160,7 +160,7 @@ const onEditModalEnter = (el, done) => {
     scale: [0.92, 1],
     duration: 260,
     ease: 'outQuad',
-    onComplete: done
+    onComplete: done,
   })
 }
 
@@ -173,7 +173,7 @@ const onEditModalLeave = (el, done) => {
     scale: [1, 0.92],
     duration: 180,
     ease: 'inQuad',
-    onComplete: done
+    onComplete: done,
   })
 }
 
@@ -187,7 +187,7 @@ const closeLightbox = () => {
 
 const handleEditFileChange = (event) => {
   const files = Array.from(event.target.files || [])
-  files.forEach(file => {
+  files.forEach((file) => {
     editForm.value.images.push({
       file,
       imageFileName: file.name, // 佔位，saveEdit 上傳成功後換成真正路徑
@@ -209,11 +209,11 @@ const saveEdit = async (post) => {
 
   if (newImages.length > 0) {
     const formData = new FormData()
-    newImages.forEach(img => formData.append('files', img.file))
+    newImages.forEach((img) => formData.append('files', img.file))
 
     try {
       const uploadRes = await api.post(`/CommunityPost/upload-images`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
       })
       newImages.forEach((img, idx) => {
         img.imageFileName = uploadRes.data[idx]
@@ -228,14 +228,14 @@ const saveEdit = async (post) => {
   // 重新編號 sortOrder，避免移除中間照片後留下缺口
   const images = editForm.value.images.map((img, idx) => ({
     imageFileName: img.imageFileName,
-    sortOrder: idx + 1
+    sortOrder: idx + 1,
   }))
 
   const taggedProducts = editForm.value.taggedProducts.map(name => {
     const matched = availableProducts.value.find(p => p.name === name)
     return {
       productId: matched ? matched.productId : null,
-      productRoute: null
+      productRoute: null,
     }
   })
 
@@ -246,7 +246,7 @@ const saveEdit = async (post) => {
       content: editForm.value.content,
       status: editForm.value.status,
       images,
-      taggedProducts
+      taggedProducts,
     })
   } catch (err) {
     console.error('編輯貼文失敗：', err)
@@ -302,7 +302,7 @@ watch(() => route.params.userId, () => {
 
 const tabs = [
   { key: 'works', label: '穿搭作品' },
-  { key: 'saved', label: '收藏' }
+  { key: 'saved', label: '收藏' },
 ]
 
 // 目前登入者對這個人的追蹤紀錄 id，還沒追蹤是 null
@@ -336,7 +336,9 @@ const fetchFollowCounts = async () => {
 
 const fetchFollowStatus = async () => {
   try {
-    const res = await api.get(`/UserFollow/follower/${currentUserId.value}/following/${viewedUserId.value}`)
+    const res = await api.get(
+      `/UserFollow/follower/${currentUserId.value}/following/${viewedUserId.value}`,
+    )
     if (res.data) {
       userProfile.value.isFollowing = true
       myFollowId.value = res.data.userFollowId
@@ -364,7 +366,7 @@ const toggleFollow = async () => {
     try {
       await api.post(`/UserFollow`, {
         followerId: currentUserId.value,
-        followingId: viewedUserId.value
+        followingId: viewedUserId.value,
       })
     } catch (err) {
       console.error('追蹤失敗：', err)
@@ -382,8 +384,6 @@ const toggleFollow = async () => {
   
 
   <div class="community-page min-vh-100 w-100">
-    
-
     <div class="container-fluid container-lg pb-5">
 
       <!--  返回社群按鈕 -->
@@ -425,7 +425,6 @@ const toggleFollow = async () => {
 
         <div class="profile-body">
           <div class="profile-top">
-
             <!-- 大頭貼 -->
             <div class="avatar-wrapper">
               <img :src="userProfile.avatar" class="avatar-img" alt="Avatar" @error="onAvatarError($event, userProfile.name)" />
@@ -442,7 +441,10 @@ const toggleFollow = async () => {
                   <div class="stat-num">{{ userProfile.followersCount }}</div>
                   <div class="stat-label">粉絲</div>
                 </router-link>
-                <router-link :to="`/community/profile/${viewedUserId}/following`" class="stat-item stat-item-clickable">
+                <router-link
+                  :to="`/community/profile/${viewedUserId}/following`"
+                  class="stat-item stat-item-clickable"
+                >
                   <div class="stat-num">{{ userProfile.followingCount }}</div>
                   <div class="stat-label">追蹤中</div>
                 </router-link>
@@ -481,7 +483,9 @@ const toggleFollow = async () => {
               class="tab-btn"
               :class="{ active: activeTab === t.key }"
               @click="activeTab = t.key"
-            >{{ t.label }}</button>
+            >
+              {{ t.label }}
+            </button>
           </div>
         </div>
       </div>
@@ -497,12 +501,16 @@ const toggleFollow = async () => {
               v-if="viewedUserId === currentUserId && post.status !== 'public'"
               class="post-status-badge"
               :class="post.status === 'hide' ? 'badge-hide' : 'badge-check'"
-            >{{ post.status === 'hide' ? '隱藏' : '審核中' }}</span>
+              >{{ post.status === 'hide' ? '隱藏' : '審核中' }}</span
+            >
             <img :src="post.image" :alt="post.content" />
           </router-link>
 
           <div class="post-body">
-            <router-link :to="`/community/post/${post.communityPostId}`" class="text-decoration-none">
+            <router-link
+              :to="`/community/post/${post.communityPostId}`"
+              class="text-decoration-none"
+            >
               <h6 class="post-title">{{ post.content }}</h6>
             </router-link>
 
@@ -521,15 +529,23 @@ const toggleFollow = async () => {
               <Teleport to="body">
                 <!-- :css="false"：動畫改由 anime.js 控制，v-if 要放進去才觸發得到 enter/leave -->
                 <Transition @enter="onEditModalEnter" @leave="onEditModalLeave" :css="false">
-                  <div v-if="editingPostId === post.communityPostId" class="edit-modal-overlay" @click.self="cancelEdit">
+                  <div
+                    v-if="editingPostId === post.communityPostId"
+                    class="edit-modal-overlay"
+                    @click.self="cancelEdit"
+                  >
                     <div class="edit-modal">
                     <div class="edit-modal-header">
                       <h3 class="edit-modal-title">編輯貼文</h3>
                       <button type="button" class="edit-modal-close" @click="cancelEdit">✕</button>
                     </div>
 
-                    <div class="edit-form">
-                      <textarea v-model="editForm.content" class="edit-textarea" rows="3"></textarea>
+                      <div class="edit-form">
+                        <textarea
+                          v-model="editForm.content"
+                          class="edit-textarea"
+                          rows="3"
+                        ></textarea>
 
                       <div class="edit-thumb-row">
                         <div class="edit-thumb-item" v-for="(img, idx) in editForm.images" :key="idx">
@@ -587,11 +603,17 @@ const toggleFollow = async () => {
                         </span>
                       </div>
 
-                      <div class="edit-visibility">
-                        <label><input type="radio" v-model="editForm.status" value="public" /> 公開</label>
-                        <label><input type="radio" v-model="editForm.status" value="hide" /> 隱藏</label>
+                        <div class="edit-visibility">
+                          <label
+                            ><input type="radio" v-model="editForm.status" value="public" />
+                            公開</label
+                          >
+                          <label
+                            ><input type="radio" v-model="editForm.status" value="hide" />
+                            隱藏</label
+                          >
+                        </div>
                       </div>
-                    </div>
 
                     <div class="edit-modal-footer">
                       <button class="btn-cancel-edit" @click="cancelEdit">取消</button>
@@ -604,11 +626,12 @@ const toggleFollow = async () => {
 
               <div v-if="editingPostId !== post.communityPostId" class="post-manage-actions">
                 <button class="btn-edit-post" @click="startEdit(post)">編輯貼文</button>
-                <button class="btn-delete-post" @click="deletePost(post.communityPostId)">刪除貼文</button>
+                <button class="btn-delete-post" @click="deletePost(post.communityPostId)">
+                  刪除貼文
+                </button>
               </div>
             </template>
           </div>
-
         </div>
       </div>
 
@@ -616,13 +639,19 @@ const toggleFollow = async () => {
       <div v-else-if="activeTab === 'saved'">
         <div v-if="savedPosts.length" class="post-grid">
           <div v-for="post in savedPosts" :key="post.communityPostId" class="post-card">
-            <router-link :to="`/community/post/${post.communityPostId}`" class="post-media d-block text-decoration-none">
+            <router-link
+              :to="`/community/post/${post.communityPostId}`"
+              class="post-media d-block text-decoration-none"
+            >
               <span class="tag-label" v-if="post.tags[0]">{{ post.tags[0].replace('#', '') }}</span>
               <img :src="post.image" :alt="post.content" />
             </router-link>
 
             <div class="post-body">
-              <router-link :to="`/community/post/${post.communityPostId}`" class="text-decoration-none">
+              <router-link
+                :to="`/community/post/${post.communityPostId}`"
+                class="text-decoration-none"
+              >
                 <h6 class="post-title">{{ post.content }}</h6>
               </router-link>
 
@@ -667,7 +696,7 @@ const toggleFollow = async () => {
 .community-page {
   width: 100%;
   min-height: 100vh;
-  background-color: #F9F4F0 !important;
+  background-color: #f9f4f0 !important;
   box-sizing: border-box;
   --cream:#F9F4F0;
   --paper:#FFFDFB;
@@ -682,21 +711,30 @@ const toggleFollow = async () => {
 }
 
 /* ---------- 返回社群按鈕 ---------- */
-.back-pill{
-  display:inline-flex; align-items:center; gap:.3rem;
-  border:1px solid var(--ink); border-radius:999px;
-  padding:.35rem 1rem; font-size:.82rem; color:var(--ink);
-  text-decoration:none; margin-bottom:1.2rem;
-  transition:all .18s ease;
+.back-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  padding: 0.35rem 1rem;
+  font-size: 0.82rem;
+  color: var(--ink);
+  text-decoration: none;
+  margin-bottom: 1.2rem;
+  transition: all 0.18s ease;
 }
-.back-pill:hover{ background:var(--ink); color:var(--cream); }
+.back-pill:hover {
+  background: var(--ink);
+  color: var(--cream);
+}
 
 /* ---------- 個人檔案卡 ---------- */
-.profile-card{
-  background:var(--paper);
-  border:1px solid var(--hairline);
-  border-radius:22px;
-  overflow:hidden;
+.profile-card {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 22px;
+  overflow: hidden;
 }
 
 /* ---------- 骨架載入畫面 ---------- */
@@ -755,239 +793,440 @@ const toggleFollow = async () => {
     );
   position:relative;
 }
-.profile-banner::after{
-  content:"";
-  position:absolute; inset:0;
-  background:linear-gradient(180deg, rgba(122,75,84,.08), rgba(122,75,84,0) 60%);
+.profile-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(122, 75, 84, 0.08), rgba(122, 75, 84, 0) 60%);
 }
 
-.profile-body{ padding:0 2.2rem 1.6rem; position:relative; }
-
-.profile-top{
-  display:flex; align-items:flex-end; justify-content:space-between;
-  flex-wrap:wrap; gap:1.2rem;
-  margin-top:-58px;
+.profile-body {
+  padding: 0 2.2rem 1.6rem;
+  position: relative;
 }
 
-.avatar-wrapper{
-  width:112px; height:112px; border-radius:50%;
-  background:var(--paper); padding:5px;
-  box-shadow:0 0 0 2px var(--plum);
-  flex-shrink:0;
-}
-.avatar-img{ width:100%; height:100%; border-radius:50%; object-fit:cover; display:block; }
-
-.profile-meta{
-  flex:1;
-  display:flex; align-items:center; justify-content:space-between;
-  flex-wrap:wrap; gap:1rem;
-  padding-bottom:.3rem;
+.profile-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+  margin-top: -58px;
 }
 
-.stat-group{ display:flex; gap:2.2rem; }
-.stat-item{ text-align:center; }
-.stat-item-clickable{
-  background:none; border:none; padding:0; cursor:pointer;
-  text-decoration:none; display:block;
-  transition:opacity .18s ease;
+.avatar-wrapper {
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  background: var(--paper);
+  padding: 5px;
+  box-shadow: 0 0 0 2px var(--plum);
+  flex-shrink: 0;
 }
-.stat-item-clickable:hover{ opacity:.7; }
-.stat-num{
-  font-family:'Noto Serif TC', serif;
-  font-weight:900; font-size:1.25rem; color:var(--ink); line-height:1.1;
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
 }
-.stat-label{ font-size:.74rem; color:var(--ink-soft); margin-top:.15rem; }
 
-.action-group{ display:flex; gap:.7rem; }
-.btn-follow-main{
-  background:var(--ink); color:var(--paper);
-  border:none; border-radius:4px;
-  padding:.6rem 1.5rem; font-size:.88rem; font-weight:600;
-  transition:background .18s ease, transform .18s ease;
+.profile-meta {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding-bottom: 0.3rem;
 }
-.btn-follow-main:hover{ background:var(--plum-deep); transform:translateY(-1px); }
-.btn-follow-main.following{ background:var(--hairline); color:var(--ink-soft); }
-.btn-follow-main.following:hover{ background:var(--hairline); transform:none; }
 
-.btn-message{
-  display:inline-block; text-decoration:none;
-  background:transparent; color:var(--ink);
-  border:1px solid var(--ink); border-radius:4px;
-  padding:.6rem 1.4rem; font-size:.88rem; font-weight:500;
-  transition:all .18s ease;
+.stat-group {
+  display: flex;
+  gap: 2.2rem;
 }
-.btn-message:hover{ background:var(--ink); color:var(--paper); }
+.stat-item {
+  text-align: center;
+}
+.stat-item-clickable {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: none;
+  display: block;
+  transition: opacity 0.18s ease;
+}
+.stat-item-clickable:hover {
+  opacity: 0.7;
+}
+.stat-num {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 900;
+  font-size: 1.25rem;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.stat-label {
+  font-size: 0.74rem;
+  color: var(--ink-soft);
+  margin-top: 0.15rem;
+}
+
+.action-group {
+  display: flex;
+  gap: 0.7rem;
+}
+.btn-follow-main {
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 4px;
+  padding: 0.6rem 1.5rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition:
+    background 0.18s ease,
+    transform 0.18s ease;
+}
+.btn-follow-main:hover {
+  background: var(--plum-deep);
+  transform: translateY(-1px);
+}
+.btn-follow-main.following {
+  background: var(--hairline);
+  color: var(--ink-soft);
+}
+.btn-follow-main.following:hover {
+  background: var(--hairline);
+  transform: none;
+}
+
+.btn-message {
+  display: inline-block;
+  text-decoration: none;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  padding: 0.6rem 1.4rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  transition: all 0.18s ease;
+}
+.btn-message:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
 
 /* ---------- 姓名 / 簡介 ---------- */
-.profile-intro{ margin-top:1rem; }
-.profile-name{
-  font-family:'Noto Serif TC', serif;
-  font-weight:900; font-size:1.5rem;
-  margin:0 0 .3rem;
-  color:var(--ink);
+.profile-intro {
+  margin-top: 1rem;
 }
-.profile-handle{
-  font-size:.86rem; color:var(--ink-soft);
-  display:flex; align-items:center; gap:.4rem; margin-bottom:.6rem;
+.profile-name {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 900;
+  font-size: 1.5rem;
+  margin: 0 0 0.3rem;
+  color: var(--ink);
 }
-.profile-handle .dot{ color:var(--hairline); }
-.profile-handle .tagline{ color:var(--ochre); font-weight:600; }
-.profile-bio{
-  font-size:.9rem; color:var(--ink-soft); line-height:1.7;
-  max-width:640px; margin:0;
+.profile-handle {
+  font-size: 0.86rem;
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+.profile-handle .dot {
+  color: var(--hairline);
+}
+.profile-handle .tagline {
+  color: var(--ochre);
+  font-weight: 600;
+}
+.profile-bio {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  line-height: 1.7;
+  max-width: 640px;
+  margin: 0;
 }
 
 /* ---------- 頁籤 ---------- */
-.tab-row{
-  display:flex; gap:1.8rem;
-  border-bottom:1px solid var(--hairline);
-  margin-top:1.6rem;
+.tab-row {
+  display: flex;
+  gap: 1.8rem;
+  border-bottom: 1px solid var(--hairline);
+  margin-top: 1.6rem;
 }
-.tab-btn{
-  background:none; border:none; padding:.8rem 0;
-  font-family:'Noto Serif TC', serif;
-  font-size:1rem; color:var(--ink-soft);
-  position:relative; cursor:pointer;
+.tab-btn {
+  background: none;
+  border: none;
+  padding: 0.8rem 0;
+  font-family: 'Noto Serif TC', serif;
+  font-size: 1rem;
+  color: var(--ink-soft);
+  position: relative;
+  cursor: pointer;
 }
-.tab-btn.active{ color:var(--ink); font-weight:700; }
-.tab-btn.active::after{
-  content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px;
-  background:var(--plum);
+.tab-btn.active {
+  color: var(--ink);
+  font-weight: 700;
+}
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--plum);
 }
 
 /* ---------- 作品牆 ---------- */
-.post-grid{
-  display:grid;
-  grid-template-columns:repeat(4, 1fr);
-  gap:1.4rem;
-  margin-top:2rem;
+.post-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.4rem;
+  margin-top: 2rem;
 }
-.post-card{
-  background:var(--paper);
-  border:1px solid var(--hairline);
-  border-radius:16px;
-  overflow:hidden;
-  transition:transform .25s ease, box-shadow .25s ease;
+.post-card {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  overflow: hidden;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
 }
-.post-card:hover{
-  transform:translateY(-4px) rotate(-0.3deg);
-  box-shadow:0 16px 30px -20px rgba(42,36,32,.4);
-}
-
-.post-media{ position:relative; aspect-ratio:4/5; overflow:hidden; display:block; background:var(--hairline); }
-.post-media img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform .5s ease; }
-.post-card:hover .post-media img{ transform:scale(1.06); }
-
-.tag-label{
-  position:absolute; top:12px; left:-6px; z-index:2;
-  background:var(--plum); color:#fff;
-  font-size:.66rem; letter-spacing:.04em; font-weight:600;
-  padding:.26rem .65rem .26rem .9rem;
-  box-shadow:0 4px 10px rgba(0,0,0,.18);
-}
-.tag-label::after{
-  content:""; position:absolute; left:0; bottom:-6px;
-  border-width:0 6px 6px 0; border-style:solid;
-  border-color:transparent var(--plum-deep) transparent transparent;
+.post-card:hover {
+  transform: translateY(-4px) rotate(-0.3deg);
+  box-shadow: 0 16px 30px -20px rgba(42, 36, 32, 0.4);
 }
 
-.post-status-badge{
-  position:absolute; top:12px; right:12px; z-index:2;
-  color:#fff; font-size:.68rem; font-weight:700;
-  padding:.26rem .7rem; border-radius:999px;
-  box-shadow:0 2px 6px rgba(0,0,0,.2);
+.post-media {
+  position: relative;
+  aspect-ratio: 4/5;
+  overflow: hidden;
+  display: block;
+  background: var(--hairline);
 }
-.post-status-badge.badge-hide{ background:var(--ink-soft); }
-.post-status-badge.badge-check{ background:var(--ochre); }
-
-.post-body{ padding:.95rem 1rem 1.1rem; }
-.post-title{
-  font-family:'Noto Serif TC', serif;
-  font-weight:700; font-size:.92rem; color:var(--ink);
-  margin:0 0 .55rem;
-  display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden;
+.post-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.5s ease;
 }
-.post-stats{
-  display:flex; align-items:center; gap:.9rem;
-  font-size:.76rem; color:var(--ink-soft);
-}
-.post-stats a{ color:var(--plum); text-decoration:none; font-weight:600; }
-
-.tag-cloud{ display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.7rem; }
-.tag-chip{
-  font-size:.7rem; padding:.28rem .65rem; border-radius:4px;
-  background:var(--cream); border:1px solid var(--hairline); color:var(--ink-soft);
+.post-card:hover .post-media img {
+  transform: scale(1.06);
 }
 
-.post-manage-actions{ display:flex; gap:.6rem; margin-top:.8rem; }
-
-.btn-edit-post{
-  flex:1;
-  background:transparent; color:var(--ink);
-  border:1px solid var(--ink); border-radius:4px;
-  padding:.45rem; font-size:.78rem; font-weight:600;
-  transition:all .18s ease;
+.tag-label {
+  position: absolute;
+  top: 12px;
+  left: -6px;
+  z-index: 2;
+  background: var(--plum);
+  color: #fff;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  padding: 0.26rem 0.65rem 0.26rem 0.9rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
 }
-.btn-edit-post:hover{ background:var(--ink); color:var(--paper); }
-
-.btn-delete-post{
-  flex:1;
-  background:transparent; color:#B4453A;
-  border:1px solid #B4453A; border-radius:4px;
-  padding:.45rem; font-size:.78rem; font-weight:600;
-  transition:all .18s ease;
+.tag-label::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -6px;
+  border-width: 0 6px 6px 0;
+  border-style: solid;
+  border-color: transparent var(--plum-deep) transparent transparent;
 }
-.btn-delete-post:hover{ background:#B4453A; color:#fff; }
+
+.post-status-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.26rem 0.7rem;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+.post-status-badge.badge-hide {
+  background: var(--ink-soft);
+}
+.post-status-badge.badge-check {
+  background: var(--ochre);
+}
+
+.post-body {
+  padding: 0.95rem 1rem 1.1rem;
+}
+.post-title {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--ink);
+  margin: 0 0 0.55rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.post-stats {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+}
+.post-stats a {
+  color: var(--plum);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+.tag-chip {
+  font-size: 0.7rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 4px;
+  background: var(--cream);
+  border: 1px solid var(--hairline);
+  color: var(--ink-soft);
+}
+
+.post-manage-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+}
+
+.btn-edit-post {
+  flex: 1;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  padding: 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: all 0.18s ease;
+}
+.btn-edit-post:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.btn-delete-post {
+  flex: 1;
+  background: transparent;
+  color: #b4453a;
+  border: 1px solid #b4453a;
+  border-radius: 4px;
+  padding: 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: all 0.18s ease;
+}
+.btn-delete-post:hover {
+  background: #b4453a;
+  color: #fff;
+}
 
 /*
   半透明黑底 + flex 編輯貼文置中彈窗
 */
-.edit-modal-overlay{
-  --cream:#F9F4F0;
-  --paper:#FFFDFB;
-  --ink:#2A2420;
-  --ink-soft:#7A6E63;
-  --plum:#7A4B54;
-  --plum-deep:#5E3941;
-  --ochre:#B8862E;
-  --hairline:#E4D8CC;
-  position:fixed; inset:0;
-  background:rgba(42,36,32,.55);
-  display:flex; align-items:center; justify-content:center;
-  z-index:1000;
-  padding:1.5rem;
+.edit-modal-overlay {
+  --cream: #f9f4f0;
+  --paper: #fffdfb;
+  --ink: #2a2420;
+  --ink-soft: #7a6e63;
+  --plum: #7a4b54;
+  --plum-deep: #5e3941;
+  --ochre: #b8862e;
+  --hairline: #e4d8cc;
+  position: fixed;
+  inset: 0;
+  background: rgba(42, 36, 32, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1.5rem;
 }
-.edit-modal{
-  background:var(--paper);
-  border-radius:14px;
-  width:100%;
-  max-width:760px;
-  max-height:90vh;
-  box-shadow:0 20px 60px rgba(42,36,32,.35);
-  display:flex; flex-direction:column;
-  overflow:hidden; /* 讓內層 .edit-form 自己捲動，標題列跟底部按鈕才能固定不跟著捲走 */
+.edit-modal {
+  background: var(--paper);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 760px;
+  max-height: 90vh;
+  box-shadow: 0 20px 60px rgba(42, 36, 32, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* 讓內層 .edit-form 自己捲動，標題列跟底部按鈕才能固定不跟著捲走 */
 }
-.edit-modal-header{
-  display:flex; align-items:center; justify-content:space-between;
-  padding:1.2rem 1.6rem;
-  border-bottom:1px solid var(--hairline);
-  flex-shrink:0;
+.edit-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.2rem 1.6rem;
+  border-bottom: 1px solid var(--hairline);
+  flex-shrink: 0;
 }
-.edit-modal-title{
-  font-family:'Noto Serif TC', serif; font-weight:700; font-size:1.1rem;
-  color:var(--ink); margin:0;
+.edit-modal-title {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--ink);
+  margin: 0;
 }
-.edit-modal-close{
-  width:28px; height:28px; border-radius:50%;
-  border:none; background:var(--hairline); color:var(--ink-soft);
-  font-size:.8rem; line-height:1; cursor:pointer;
-  display:flex; align-items:center; justify-content:center; flex-shrink:0;
-  transition:background .18s ease, color .18s ease;
+.edit-modal-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: var(--hairline);
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease;
 }
-.edit-modal-close:hover{ background:var(--plum); color:#fff; }
-.edit-field-hint{ font-size:.72rem; color:var(--ink-soft); margin:-.3rem 0 0; }
+.edit-modal-close:hover {
+  background: var(--plum);
+  color: #fff;
+}
+.edit-field-hint {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  margin: -0.3rem 0 0;
+}
 
-.edit-form{ display:flex; flex-direction:column; gap:.6rem; padding:1.4rem 1.6rem; overflow-y:auto; }
+.edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.4rem 1.6rem;
+  overflow-y: auto;
+}
 
 .edit-textarea{
   width:100%;
@@ -1000,86 +1239,200 @@ const toggleFollow = async () => {
   resize:none;
   overflow-y:auto;
 }
-.edit-textarea:focus{ border-color:var(--plum); }
-.edit-visibility{ display:flex; gap:1rem; font-size:.8rem; color:var(--ink); }
-.edit-visibility label{ display:flex; align-items:center; gap:.35rem; cursor:pointer; }
-.edit-modal-footer{
-  display:flex; gap:.6rem;
-  padding:1.1rem 1.6rem;
-  border-top:1px solid var(--hairline);
-  flex-shrink:0;
+.edit-textarea:focus {
+  border-color: var(--plum);
+}
+.edit-visibility {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+.edit-visibility label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+.edit-modal-footer {
+  display: flex;
+  gap: 0.6rem;
+  padding: 1.1rem 1.6rem;
+  border-top: 1px solid var(--hairline);
+  flex-shrink: 0;
 }
 .edit-modal-footer .btn-cancel-edit,
-.edit-modal-footer .btn-save-edit{ flex:1; }
+.edit-modal-footer .btn-save-edit {
+  flex: 1;
+}
 
-.file-input-hidden{
-  position:absolute; opacity:0; width:100%; height:100%;
-  top:0; left:0; cursor:pointer;
+.file-input-hidden {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  cursor: pointer;
 }
-.edit-thumb-row{ display:flex; flex-wrap:wrap; gap:.5rem; }
-.edit-thumb-item{
-  position:relative;
-  width:64px; height:64px; border-radius:6px; overflow:hidden;
-  border:1px solid var(--hairline); flex-shrink:0;
+.edit-thumb-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
-.edit-thumb-item img{ width:100%; height:100%; object-fit:cover; display:block; cursor:zoom-in; }
-.edit-thumb-remove{
-  position:absolute; top:2px; right:2px;
-  width:18px; height:18px; border-radius:50%;
-  background:rgba(0,0,0,.6); color:#fff; border:none;
-  font-size:.65rem; line-height:1;
-  display:flex; align-items:center; justify-content:center;
+.edit-thumb-item {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  flex-shrink: 0;
 }
-.edit-thumb-add{
-  position:relative;
-  width:64px; height:64px; border-radius:6px; flex-shrink:0;
-  border:1px dashed var(--hairline);
-  display:flex; align-items:center; justify-content:center;
-  font-size:1.2rem; color:var(--ink-soft); cursor:pointer;
+.edit-thumb-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  cursor: zoom-in;
 }
-.edit-thumb-add:hover{ border-color:var(--plum); color:var(--plum); }
-.edit-photo-hint{ font-size:.72rem; color:var(--ink-soft); margin:0; }
+.edit-thumb-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: none;
+  font-size: 0.65rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.edit-thumb-add {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  border: 1px dashed var(--hairline);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.edit-thumb-add:hover {
+  border-color: var(--plum);
+  color: var(--plum);
+}
+.edit-photo-hint {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
 
-.edit-field-label{ font-size:.8rem; font-weight:700; color:var(--ink); }
-.edit-search-bar{
-  display:flex; align-items:center; gap:.4rem;
-  border:1px solid var(--hairline); border-radius:4px;
-  padding:.4rem .7rem; background:var(--paper);
+.edit-field-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink);
 }
-.edit-search-input{
-  flex:1; border:none; outline:none; font-size:.82rem; color:var(--ink); background:transparent;
+.edit-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 0.4rem 0.7rem;
+  background: var(--paper);
 }
-.edit-search-clear{ background:none; border:none; color:var(--ink-soft); font-size:.75rem; }
+.edit-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 0.82rem;
+  color: var(--ink);
+  background: transparent;
+}
+.edit-search-clear {
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+}
 
-.tag-chip.selectable{
-  background:var(--paper); border:1px solid var(--hairline); color:var(--ink);
-  cursor:pointer; transition:all .18s ease;
+.tag-chip.selectable {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.18s ease;
 }
-.tag-chip.selectable:hover{ border-color:var(--plum); color:var(--plum); }
-.tag-chip.selectable.active{ background:var(--plum); border-color:var(--plum); color:#fff; }
-.tag-empty{ font-size:.76rem; color:var(--ink-soft); }
+.tag-chip.selectable:hover {
+  border-color: var(--plum);
+  color: var(--plum);
+}
+.tag-chip.selectable.active {
+  background: var(--plum);
+  border-color: var(--plum);
+  color: #fff;
+}
+.tag-empty {
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+}
 
-.tag-preview{ display:flex; flex-wrap:wrap; gap:.4rem; }
-.tag-chip.selected-chip{
-  background:var(--plum); border:1px solid var(--plum); color:#fff;
-  display:inline-flex; align-items:center; gap:.35rem;
+.tag-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
 }
-.chip-remove{ background:none; border:none; color:#fff; font-size:.68rem; line-height:1; opacity:.8; }
-.chip-remove:hover{ opacity:1; }
-.btn-cancel-edit{
-  flex:1;
-  background:transparent; color:var(--ink-soft);
-  border:1px solid var(--hairline); border-radius:4px;
-  padding:.45rem; font-size:.78rem;
+.tag-chip.selected-chip {
+  background: var(--plum);
+  border: 1px solid var(--plum);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
-.btn-save-edit{
-  flex:1;
-  background:var(--ink); color:var(--paper);
-  border:none; border-radius:4px;
-  padding:.45rem; font-size:.78rem; font-weight:600;
-  transition:background .18s ease;
+.chip-remove {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 0.68rem;
+  line-height: 1;
+  opacity: 0.8;
 }
-.btn-save-edit:hover{ background:var(--plum-deep); }
+.chip-remove:hover {
+  opacity: 1;
+}
+.btn-cancel-edit {
+  flex: 1;
+  background: transparent;
+  color: var(--ink-soft);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 0.45rem;
+  font-size: 0.78rem;
+}
+.btn-save-edit {
+  flex: 1;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 4px;
+  padding: 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: background 0.18s ease;
+}
+.btn-save-edit:hover {
+  background: var(--plum-deep);
+}
 
 /* 縮圖放大燈箱，同樣 Teleport 到 body，補宣告 --ink 避免抓空值 */
 .lightbox-overlay{
@@ -1091,49 +1444,81 @@ const toggleFollow = async () => {
   padding:2rem;
   cursor:zoom-out;
 }
-.lightbox-image{
-  max-width:90vw; max-height:88vh;
-  object-fit:contain;
-  border-radius:6px;
-  box-shadow:0 20px 60px rgba(0,0,0,.5);
-  cursor:default; /* 圖片本身不算「背景」，不用跟著顯示可以關閉的游標 */
+.lightbox-image {
+  max-width: 90vw;
+  max-height: 88vh;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  cursor: default; /* 圖片本身不算「背景」，不用跟著顯示可以關閉的游標 */
 }
-.lightbox-close{
-  position:fixed; top:1.5rem; right:1.8rem;
-  width:38px; height:38px; border-radius:50%;
-  border:none; background:rgba(255,255,255,.15); color:#fff;
-  font-size:1rem; line-height:1; cursor:pointer;
-  display:flex; align-items:center; justify-content:center;
-  transition:background .18s ease;
+.lightbox-close {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.8rem;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.18s ease;
 }
-.lightbox-close:hover{ background:rgba(255,255,255,.3); }
-
+.lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
 
 /* ---------- 其他頁籤空狀態 ---------- */
-.empty-state{
-  background:var(--paper); border:1px solid var(--hairline); border-radius:22px;
-  padding:3.5rem 2rem; text-align:center; margin-top:2rem;
+.empty-state {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 22px;
+  padding: 3.5rem 2rem;
+  text-align: center;
+  margin-top: 2rem;
 }
-.empty-icon{ display:block; margin:0 auto .8rem; color:var(--ink-soft); opacity:.7; }
-.empty-note{
-  font-family:'Noto Serif TC', serif; font-style:italic;
-  color:var(--ink-soft); font-size:.95rem; margin:0;
+.empty-icon {
+  display: block;
+  margin: 0 auto 0.8rem;
+  color: var(--ink-soft);
+  opacity: 0.7;
+}
+.empty-note {
+  font-family: 'Noto Serif TC', serif;
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  margin: 0;
 }
 
 /* ---------- RWD ---------- */
 @media (max-width: 991px){
   .post-grid{ grid-template-columns:repeat(2, 1fr); }
 }
-@media (max-width: 640px){
-  .profile-top{ flex-direction:column; align-items:flex-start; }
-  .profile-meta{ width:100%; justify-content:space-between; }
-  .post-grid{ grid-template-columns:1fr; }
+@media (max-width: 640px) {
+  .profile-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .profile-meta {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .post-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
 
 <!--  這個區塊「不加 scoped」：scoped 樣式只會作用在這個元件模板裡面的元素上 -->
 <style>
 body {
-  background-color: #F9F4F0 !important;
+  background-color: #f9f4f0 !important;
 }
 </style>

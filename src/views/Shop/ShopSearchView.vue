@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import api from '@/services/api'
+import api from '@/api/api'
 import { RouterLink } from 'vue-router'
 
 const route = useRoute()
@@ -33,6 +33,10 @@ async function search(kw) {
 onMounted(() => search(route.query.keyword))
 
 // 關鍵字變了（在搜尋頁又搜新的）重搜
+watch(
+  () => route.query.keyword,
+  (kw) => search(kw),
+)
 watch(
   () => route.query.keyword,
   (kw) => search(kw),
@@ -98,14 +102,23 @@ watch(
   .grid {
     grid-template-columns: repeat(2, 1fr);
   }
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 @media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
   .grid {
     grid-template-columns: 1fr;
   }
 }
 .card {
   border: 1px solid var(--home-border);
+  transition:
+    box-shadow 0.25s ease,
+    transform 0.25s ease;
   transition:
     box-shadow 0.25s ease,
     transform 0.25s ease;

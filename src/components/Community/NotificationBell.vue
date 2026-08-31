@@ -5,7 +5,7 @@
 // （App.vue、Header.vue...），都只要 import 這個元件、丟進版面裡就能動。
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import api from '@/services/api'
+import api from '@/api/api'
 // currentUserId、loadCurrentUserId：跟 Community 其他頁面共用同一份「目前登入者是誰」，
 // 不用重複打 API 問一次。
 import { currentUserId, loadCurrentUserId } from '@/views/Community/CommunityView.vue'
@@ -47,9 +47,9 @@ const fetchNotifications = async () => {
   loading.value = true
   try {
     const res = await api.get(`/Notification/user/${currentUserId.value}`)
-    notifications.value = res.data.map(n => ({
+    notifications.value = res.data.map((n) => ({
       ...n,
-      fromAvatar: avatarUrl(n.fromAvatar, n.fromUsername)
+      fromAvatar: avatarUrl(n.fromAvatar, n.fromUsername),
     }))
   } catch (err) {
     console.error('讀取通知清單失敗：', err)
@@ -139,11 +139,22 @@ onUnmounted(() => {
 <template>
   <div class="notif-bell-wrapper">
     <button type="button" class="notif-bell-btn" @click="togglePanel" aria-label="通知">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <svg
+        viewBox="0 0 24 24"
+        width="20"
+        height="20"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
         <path d="M6 8a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6.5H4c.5-1 2-2.5 2-6.5z" />
         <path d="M10 19a2 2 0 0 0 4 0" />
       </svg>
-      <span v-if="unreadCount > 0" class="notif-badge">{{ unreadCount > 9 ? '9+' : unreadCount }}</span>
+      <span v-if="unreadCount > 0" class="notif-badge">{{
+        unreadCount > 9 ? '9+' : unreadCount
+      }}</span>
     </button>
 
     <div v-if="showPanel" class="notif-panel-backdrop" @click="closePanel"></div>
@@ -160,7 +171,12 @@ onUnmounted(() => {
           :class="{ unread: !n.isRead }"
           @click="goToNotification(n)"
         >
-          <img :src="n.fromAvatar" class="notif-avatar" alt="avatar" @error="onAvatarError($event, n.fromUsername)" />
+          <img
+            :src="n.fromAvatar"
+            class="notif-avatar"
+            alt="avatar"
+            @error="onAvatarError($event, n.fromUsername)"
+          />
           <div class="notif-item-body">
             <p class="notif-text">{{ formatNotificationText(n) }}</p>
             <span class="notif-time">{{ formatTime(n.createdDate) }}</span>
@@ -172,11 +188,15 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.notif-bell-wrapper{
-  --cream:#F9F4F0; --paper:#FFFDFB; --ink:#2A2420; --ink-soft:#7A6E63;
-  --plum:#7A4B54; --hairline:#E4D8CC;
-  position:relative;
-  font-family:'Noto Sans TC', sans-serif;
+.notif-bell-wrapper {
+  --cream: #f9f4f0;
+  --paper: #fffdfb;
+  --ink: #2a2420;
+  --ink-soft: #7a6e63;
+  --plum: #7a4b54;
+  --hairline: #e4d8cc;
+  position: relative;
+  font-family: 'Noto Sans TC', sans-serif;
 }
 .notif-bell-btn{
   position:relative;
@@ -196,36 +216,97 @@ onUnmounted(() => {
   background:var(--home-bg-soft);
   transform:translateY(-1px);
 }
-.notif-badge{
-  position:absolute; top:-2px; right:-2px;
-  background:var(--plum); color:#fff; font-size:.62rem; font-weight:700;
-  min-width:16px; height:16px; border-radius:8px; padding:0 .3rem;
-  display:flex; align-items:center; justify-content:center;
+.notif-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background: var(--plum);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  padding: 0 0.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.notif-panel-backdrop{ position:fixed; inset:0; z-index:99; }
-.notif-panel{
-  position:absolute; top:calc(100% + 10px); right:0; z-index:100;
-  width:320px; max-height:420px; overflow-y:auto;
-  background:var(--paper); border:1px solid var(--hairline); border-radius:10px;
-  box-shadow:0 12px 32px rgba(42,36,32,.18);
+.notif-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
 }
-.notif-panel-header{
-  padding:.9rem 1.1rem; font-weight:700; color:var(--ink);
-  border-bottom:1px solid var(--hairline);
-  font-family:'Noto Serif TC', serif;
+.notif-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 100;
+  width: 320px;
+  max-height: 420px;
+  overflow-y: auto;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(42, 36, 32, 0.18);
 }
-.notif-empty{ padding:2rem 1.1rem; text-align:center; color:var(--ink-soft); font-size:.85rem; }
-.notif-list{ display:flex; flex-direction:column; }
-.notif-item{
-  display:flex; align-items:flex-start; gap:.7rem;
-  padding:.8rem 1.1rem; background:none; border:none; border-bottom:1px solid var(--hairline);
-  text-align:left; cursor:pointer; transition:background .15s ease;
+.notif-panel-header {
+  padding: 0.9rem 1.1rem;
+  font-weight: 700;
+  color: var(--ink);
+  border-bottom: 1px solid var(--hairline);
+  font-family: 'Noto Serif TC', serif;
 }
-.notif-item:last-child{ border-bottom:none; }
-.notif-item:hover{ background:var(--cream); }
-.notif-item.unread{ background:rgba(122,75,84,.06); }
-.notif-avatar{ width:36px; height:36px; border-radius:50%; object-fit:cover; flex-shrink:0; }
-.notif-item-body{ flex:1; min-width:0; }
-.notif-text{ margin:0; font-size:.85rem; color:var(--ink); line-height:1.4; }
-.notif-time{ font-size:.68rem; color:var(--ink-soft); }
+.notif-empty {
+  padding: 2rem 1.1rem;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+.notif-list {
+  display: flex;
+  flex-direction: column;
+}
+.notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.8rem 1.1rem;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.notif-item:last-child {
+  border-bottom: none;
+}
+.notif-item:hover {
+  background: var(--cream);
+}
+.notif-item.unread {
+  background: rgba(122, 75, 84, 0.06);
+}
+.notif-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.notif-item-body {
+  flex: 1;
+  min-width: 0;
+}
+.notif-text {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink);
+  line-height: 1.4;
+}
+.notif-time {
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+}
 </style>
