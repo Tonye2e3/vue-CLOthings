@@ -2,26 +2,20 @@
 import { ref, onMounted, watch, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '@/api/api'
-// anime.js：編輯彈窗的開關動畫
 import { animate } from 'animejs'
 
-// 收藏清單、formatCount、currentUserId 都從 CommunityView.vue 共用
 import { savedPosts, loadSavedPosts, formatCount, currentUserId, loadCurrentUserId } from '@/views/Community/CommunityView.vue'
 
-// 圖片是靜態檔案，不走 /api，用 VITE_API_URL 去掉 /api 尾巴
 const IMAGE_BASE = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
 
 const route = useRoute()
 
-// 大頭貼載入失敗時換成 dicebear 預設圖；比對網址而非用旗標，避免同一個 img 元素重複使用時卡住舊狀態
 const onAvatarError = (event, name) => {
   const fallbackUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${name || 'guest'}`
   if (event.target.src === fallbackUrl) return
   event.target.src = fallbackUrl
 }
 
-// viewedUserId：正在看誰的頁面（網址參數）；currentUserId：我是誰（import 進來）
-// 用 computed 才會隨路由切換即時更新（Vue Router 會重用同一個元件）
 const viewedUserId = computed(() => Number(route.params.userId))
 
 const userProfile = ref({
@@ -37,14 +31,9 @@ const userProfile = ref({
 })
 
 const activeTab = ref('works')
-
-// 貼文清單，等 fetchUserPosts() 填入
 const userPosts = ref([])
-
-// 個人資料、貼文都還沒抓回來之前顯示骨架畫面
 const profileLoading = ref(true)
 
-// 抓這個使用者發的所有貼文
 const fetchUserPosts = async () => {
   try {
     const res = await api.get(`/CommunityPost/user/${viewedUserId.value}`)
@@ -56,11 +45,11 @@ const fetchUserPosts = async () => {
       image: post.images && post.images.length > 0
         ? `${IMAGE_BASE}${post.images[0].imageFileName}`
         : '',
-      images: post.images || [], // 編輯貼文換照片要用完整清單
+      images: post.images || [],
       likesCount: post.likesCount,
       commentsCount: post.commentsCount,
       tags: post.taggedProducts.map(t => `#${t.name}`),
-      taggedProducts: post.taggedProducts || [] // 編輯貼文改標記商品要用
+      taggedProducts: post.taggedProducts || []
     }))
     userProfile.value.postsCount = userPosts.value.length
   } catch (err) {
@@ -73,10 +62,6 @@ const deletePost = async (communityPostId) => {
 
   try {
     const res = await api.delete(`/CommunityPost/${communityPostId}`)
-    // 修正：後端就算刪除失敗，也是回傳 HTTP 200（body 裡用 ok:false 表示失敗，
-    // 不是用 HTTP 狀態碼），所以這裡一定要自己檢查 res.data.ok，不能只看 API
-    // 有沒有丟出例外——不然刪除失敗時（例如貼文底下還有關聯資料造成資料庫擋下來）
-    // 畫面上完全不會有任何提示，貼文卻其實還在資料庫裡。
     if (!res.data.ok) {
       console.error('刪除貼文失敗，後端回傳：', res.data)
       alert('刪除失敗，請稍後再試一次！')
@@ -91,7 +76,6 @@ const deletePost = async (communityPostId) => {
   userPosts.value = userPosts.value.filter(p => p.communityPostId !== communityPostId)
 }
 
-// 目前正在編輯哪一篇貼文，null 代表沒有
 const editingPostId = ref(null)
 
 const availableProducts = ref([])
@@ -111,7 +95,6 @@ const productSearch = ref('')
 const filteredProducts = computed(() => {
   const q = productSearch.value.trim().toLowerCase()
   if (!q) {
-    // 沒搜尋時只列前 5 個熱門標籤，避免標籤區塊被拉長
     return availableProducts.value.slice(0, 5)
   }
   return availableProducts.value.filter((p) => p.name.toLowerCase().includes(q))
@@ -127,7 +110,6 @@ const toggleEditProduct = (name) => {
   }
 }
 
-// images 裡每筆 isNew=false 是舊照片，isNew=true 是這次新選的（還沒真正上傳）
 const editForm = ref({ content: '', status: 'public', images: [], taggedProducts: [] })
 
 const startEdit = (post) => {
@@ -150,8 +132,6 @@ const cancelEdit = () => {
   editingPostId.value = null
 }
 
-// ---------- 編輯彈窗開關動畫（Transition JS hook + anime.js） ----------
-
 const onEditModalEnter = (el, done) => {
   const modalBox = el.querySelector('.edit-modal')
   animate(el, { opacity: [0, 1], duration: 200, ease: 'outQuad' })
@@ -164,7 +144,6 @@ const onEditModalEnter = (el, done) => {
   })
 }
 
-// :css="false" 模式下 leave 一定要呼叫 done()，不然元素會卡在 DOM 拿不掉
 const onEditModalLeave = (el, done) => {
   const modalBox = el.querySelector('.edit-modal')
   animate(el, { opacity: [1, 0], duration: 180, ease: 'inQuad' })
@@ -190,7 +169,7 @@ const handleEditFileChange = (event) => {
   files.forEach((file) => {
     editForm.value.images.push({
       file,
-      imageFileName: file.name, // 佔位，saveEdit 上傳成功後換成真正路徑
+      imageFileName: file.name,
       sortOrder: editForm.value.images.length + 1,
       url: URL.createObjectURL(file),
       isNew: true
@@ -203,7 +182,6 @@ const removeEditImage = (index) => {
   editForm.value.images.splice(index, 1)
 }
 
-// 儲存編輯：先上傳新照片，再打 PUT 更新貼文
 const saveEdit = async (post) => {
   const newImages = editForm.value.images.filter(img => img.isNew)
 
@@ -225,7 +203,6 @@ const saveEdit = async (post) => {
     }
   }
 
-  // 重新編號 sortOrder，避免移除中間照片後留下缺口
   const images = editForm.value.images.map((img, idx) => ({
     imageFileName: img.imageFileName,
     sortOrder: idx + 1,
@@ -254,7 +231,6 @@ const saveEdit = async (post) => {
     return
   }
 
-  // 成功後直接更新畫面，不用重打 GET
   post.content = editForm.value.content
   post.status = editForm.value.status
   post.images = images
@@ -270,16 +246,17 @@ const saveEdit = async (post) => {
 
 onMounted(async () => {
   loadProfileData()
-  loadSavedPosts() // 避免直接連進這頁時收藏頁籤看起來是空的
   fetchProducts() // 編輯表單要用，只有本人頁面用得上但先載入沒關係
-  // 先確定拿到真正的 userId，才能準確比對「是不是在看自己的頁面」
+  // 修正：loadSavedPosts、fetchFollowStatus 都需要用到 currentUserId.value，
+  // 一定要先等 loadCurrentUserId() 真的拿到 userId，才能呼叫這些函式，
+  // 不然 currentUserId 還是初始值 null，會打出 GET /api/CommunityFavorite/user/null（400）。
   await loadCurrentUserId()
+  loadSavedPosts() // 避免直接連進這頁時收藏頁籤看起來是空的
   if (viewedUserId.value !== currentUserId.value) {
     fetchFollowStatus()
   }
 })
 
-// 三支 API 平行送出，全部回來才關掉骨架畫面，避免資料只到一半的破圖
 const loadProfileData = async () => {
   profileLoading.value = true
   try {
@@ -289,7 +266,6 @@ const loadProfileData = async () => {
   }
 }
 
-// 切換到別人的個人頁時 Vue Router 會重用元件，onMounted 不會再跑，靠 watch 補上
 watch(() => route.params.userId, () => {
   loadProfileData()
   if (viewedUserId.value !== currentUserId.value) {
@@ -305,7 +281,6 @@ const tabs = [
   { key: 'saved', label: '收藏' },
 ]
 
-// 目前登入者對這個人的追蹤紀錄 id，還沒追蹤是 null
 const myFollowId = ref(null)
 
 const fetchPublicProfile = async () => {
@@ -313,7 +288,6 @@ const fetchPublicProfile = async () => {
     const res = await api.get(`/PublicUserProfile/${viewedUserId.value}`)
     userProfile.value.name = res.data.username
     userProfile.value.handle = `@${res.data.account}`
-    // 沒設大頭貼時用 username 當 dicebear seed，跟貼文卡片、留言的預設頭像一致
     userProfile.value.avatar = res.data.avatar
       ? `${IMAGE_BASE}${res.data.avatar}`
       : `https://api.dicebear.com/7.x/avataaars/svg?seed=${res.data.username}`
@@ -373,7 +347,6 @@ const toggleFollow = async () => {
       return
     }
     userProfile.value.followersCount += 1
-    // POST 不回傳新紀錄的 id，重新查一次才知道 myFollowId
     await fetchFollowStatus()
   }
 }
@@ -381,15 +354,13 @@ const toggleFollow = async () => {
 
 
 <template>
-  
+
 
   <div class="community-page min-vh-100 w-100">
     <div class="container-fluid container-lg pb-5">
 
-      <!--  返回社群按鈕 -->
       <router-link to="/community" class="back-pill">← 返回社群</router-link>
 
-      <!-- profileLoading：個人資料、貼文都還沒抓回來之前顯示骨架佔位畫面 -->
       <template v-if="profileLoading">
         <div class="skeleton-profile-card">
           <div class="skeleton-block skeleton-banner"></div>
@@ -417,20 +388,16 @@ const toggleFollow = async () => {
       </template>
 
       <template v-else>
-      <!-- 個人檔案卡 -->
       <div class="profile-card mb-4">
 
-        <!-- 封面橫幅 -->
         <div class="profile-banner"></div>
 
         <div class="profile-body">
           <div class="profile-top">
-            <!-- 大頭貼 -->
             <div class="avatar-wrapper">
               <img :src="userProfile.avatar" class="avatar-img" alt="Avatar" @error="onAvatarError($event, userProfile.name)" />
             </div>
 
-            <!-- 數據與動作 -->
             <div class="profile-meta">
               <div class="stat-group">
                 <div class="stat-item">
@@ -450,7 +417,6 @@ const toggleFollow = async () => {
                 </router-link>
               </div>
 
-              <!-- 只有瀏覽別人的頁面才顯示追蹤／訊息按鈕 -->
               <div class="action-group" v-if="viewedUserId !== currentUserId">
                 <button
                   class="btn-follow-main"
@@ -464,7 +430,6 @@ const toggleFollow = async () => {
             </div>
           </div>
 
-          <!-- 姓名與簡介 -->
           <div class="profile-intro">
             <h1 class="profile-name">{{ userProfile.name }}</h1>
             <div class="profile-handle">
@@ -475,7 +440,6 @@ const toggleFollow = async () => {
             <p class="profile-bio">{{ userProfile.bio }}</p>
           </div>
 
-          <!-- 頁籤 -->
           <div class="tab-row">
             <button
               v-for="t in tabs"
@@ -490,13 +454,11 @@ const toggleFollow = async () => {
         </div>
       </div>
 
-      <!-- 穿搭作品牆 -->
       <div v-if="activeTab === 'works'" class="post-grid">
         <div v-for="post in userPosts" :key="post.communityPostId" class="post-card">
 
           <router-link :to="`/community/post/${post.communityPostId}`" class="post-media d-block text-decoration-none">
             <span class="tag-label" v-if="post.tags[0]">{{ post.tags[0].replace('#', '') }}</span>
-            <!--  狀態徽章只給本人看  -->
             <span
               v-if="viewedUserId === currentUserId && post.status !== 'public'"
               class="post-status-badge"
@@ -523,11 +485,8 @@ const toggleFollow = async () => {
               <span v-for="tag in post.tags" :key="tag" class="tag-chip">{{ tag }}</span>
             </div>
 
-            <!-- 編輯／刪除只有本人看自己頁面才會出現 -->
             <template v-if="viewedUserId === currentUserId">
-              <!-- Teleport 到 body，脫離卡片欄寬限制才能置中彈出 -->
               <Teleport to="body">
-                <!-- :css="false"：動畫改由 anime.js 控制，v-if 要放進去才觸發得到 enter/leave -->
                 <Transition @enter="onEditModalEnter" @leave="onEditModalLeave" :css="false">
                   <div
                     v-if="editingPostId === post.communityPostId"
@@ -635,7 +594,6 @@ const toggleFollow = async () => {
         </div>
       </div>
 
-      <!-- 收藏牆 -->
       <div v-else-if="activeTab === 'saved'">
         <div v-if="savedPosts.length" class="post-grid">
           <div v-for="post in savedPosts" :key="post.communityPostId" class="post-card">
@@ -667,7 +625,6 @@ const toggleFollow = async () => {
           </div>
         </div>
 
-        <!-- 收藏清單是空的時候顯示這個提示 -->
         <div v-else class="empty-state">
           <svg class="empty-icon" viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 8l2.5-4h11L20 8" />
@@ -682,7 +639,6 @@ const toggleFollow = async () => {
       </template>
     </div>
 
-    <!--  圖片放大燈箱  -->
     <Teleport to="body" v-if="lightboxImage">
       <div class="lightbox-overlay" @click.self="closeLightbox">
         <button type="button" class="lightbox-close" @click="closeLightbox">✕</button>
@@ -710,7 +666,6 @@ const toggleFollow = async () => {
   font-family: 'Noto Sans TC', sans-serif;
 }
 
-/* ---------- 返回社群按鈕 ---------- */
 .back-pill {
   display: inline-flex;
   align-items: center;
@@ -729,7 +684,6 @@ const toggleFollow = async () => {
   color: var(--cream);
 }
 
-/* ---------- 個人檔案卡 ---------- */
 .profile-card {
   background: var(--paper);
   border: 1px solid var(--hairline);
@@ -737,7 +691,6 @@ const toggleFollow = async () => {
   overflow: hidden;
 }
 
-/* ---------- 骨架載入畫面 ---------- */
 @keyframes skeleton-shimmer {
   0% { background-position: -300px 0; }
   100% { background-position: 300px 0; }
@@ -750,7 +703,6 @@ const toggleFollow = async () => {
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
   border-radius: 6px;
 }
-/* 骨架版的個人檔案卡 */
 .skeleton-profile-card{
   background:var(--paper); border:1px solid var(--hairline); border-radius:22px;
   overflow:hidden; margin-bottom:1.6rem;
@@ -769,7 +721,6 @@ const toggleFollow = async () => {
 .skeleton-line-90{ width:90%; }
 .skeleton-line-50{ width:50%; }
 
-/* 骨架版的貼文網格：跟 .post-grid／.post-card 同一組欄數、圓角、間距。 */
 .skeleton-grid{
   display:grid; grid-template-columns:repeat(4, 1fr); gap:1.4rem; margin-top:2rem;
 }
@@ -919,7 +870,6 @@ const toggleFollow = async () => {
   color: var(--paper);
 }
 
-/* ---------- 姓名 / 簡介 ---------- */
 .profile-intro {
   margin-top: 1rem;
 }
@@ -953,7 +903,6 @@ const toggleFollow = async () => {
   margin: 0;
 }
 
-/* ---------- 頁籤 ---------- */
 .tab-row {
   display: flex;
   gap: 1.8rem;
@@ -984,7 +933,6 @@ const toggleFollow = async () => {
   background: var(--plum);
 }
 
-/* ---------- 作品牆 ---------- */
 .post-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1145,9 +1093,6 @@ const toggleFollow = async () => {
   color: #fff;
 }
 
-/*
-  半透明黑底 + flex 編輯貼文置中彈窗
-*/
 .edit-modal-overlay {
   --cream: #f9f4f0;
   --paper: #fffdfb;
@@ -1175,7 +1120,7 @@ const toggleFollow = async () => {
   box-shadow: 0 20px 60px rgba(42, 36, 32, 0.35);
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* 讓內層 .edit-form 自己捲動，標題列跟底部按鈕才能固定不跟著捲走 */
+  overflow: hidden;
 }
 .edit-modal-header {
   display: flex;
@@ -1234,7 +1179,6 @@ const toggleFollow = async () => {
   padding:.6rem .8rem; font-size:.83rem; color:var(--ink);
   font-family:inherit;
   outline:none;
-  /* 輸入框固定高度（不會隨內容變高），貼文內容太長的話用 overflow-y:auto，輸入框自己出現垂直捲軸 */
   height:160px;
   resize:none;
   overflow-y:auto;
@@ -1434,7 +1378,6 @@ const toggleFollow = async () => {
   background: var(--plum-deep);
 }
 
-/* 縮圖放大燈箱，同樣 Teleport 到 body，補宣告 --ink 避免抓空值 */
 .lightbox-overlay{
   --ink:#2A2420;
   position:fixed; inset:0;
@@ -1450,7 +1393,7 @@ const toggleFollow = async () => {
   object-fit: contain;
   border-radius: 6px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  cursor: default; /* 圖片本身不算「背景」，不用跟著顯示可以關閉的游標 */
+  cursor: default;
 }
 .lightbox-close {
   position: fixed;
@@ -1474,7 +1417,6 @@ const toggleFollow = async () => {
   background: rgba(255, 255, 255, 0.3);
 }
 
-/* ---------- 其他頁籤空狀態 ---------- */
 .empty-state {
   background: var(--paper);
   border: 1px solid var(--hairline);
@@ -1497,7 +1439,6 @@ const toggleFollow = async () => {
   margin: 0;
 }
 
-/* ---------- RWD ---------- */
 @media (max-width: 991px){
   .post-grid{ grid-template-columns:repeat(2, 1fr); }
 }
@@ -1516,7 +1457,6 @@ const toggleFollow = async () => {
 }
 </style>
 
-<!--  這個區塊「不加 scoped」：scoped 樣式只會作用在這個元件模板裡面的元素上 -->
 <style>
 body {
   background-color: #f9f4f0 !important;
