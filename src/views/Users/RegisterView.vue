@@ -35,8 +35,8 @@ const demoAccounts = [
     account: 'TestDemo',
     username: 'TestDemo',
     email: 's39268989@gmail.com',
-    password: 'TestDemo',
-    confirmPassword: 'TestDemo',
+    password: 'Aa12345',
+    confirmPassword: 'Aa12345',
     phone: '0912345678',
   },
 ]
