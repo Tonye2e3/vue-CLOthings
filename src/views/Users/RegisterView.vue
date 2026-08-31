@@ -39,15 +39,6 @@ const demoAccounts = [
     confirmPassword: 'TestTony',
     phone: '0912345678',
   },
-  {
-    label: 'TestTony1',
-    account: 'TestTony1',
-    username: 'TestTony1',
-    email: 's39268989@gmail.com',
-    password: 'TestTony1',
-    confirmPassword: 'TestTony1',
-    phone: '0912345678',
-  },
 ]
 // 測試快速登入
 function selectDemoAccount(event) {
