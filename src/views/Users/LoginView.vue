@@ -7,6 +7,11 @@ import { ref } from 'vue'
 const account = ref('')
 const password = ref('')
 
+// 🟢 新增：2FA 狀態
+const requiresTwoFactor = ref(false)
+const twoFactorToken = ref('')
+const twoFactorCode = ref('')
+
 import api, { resetSessionExpiredState } from '@/api/api'
 import { useAuthStore } from '@/stores/auth'
 const authStore = useAuthStore()
@@ -20,27 +25,74 @@ async function login() {
     account: account.value,
     password: password.value,
   }
+
   try {
     const resp = await api.post('/User/login', data)
-    console.log('登入結果', resp)
-    console.log('Pinia 登入資料', authStore)
 
+    console.log('登入結果', resp.data)
+
+    // 🟢 新增：帳號有開啟 2FA
+    if (resp.data.requiresTwoFactor) {
+      twoFactorToken.value = resp.data.twoFactorToken
+      requiresTwoFactor.value = true
+
+      // 不可以在這裡 setAuth
+      // 因為目前還沒有正式 Access Token
+      return
+    }
+   
+
+    // ⚪ 沒開 2FA 的帳號維持原本登入流程
     authStore.setAuth(resp.data)
 
-    // 登入成功後重設 Session Expired 狀態
     resetSessionExpiredState()
 
-    //測試get me功能
-    // const meResp = await api.get('/User/me')
-    // console.log('目前使用者：', meResp.data)
-
     alert('登入成功')
+
     router.push(route.query.redirect || '/')
   } catch (error) {
+    console.error('登入失敗：', error)
+
     if (error.response?.status === 401) {
       alert('帳號或密碼錯誤')
     } else {
       alert('伺服器錯誤，請稍後再試')
+    }
+  }
+}
+
+// 🟢 新增：驗證 TOTP
+async function verifyTwoFactor() {
+  if (!/^\d{6}$/.test(twoFactorCode.value)) {
+    alert('請輸入 6 位數驗證碼')
+    return
+  }
+
+  const data = {
+    twoFactorToken: twoFactorToken.value,
+    code: twoFactorCode.value,
+  }
+
+  try {
+    const resp = await api.post('/User/2fa/login', data)
+
+    console.log('2FA 登入結果：', resp.data)
+
+    // 這次才是真正登入完成
+    authStore.setAuth(resp.data)
+
+    resetSessionExpiredState()
+
+    alert('登入成功')
+
+    router.push(route.query.redirect || '/')
+  } catch (error) {
+    console.error('2FA 驗證失敗：', error)
+
+    if (error.response?.status === 401) {
+      alert(error.response?.data || '驗證碼錯誤或已過期')
+    } else {
+      alert(error.response?.data || '二階段驗證失敗')
     }
   }
 }
@@ -51,6 +103,7 @@ function googleLogin() {
 </script>
 
 <template>
+<template v-if="!requiresTwoFactor">
   <div class="login-page">
     <div class="login-card">
       <!-- 標題 -->
@@ -130,6 +183,48 @@ function googleLogin() {
     </div>
   </div>
 </template>
+
+  <!-- 🟢 二階段驗證 -->
+<template  v-else>
+<div class="two-factor-container">
+  <div class="two-factor-header">
+    <p class="login-label">TWO-FACTOR AUTHENTICATION</p>
+
+    <h2>二階段驗證</h2>
+
+    <p>
+      請開啟 Microsoft Authenticator，
+      輸入目前顯示的 6 位數驗證碼。
+    </p>
+  </div>
+
+  <div class="form-group">
+    <label>驗證碼</label>
+
+    <input
+      v-model="twoFactorCode"
+      type="text"
+      inputmode="numeric"
+      maxlength="6"
+      class="form-input two-factor-input"
+      placeholder="000000"
+      autocomplete="one-time-code"
+      @keyup.enter="verifyTwoFactor"
+    />
+  </div>
+
+  <button
+    type="button"
+    class="login-btn"
+    @click="verifyTwoFactor"
+  >
+    驗證並登入
+  </button>
+</div>
+</template>
+</template>
+
+
 
 <style scoped>
 .login-page {
@@ -460,5 +555,59 @@ function googleLogin() {
   .social-login {
     grid-template-columns: 1fr;
   }
+}
+
+
+/* =========================
+   Two Factor Authentication
+========================= */
+
+.two-factor-container {
+  max-width: 400px;
+
+  margin: 150px auto;
+  padding: 40px 20px;
+
+  background: #ffffff;
+
+  border: 1px solid #eeeeee;
+  border-radius: 16px;
+
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.03),
+    0 16px 40px rgba(0, 0, 0, 0.05);
+}
+
+.two-factor-header {
+  margin-bottom: 28px;
+
+  text-align: center;
+}
+
+.two-factor-header h2 {
+  margin-bottom: 10px;
+
+  color: #222222;
+
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.two-factor-header p {
+  margin: 0;
+
+  color: #888888;
+
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.two-factor-input {
+  text-align: center;
+
+  font-size: 22px;
+  font-weight: 600;
+
+  letter-spacing: 8px;
 }
 </style>

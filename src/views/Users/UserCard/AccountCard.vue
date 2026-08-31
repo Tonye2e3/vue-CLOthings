@@ -2,6 +2,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import api from '@/api/api'
 import { isValidPassword, isValidPhone, isValidEmail } from '@/utils/UserValidator'
+import QRCode from 'qrcode'
 
 const userData = reactive({
   userId: null,
@@ -15,10 +16,29 @@ const userData = reactive({
 })
 
 const backupData = reactive({})
-
+// 編輯模式
 const isEditing = ref(false)
+// 修改密碼模式
 const isChangingPassword = ref(false)
 
+// 二階段驗證
+const isSettingUpTwoFactor = ref(false)
+// 二階段驗證資料
+const twoFactorSetup = reactive({
+  secret: '',
+  otpAuthUrl: '',
+  code: '',
+})
+
+// 是否正在進行停用 2FA
+const isDisablingTwoFactor = ref(false)
+// 停用 2FA 時輸入的驗證碼
+const disableTwoFactorCode = ref('')
+
+// QR Code 圖片
+const twoFactorQrCode = ref('')
+
+// 修改密碼表單資料
 const passwordData = reactive({
   currentPassword: '',
   newPassword: '',
@@ -28,8 +48,6 @@ const passwordData = reactive({
 // ==============================
 // 取得目前登入會員資料
 // GET /api/User/me
-// ==============================
-
 async function getUserData() {
   try {
     const resp = await api.get('/User/me')
@@ -41,10 +59,124 @@ async function getUserData() {
 }
 
 // ==============================
+// 取得二階段驗證狀態
+// GET /api/User/2fa/status
+async function getTwoFactorStatus() {
+  try {
+    const resp = await api.get('/User/2fa/status')
+
+    userData.twoFactorEnabled = resp.data.twoFactorEnabled
+  } catch (error) {
+    console.error('取得二階段驗證狀態失敗：', error)
+  }
+}
+
+// ==============================
+// 開始設定二階段驗證
+// GET /api/User/2fa/setup
+async function setupTwoFactor() {
+  try {
+    const resp = await api.get('/User/2fa/setup')
+
+     // 🟢 暫時新增
+    console.log('2FA setup 回傳：', resp.data)
+
+    twoFactorSetup.secret = resp.data.secret
+    twoFactorSetup.otpAuthUrl = resp.data.otpAuthUrl
+    twoFactorSetup.code = ''
+
+     // 把後端提供的 otpAuthUrl 轉成 QR Code
+    twoFactorQrCode.value = await QRCode.toDataURL(
+      twoFactorSetup.otpAuthUrl
+    )
+
+    isSettingUpTwoFactor.value = true
+  } catch (error) {
+    console.error('建立二階段驗證設定失敗：', error)
+
+    alert(error.response?.data || '建立二階段驗證設定失敗')
+  }
+}
+
+// 確認並啟用二階段驗證
+async function enableTwoFactor() {
+  // 前端先檢查格式
+  if (!/^\d{6}$/.test(twoFactorSetup.code)) {
+    alert('請輸入 6 位數驗證碼')
+    return
+  } 
+  try {
+    const resp = await api.post('/User/2fa/enable', {
+      code: twoFactorSetup.code,
+    })
+
+    // 更新畫面狀態
+    userData.twoFactorEnabled = resp.data.twoFactorEnabled
+
+    // 關閉設定區域
+    isSettingUpTwoFactor.value = false
+
+    // 清除設定資料
+    twoFactorSetup.secret = ''
+    twoFactorSetup.otpAuthUrl = ''
+    twoFactorSetup.code = ''
+    twoFactorQrCode.value = ''
+
+    alert('二階段驗證啟用成功')
+  } catch (error) {
+    console.error('啟用二階段驗證失敗：', error)
+
+    if (error.response?.status === 400) {
+      alert(error.response?.data || '驗證碼錯誤，請重新輸入')
+    } else {
+      alert(error.response?.data || '啟用二階段驗證失敗')
+    }
+  }
+}
+
+// 顯示停用 2FA 驗證區
+function showDisableTwoFactor() {
+  disableTwoFactorCode.value = ''
+  isDisablingTwoFactor.value = true
+}
+
+// 停用二階段驗證
+async function disableTwoFactor() {
+  // 前端先檢查格式
+  if (!/^\d{6}$/.test(disableTwoFactorCode.value)) {
+    alert('請輸入 6 位數驗證碼')
+    return
+  }
+
+  try {
+    const resp = await api.post('/User/2fa/disable', {
+      code: disableTwoFactorCode.value,
+    })
+
+    // 更新目前狀態
+    userData.twoFactorEnabled = resp.data.twoFactorEnabled
+
+    // 收起停用驗證區
+    isDisablingTwoFactor.value = false
+
+    // 清除驗證碼
+    disableTwoFactorCode.value = ''
+
+    alert('二階段驗證已停用')
+  } catch (error) {
+    console.error('停用二階段驗證失敗：', error)
+
+    if (error.response?.status === 400) {
+      alert(error.response?.data || '驗證碼錯誤，請重新輸入')
+    } else {
+      alert(error.response?.data || '停用二階段驗證失敗')
+    }
+  }
+}
+
+// ==============================
 // 重新寄送 Email 驗證信
 // POST /api/User/resend-verification-email
-// ==============================
-
 async function resendVerificationEmail() {
   try {
     await api.post('/User/resend-verification-email')
@@ -64,16 +196,13 @@ async function resendVerificationEmail() {
 
 // ==============================
 // 頁面載入
-// ==============================
-
 onMounted(() => {
   getUserData()
+  getTwoFactorStatus()
 })
 
 // ==============================
 // 進入編輯模式
-// ==============================
-
 const toggleEdit = () => {
   Object.assign(backupData, userData)
 
@@ -82,8 +211,6 @@ const toggleEdit = () => {
 
 // ==============================
 // 取消編輯
-// ==============================
-
 const cancel = () => {
   Object.assign(userData, backupData)
 
@@ -93,8 +220,6 @@ const cancel = () => {
 // ==============================
 // 儲存帳戶資料
 // PUT /api/User/me
-// ==============================
-
 const save = async () => {
   const phoneError = isValidPhone(userData.phone)
   const emailError = isValidEmail(userData.email)
@@ -132,8 +257,6 @@ const save = async () => {
 
 // ==============================
 // 清除密碼欄位
-// ==============================
-
 const clearPasswordForm = () => {
   passwordData.currentPassword = ''
   passwordData.newPassword = ''
@@ -142,8 +265,6 @@ const clearPasswordForm = () => {
 
 // ==============================
 // 取消修改密碼
-// ==============================
-
 const cancelChangePassword = () => {
   clearPasswordForm()
 
@@ -153,8 +274,6 @@ const cancelChangePassword = () => {
 // ==============================
 // 修改密碼
 // PUT /api/User/me/password
-// ==============================
-
 const changePassword = async () => {
   // 防止空白
   if (!passwordData.currentPassword) {
@@ -224,7 +343,7 @@ const changePassword = async () => {
          顯示模式
     =============================== -->
 
-    <div v-if="!isEditing">
+    <div class="user-info" v-if="!isEditing">
       <div class="user-info-grid">
         <!-- 帳號 -->
 
@@ -373,13 +492,150 @@ const changePassword = async () => {
           </div>
         </div>
       </div>
+
+      <!-- ==============================
+     二階段驗證
+=============================== -->
+
+<div class="user-divider"></div>
+
+<div class="two-factor-section">
+  <div class="two-factor-header">
+    <div>
+      <h3 class="password-title">二階段驗證</h3>
+
+      <p class="password-description">
+        使用 Authenticator 驗證碼，加強帳戶登入安全性。
+      </p>
+    </div>
+
+    <!-- 已啟用 -->
+    <div v-if="userData.twoFactorEnabled" class="two-factor-action">
+      <span class="two-factor-status two-factor-enabled">
+        ✓ 已啟用
+      </span>
+
+      <button
+        type="button"
+        class="user-btn user-btn-secondary"
+        @click="showDisableTwoFactor"
+      >
+        停用
+      </button>
+    </div>
+
+    <!-- 未啟用 -->
+    <div v-else class="two-factor-action">
+      <span class="two-factor-status two-factor-disabled">
+        未啟用
+      </span>
+
+      <button
+        type="button"
+        class="user-btn user-btn-primary"
+        @click="setupTwoFactor"
+      >
+        啟用
+      </button>
+    </div>
+  </div>
+
+  <!-- 停用二階段驗證確認區 -->
+<div
+  v-if="userData.twoFactorEnabled && isDisablingTwoFactor"
+  class="two-factor-setup"
+>
+  <p class="two-factor-setup-title">
+    停用二階段驗證
+  </p>
+
+  <p>
+    請輸入 Authenticator 目前顯示的 6 位數驗證碼。
+  </p>
+
+  <div class="two-factor-verify">
+    <input
+      v-model.trim="disableTwoFactorCode"
+      type="text"
+      inputmode="numeric"
+      maxlength="6"
+      autocomplete="one-time-code"
+      placeholder="000000"
+      class="two-factor-code-input"
+    />
+
+    <button
+      type="button"
+      class="user-btn user-btn-secondary"
+      @click="disableTwoFactor"
+    >
+      確認停用
+    </button>
+  </div>
+</div>
+
+  <!-- 暫時確認 setup API 是否成功 -->
+  <div
+  v-if="isSettingUpTwoFactor"
+  class="two-factor-setup"
+>
+  <p class="two-factor-setup-title">
+    使用 Microsoft Authenticator 掃描 QR Code
+  </p>
+
+  <!-- 🟢 QR Code -->
+  <div class="two-factor-qr">
+    <img
+      v-if="twoFactorQrCode"
+      :src="twoFactorQrCode"
+      alt="二階段驗證 QR Code"
+    />
+  </div>
+
+  <!-- 🟢 手動輸入 Secret -->
+  <p class="two-factor-manual-text">
+    無法掃描？也可以手動輸入以下設定金鑰：
+  </p>
+
+  <code class="two-factor-secret">
+    {{ twoFactorSetup.secret }}
+  </code>
+
+  <!-- 🟢 新增：TOTP 驗證碼 -->
+<div class="two-factor-verify">
+  <label for="twoFactorCode">
+    輸入 Authenticator 顯示的 6 位數驗證碼
+  </label>
+
+  <input
+    id="twoFactorCode"
+    v-model.trim="twoFactorSetup.code"
+    type="text"
+    inputmode="numeric"
+    maxlength="6"
+    autocomplete="one-time-code"
+    placeholder="000000"
+    class="two-factor-code-input"
+  />
+
+  <button
+    type="button"
+    class="user-btn user-btn-primary"
+    @click="enableTwoFactor"
+  >
+    確認啟用
+  </button>
+</div>
+
+</div>
+</div>
     </div>
 
     <!-- ==============================
          編輯帳戶資料
     =============================== -->
 
-    <div v-else>
+    <div class="user-info-edit" v-else>
       <div class="user-form-grid">
         <!-- 帳號 -->
 
@@ -528,14 +784,126 @@ const changePassword = async () => {
 .email-resend-btn:hover {
   color: #000000;
 }
+
+/* =========================
+   Two Factor Authentication
+========================= */
+.two-factor-section {
+  width: 100%;
+}
+
+.two-factor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.two-factor-action {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.two-factor-status {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.two-factor-enabled {
+  color: #198754;
+}
+
+.two-factor-disabled {
+  color: #888888;
+}
+
+.two-factor-setup {
+  max-width: 600px;
+  margin-top: 24px;
+  padding: 20px;
+
+  border: 1px solid #eeeeee;
+  border-radius: 8px;
+
+  background: #fafafa;
+}
+
+.two-factor-setup p {
+  margin: 0 0 12px;
+
+  color: #666666;
+  font-size: 13px;
+}
+
+.two-factor-secret {
+  display: block;
+  overflow-wrap: anywhere;
+
+  color: #222222;
+  font-size: 13px;
+}
+
+.two-factor-setup-title {
+  font-weight: 600;
+}
+
+.two-factor-qr {
+  margin: 16px 0;
+}
+
+.two-factor-qr img {
+  display: block;
+  width: 200px;
+  height: 200px;
+
+  border-radius: 8px;
+}
+
+.two-factor-manual-text {
+  margin-top: 16px;
+}
+
+/*  2FA 驗證碼區域 */
+.two-factor-verify {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.two-factor-verify label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.two-factor-code-input {
+  width: 200px;
+  padding: 10px 12px;
+
+  border: 1px solid #d8d8d8;
+  border-radius: 6px;
+
+  font-size: 18px;
+  letter-spacing: 4px;
+}
+
 @media (max-width: 576px) {
-  .password-header {
+  .password-header,
+  .two-factor-header {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .password-header .user-btn {
+  .password-header .user-btn,
+  .two-factor-header .user-btn {
     width: 100%;
+  }
+
+  .two-factor-action {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 </style>
