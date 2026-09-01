@@ -66,7 +66,6 @@ async function login() {
   try {
     const resp = await api.post('/User/login', data)
 
-    console.log('登入結果', resp.data)
 
     // 🟢 新增：帳號有開啟 2FA
     if (resp.data.requiresTwoFactor) {
@@ -113,7 +112,6 @@ async function verifyTwoFactor() {
   try {
     const resp = await api.post('/User/2fa/login', data)
 
-    console.log('2FA 登入結果：', resp.data)
 
     // 這次才是真正登入完成
     authStore.setAuth(resp.data)
