@@ -109,22 +109,22 @@ const fetchPost = async () => {
       userId: p.userId,
       user: p.user
         ? {
-            ...p.user,
-            avatar: p.user.avatar
-              ? `${IMAGE_BASE}${p.user.avatar}`
-              : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + p.user.name,
-          }
+          ...p.user,
+          avatar: p.user.avatar
+            ? `${IMAGE_BASE}${p.user.avatar}`
+            : 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + p.user.name,
+        }
         : { name: '未知使用者', avatar: '', location: '' },
       isFollowing: false, // 實際狀態由 fetchFollowStatus() 另外查
       postDate: p.postDate,
       status: p.status,
       images: (p.images && p.images.length)
         ? p.images.map(img => ({
-            postImageId: img.postImageId,
-            imageFileName: img.imageFileName,
-            sortOrder: img.sortOrder,
-            url: `${IMAGE_BASE}${img.imageFileName}`
-          }))
+          postImageId: img.postImageId,
+          imageFileName: img.imageFileName,
+          sortOrder: img.sortOrder,
+          url: `${IMAGE_BASE}${img.imageFileName}`
+        }))
         : [{ postImageId: null, imageFileName: null, sortOrder: 1, url: postImage }],
       content: p.content,
       commentsCount: p.commentsCount ?? 0,
@@ -537,6 +537,46 @@ const addComment = async () => {
   post.value.commentsCount += 1
   fetchComments() // 重打一次拿到真正的 postCommentId、commentDate 等欄位
 }
+
+//==============================================================
+//測試按鈕資料
+//檢舉留言
+const demoReportData = [
+  {
+    contact: '詐騙,欠檢舉',
+  },
+  {
+    contact: '不實廣告,冒犯言論',
+  },
+  {
+    contact: '色情,不實廣告',
+  },
+]
+// 隨機選擇一筆範例資料並填入表單
+function selectReportDemoData() {
+  const selected = demoReportData[Math.floor(Math.random() * demoReportData.length)]
+  reportReason.value = selected.contact
+}
+//留言
+const demoCommentData = [
+  {
+    contact: '這篇文章很棒！',
+  },
+  {
+    contact: '我也有同樣的疑問，請問作者可以解答嗎？',
+  },
+  {
+    contact: '謝謝分享，受益良多！',
+  },
+]
+// 隨機選擇一筆範例資料並填入表單
+function selectCommentDemoData() {
+  const selected = demoCommentData[Math.floor(Math.random() * demoCommentData.length)]
+  newComment.value = selected.contact
+}
+//===================================================================
+
+
 </script>
 
 <template>
@@ -558,14 +598,8 @@ const addComment = async () => {
               </div>
             </div>
             <div class="skeleton-block skeleton-main-media"></div>
-            <div
-              class="skeleton-block skeleton-line skeleton-line-90"
-              style="margin-top: 1.2rem"
-            ></div>
-            <div
-              class="skeleton-block skeleton-line skeleton-line-60"
-              style="margin-top: 0.6rem"
-            ></div>
+            <div class="skeleton-block skeleton-line skeleton-line-90" style="margin-top: 1.2rem"></div>
+            <div class="skeleton-block skeleton-line skeleton-line-60" style="margin-top: 0.6rem"></div>
           </div>
         </div>
         <div class="col-12 col-lg-4">
@@ -586,17 +620,14 @@ const addComment = async () => {
             <!-- 發文者資訊列 -->
             <div class="author-bar">
               <router-link :to="`/community/profile/${post.userId}`" class="author-info text-decoration-none">
-                <img :src="post.user.avatar" class="author-avatar" alt="avatar" @error="onAvatarError($event, post.user.name)" />
+                <img :src="post.user.avatar" class="author-avatar" alt="avatar"
+                  @error="onAvatarError($event, post.user.name)" />
                 <div>
                   <h6 class="author-name">{{ post.user.name }}</h6>
                   <small class="author-meta">{{ postTimeDisplay }} · {{ post.user.location }}</small>
                 </div>
               </router-link>
-              <button
-                class="btn-follow-main"
-                :class="{ following: post.isFollowing }"
-                @click="toggleFollow"
-              >
+              <button class="btn-follow-main" :class="{ following: post.isFollowing }" @click="toggleFollow">
                 {{ post.isFollowing ? '已追蹤' : '＋ 追蹤' }}
               </button>
             </div>
@@ -609,60 +640,34 @@ const addComment = async () => {
               <!-- 超過 1 張才顯示箭頭／圓點 -->
               <template v-if="post.images.length > 1">
                 <button class="media-arrow media-arrow-prev" @click="prevImage" aria-label="上一張">
-                  <svg
-                    viewBox="0 0 24 24"
-                    width="18"
-                    height="18"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.4"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4"
+                    stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="15 18 9 12 15 6"></polyline>
                   </svg>
                 </button>
                 <button class="media-arrow media-arrow-next" @click="nextImage" aria-label="下一張">
-                  <svg
-                    viewBox="0 0 24 24"
-                    width="18"
-                    height="18"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.4"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4"
+                    stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="9 18 15 12 9 6"></polyline>
                   </svg>
                 </button>
                 <div class="media-dots">
-                  <button
-                    v-for="(img, idx) in post.images"
-                    :key="idx"
-                    class="media-dot"
-                    :class="{ active: idx === currentImageIndex }"
-                    @click="
+                  <button v-for="(img, idx) in post.images" :key="idx" class="media-dot"
+                    :class="{ active: idx === currentImageIndex }" @click="
                       currentImageIndex = idx;
-                      restartAutoplay();
-                    "
-                  ></button>
+                    restartAutoplay();
+                    "></button>
                 </div>
               </template>
             </div>
 
             <!-- 縮圖列：跟主圖同一份 post.images，點法互通 -->
             <div class="post-thumb-row" v-if="post.images.length > 1">
-              <button
-                v-for="(img, idx) in post.images"
-                :key="idx"
-                class="post-thumb-item"
-                :class="{ active: idx === currentImageIndex }"
-                @click="
+              <button v-for="(img, idx) in post.images" :key="idx" class="post-thumb-item"
+                :class="{ active: idx === currentImageIndex }" @click="
                   currentImageIndex = idx;
-                  restartAutoplay();
-                "
-              >
+                restartAutoplay();
+                ">
                 <img :src="img.url" alt="縮圖" />
               </button>
             </div>
@@ -672,14 +677,19 @@ const addComment = async () => {
               <div class="action-left">
                 <button class="action-btn" :class="{ liked: post.isLiked }" @click="toggleLike">
                   <!-- 已按讚時整顆心實心紅色，還沒按讚時空心線條 -->
-                  <svg ref="likeIconEl" class="icon-inline" viewBox="0 0 24 24" width="16" height="16" :fill="post.isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  <svg ref="likeIconEl" class="icon-inline" viewBox="0 0 24 24" width="16" height="16"
+                    :fill="post.isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                      d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                   </svg>
                   {{ likesDisplay }}
                 </button>
                 <button class="action-btn" @click="scrollToComments">
-                  <svg class="icon-inline" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" />
+                  <svg class="icon-inline" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                      d="M21 12c0 4.4-4 8-9 8-1.1 0-2.1-.2-3-.5L4 21l1.3-4.2A7.8 7.8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z" />
                   </svg>
                   {{ post.commentsCount }}
                 </button>
@@ -691,7 +701,8 @@ const addComment = async () => {
                   <div v-if="showShareMenu" class="share-menu-backdrop" @click="closeShareMenu"></div>
                   <div v-if="showShareMenu" class="share-menu">
                     <button v-if="canNativeShare" type="button" class="share-menu-item" @click="nativeShare">
-                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="18" cy="5" r="3" />
                         <circle cx="6" cy="12" r="3" />
                         <circle cx="18" cy="19" r="3" />
@@ -701,16 +712,8 @@ const addComment = async () => {
                       系統分享
                     </button>
                     <button type="button" class="share-menu-item" @click="copyLink">
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="14"
-                        height="14"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      >
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
                         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
                         <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                       </svg>
@@ -728,45 +731,29 @@ const addComment = async () => {
                 <!-- 檢舉：跟分享選單同一種定位邏輯 -->
                 <div class="report-wrapper">
                   <button class="action-btn" @click="toggleReportMenu">
-                    <svg
-                      class="icon-inline"
-                      viewBox="0 0 24 24"
-                      width="15"
-                      height="15"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
+                    <svg class="icon-inline" viewBox="0 0 24 24" width="15" height="15" fill="none"
+                      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M5 3v18" />
                       <path d="M5 4h13l-3 4 3 4H5" />
                     </svg>
                     檢舉
                   </button>
-                  <div
-                    v-if="showReportMenu"
-                    class="share-menu-backdrop"
-                    @click="closeReportMenu"
-                  ></div>
+                  <div v-if="showReportMenu" class="share-menu-backdrop" @click="closeReportMenu"></div>
                   <div v-if="showReportMenu" class="report-panel">
                     <p class="report-panel-title">檢舉這篇貼文</p>
-                    <textarea
-                      v-model="reportReason"
-                      class="report-textarea"
-                      rows="3"
-                      placeholder="請簡短說明檢舉原因（例如：不實廣告、冒犯言論...）"
-                    ></textarea>
+                    <!-- 測試按鈕 -->
+                    <button type="button" class="report-btn-demo" @click="selectReportDemoData">
+                      填入測試資料
+                    </button>
+
+                    <textarea v-model="reportReason" class="report-textarea" rows="3"
+                      placeholder="請簡短說明檢舉原因（例如：不實廣告、冒犯言論...）"></textarea>
                     <div class="report-panel-actions">
                       <button type="button" class="report-btn-cancel" @click="closeReportMenu">
                         取消
                       </button>
-                      <button
-                        type="button"
-                        class="report-btn-submit"
-                        :disabled="!reportReason.trim() || reportSubmitting"
-                        @click="submitReport"
-                      >
+                      <button type="button" class="report-btn-submit"
+                        :disabled="!reportReason.trim() || reportSubmitting" @click="submitReport">
                         {{ reportSubmitting ? '送出中...' : '送出檢舉' }}
                       </button>
                     </div>
@@ -775,17 +762,9 @@ const addComment = async () => {
               </div>
               <!-- 收藏按鈕：更新共用收藏清單，UserProfileView.vue 收藏頁籤才看得到 -->
               <button class="action-btn" :class="{ saved: isSaved }" @click="toggleSave">
-                <svg
-                  class="icon-inline"
-                  viewBox="0 0 24 24"
-                  width="14"
-                  height="14"
-                  :fill="isSaved ? 'currentColor' : 'none'"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
+                <svg class="icon-inline" viewBox="0 0 24 24" width="14" height="14"
+                  :fill="isSaved ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
                   <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
                 </svg>
                 {{ isSaved ? '已收藏' : '收藏' }}
@@ -799,13 +778,8 @@ const addComment = async () => {
             <div class="tagged-products" v-if="post.taggedProducts.length">
               <span class="tagged-label">標記商品</span>
               <div class="tag-cloud">
-                <router-link
-                  v-for="tag in post.taggedProducts"
-                  :key="tag.postTaggedProductId"
-                  :to="`/community?tag=${encodeURIComponent(tag.name)}`"
-                  class="tag-chip"
-                  >#{{ tag.name }}</router-link
-                >
+                <router-link v-for="tag in post.taggedProducts" :key="tag.postTaggedProductId"
+                  :to="`/community?tag=${encodeURIComponent(tag.name)}`" class="tag-chip">#{{ tag.name }}</router-link>
               </div>
             </div>
 
@@ -815,6 +789,8 @@ const addComment = async () => {
               <div class="comment-title">
                 <span class="dot"></span>留言
               </div>
+              <!-- //測試按鈕 -->
+              <button class="btn-demo" @click="selectCommentDemoData">填入測試資料</button>
 
               <!-- 正在回覆某則留言時顯示提示，可按 ✕ 取消 -->
               <div v-if="replyingTo" class="replying-to-row">
@@ -824,13 +800,8 @@ const addComment = async () => {
 
               <!-- 輸入留言放最上面，不用先滑過所有留言才看得到輸入框 -->
               <div class="comment-input-row">
-                <input
-                  type="text"
-                  v-model="newComment"
-                  class="comment-input"
-                  :placeholder="replyingTo ? `回覆 @${replyingTo.user}...` : '留下你的想法...'"
-                  @keyup.enter="addComment"
-                />
+                <input type="text" v-model="newComment" class="comment-input"
+                  :placeholder="replyingTo ? `回覆 @${replyingTo.user}...` : '留下你的想法...'" @keyup.enter="addComment" />
                 <button class="btn-send" @click="addComment">送出</button>
               </div>
 
@@ -842,7 +813,8 @@ const addComment = async () => {
                       <img :src="c.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, c.user)" />
                     </router-link>
                     <div class="comment-bubble">
-                      <router-link :to="`/community/profile/${c.userId}`" class="comment-user">{{ c.user }}</router-link>
+                      <router-link :to="`/community/profile/${c.userId}`" class="comment-user">{{ c.user
+                      }}</router-link>
                       <span>{{ c.commentText }}</span>
                       <div class="comment-meta">
                         <span class="comment-time">{{ formatDateTime(c.commentDate) }}</span>
@@ -858,7 +830,8 @@ const addComment = async () => {
                       <img :src="r.avatar" class="comment-avatar" alt="avatar" @error="onAvatarError($event, r.user)" />
                     </router-link>
                     <div class="comment-bubble">
-                      <router-link :to="`/community/profile/${r.userId}`" class="comment-user">{{ r.user }}</router-link>
+                      <router-link :to="`/community/profile/${r.userId}`" class="comment-user">{{ r.user
+                      }}</router-link>
                       <span>{{ r.commentText }}</span>
                       <div class="comment-meta">
                         <span class="comment-time">{{ formatDateTime(r.commentDate) }}</span>
@@ -888,12 +861,8 @@ const addComment = async () => {
               <div v-for="item in post.taggedProducts" :key="item.postTaggedProductId" class="product-row">
                 <!-- 圖片是 wwwroot/images/product/ 底下的檔案，跟貼文照片資料夾不一樣 -->
                 <router-link :to="`/shop/product/${item.productId}`" class="product-link">
-                  <img
-                    v-if="item.image"
-                    :src="`${IMAGE_BASE}/images/product/${item.image}`"
-                    class="product-thumb"
-                    alt="product"
-                  />
+                  <img v-if="item.image" :src="`${IMAGE_BASE}/images/product/${item.image}`" class="product-thumb"
+                    alt="product" />
                   <div class="product-info">
                     <p class="product-name">{{ item.name }}</p>
                     <p class="product-price">NT$ {{ item.price }}</p>
@@ -907,12 +876,8 @@ const addComment = async () => {
           <div class="side-card">
             <div class="side-title"><span class="dot"></span>相似穿搭推薦</div>
             <div class="similar-grid">
-              <router-link
-                v-for="sp in similarPosts"
-                :key="sp.communityPostId"
-                :to="`/community/post/${sp.communityPostId}`"
-                class="similar-thumb"
-              >
+              <router-link v-for="sp in similarPosts" :key="sp.communityPostId"
+                :to="`/community/post/${sp.communityPostId}`" class="similar-thumb">
                 <img :src="sp.image" alt="similar look" />
               </router-link>
             </div>
@@ -955,6 +920,7 @@ const addComment = async () => {
   margin-bottom: 1.2rem;
   transition: all 0.18s ease;
 }
+
 .back-pill:hover {
   background: var(--ink);
   color: var(--cream);
@@ -965,66 +931,77 @@ const addComment = async () => {
   0% {
     background-position: -300px 0;
   }
+
   100% {
     background-position: 300px 0;
   }
 }
+
 .skeleton-block {
   background-color: var(--hairline);
-  background-image: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0) 0,
-    rgba(255, 255, 255, 0.55) 50%,
-    rgba(255, 255, 255, 0) 100%
-  );
+  background-image: linear-gradient(90deg,
+      rgba(255, 255, 255, 0) 0,
+      rgba(255, 255, 255, 0.55) 50%,
+      rgba(255, 255, 255, 0) 100%);
   background-size: 300px 100%;
   background-repeat: no-repeat;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
   border-radius: 6px;
 }
+
 .skeleton-author-bar {
   display: flex;
   align-items: center;
   gap: 0.7rem;
   margin-bottom: 1.1rem;
 }
+
 .skeleton-avatar-lg {
   width: 44px;
   height: 44px;
   border-radius: 50%;
   flex-shrink: 0;
 }
+
 .skeleton-author-lines {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   flex: 1;
 }
+
 .skeleton-line {
   height: 14px;
 }
+
 .skeleton-line-40 {
   width: 40%;
 }
+
 .skeleton-line-30 {
   width: 30%;
 }
+
 .skeleton-line-90 {
   width: 90%;
 }
+
 .skeleton-line-60 {
   width: 60%;
 }
+
 .skeleton-main-media {
   width: 100%;
   height: 550px;
   border-radius: 8px;
 }
+
 .skeleton-side-card {
   width: 100%;
   height: 320px;
   border-radius: 16px;
 }
+
 @media (max-width: 767px) {
   .skeleton-main-media {
     height: 340px;
@@ -1040,6 +1017,7 @@ const addComment = async () => {
   text-align: center;
   color: var(--ink-soft);
 }
+
 .not-found-state p {
   margin-bottom: 1rem;
 }
@@ -1059,11 +1037,13 @@ const addComment = async () => {
   justify-content: space-between;
   margin-bottom: 1.2rem;
 }
+
 .author-info {
   display: flex;
   align-items: center;
   gap: 0.8rem;
 }
+
 .author-avatar {
   width: 48px;
   height: 48px;
@@ -1071,6 +1051,7 @@ const addComment = async () => {
   object-fit: cover;
   box-shadow: 0 0 0 2px var(--plum);
 }
+
 .author-name {
   font-family: 'Noto Serif TC', serif;
   font-weight: 700;
@@ -1078,6 +1059,7 @@ const addComment = async () => {
   margin: 0;
   color: var(--ink);
 }
+
 .author-meta {
   font-size: 0.78rem;
   color: var(--ink-soft);
@@ -1095,14 +1077,17 @@ const addComment = async () => {
     background 0.18s ease,
     transform 0.18s ease;
 }
+
 .btn-follow-main:hover {
   background: var(--plum-deep);
   transform: translateY(-1px);
 }
+
 .btn-follow-main.following {
   background: var(--hairline);
   color: var(--ink-soft);
 }
+
 .btn-follow-main.following:hover {
   background: var(--hairline);
   transform: none;
@@ -1116,6 +1101,7 @@ const addComment = async () => {
   background: var(--cream);
   margin-bottom: 1.1rem;
 }
+
 .post-image {
   width: 100%;
   height: 550px;
@@ -1137,6 +1123,7 @@ const addComment = async () => {
   padding: 0.3rem 0.75rem 0.3rem 1rem;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
 }
+
 .tag-label::after {
   content: '';
   position: absolute;
@@ -1165,12 +1152,15 @@ const addComment = async () => {
   justify-content: center;
   transition: background 0.18s ease;
 }
+
 .media-arrow:hover {
   background: rgba(0, 0, 0, 0.7);
 }
+
 .media-arrow-prev {
   left: 12px;
 }
+
 .media-arrow-next {
   right: 12px;
 }
@@ -1184,6 +1174,7 @@ const addComment = async () => {
   display: flex;
   gap: 0.4rem;
 }
+
 .media-dot {
   width: 7px;
   height: 7px;
@@ -1195,6 +1186,7 @@ const addComment = async () => {
     background 0.18s ease,
     transform 0.18s ease;
 }
+
 .media-dot.active {
   background: #fff;
   transform: scale(1.25);
@@ -1206,6 +1198,7 @@ const addComment = async () => {
   gap: 0.5rem;
   margin-bottom: 1.1rem;
 }
+
 .post-thumb-item {
   width: 56px;
   height: 56px;
@@ -1217,9 +1210,11 @@ const addComment = async () => {
   background: none;
   transition: border-color 0.18s ease;
 }
+
 .post-thumb-item.active {
   border-color: var(--plum);
 }
+
 .post-thumb-item img {
   width: 100%;
   height: 100%;
@@ -1237,10 +1232,12 @@ const addComment = async () => {
   border-bottom: 1px solid var(--hairline);
   margin-bottom: 1.2rem;
 }
+
 .action-left {
   display: flex;
   gap: 1.6rem;
 }
+
 .action-btn {
   background: none;
   border: none;
@@ -1252,25 +1249,53 @@ const addComment = async () => {
   align-items: center;
   gap: 0.4rem;
 }
-.action-btn:hover{ color:var(--ink); }
-.action-btn.liked{ color:#B4453A; font-weight:600; }
-.action-btn.saved{ color:var(--ochre); font-weight:600; }
+
+.action-btn:hover {
+  color: var(--ink);
+}
+
+.action-btn.liked {
+  color: #B4453A;
+  font-weight: 600;
+}
+
+.action-btn.saved {
+  color: var(--ochre);
+  font-weight: 600;
+}
+
 /* icon-inline：文字並排的小圖示共用樣式，顏色跟著文字走 */
-.icon-inline{ flex-shrink:0; }
+.icon-inline {
+  flex-shrink: 0;
+}
 
 /* .share-wrapper 是定位參考點，.share-menu-backdrop 透明鋪滿全畫面處理「點外面關閉」 */
-.share-wrapper{ position:relative; }
-.share-menu-backdrop{ position:fixed; inset:0; z-index:9; }
-.share-menu{
-  position:absolute; top:calc(100% + 8px); left:0; z-index:10;
-  background:var(--paper);
-  border:1px solid var(--hairline);
-  border-radius:8px;
-  box-shadow:0 10px 30px rgba(42,36,32,.18);
-  padding:.4rem;
-  min-width:180px;
-  display:flex; flex-direction:column; gap:.15rem;
+.share-wrapper {
+  position: relative;
 }
+
+.share-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+}
+
+.share-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 10;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(42, 36, 32, .18);
+  padding: .4rem;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+}
+
 .share-menu-item {
   display: flex;
   align-items: center;
@@ -1285,26 +1310,43 @@ const addComment = async () => {
   cursor: pointer;
   transition: background 0.15s ease;
 }
-.share-menu-item:hover{ background:var(--cream); }
-.share-menu-item svg{ width:16px; height:16px; flex-shrink:0; color:var(--ink-soft); }
+
+.share-menu-item:hover {
+  background: var(--cream);
+}
+
+.share-menu-item svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--ink-soft);
+}
 
 /* 跟分享選單同一種定位邏輯，共用同一顆 backdrop 處理「點外面關閉」 */
-.report-wrapper{ position:relative; }
-.report-panel{
-  position:absolute; top:calc(100% + 8px); right:0; z-index:10;
-  background:var(--paper);
-  border:1px solid var(--hairline);
-  border-radius:8px;
-  box-shadow:0 10px 30px rgba(42,36,32,.18);
-  padding:1rem;
-  width:260px;
+.report-wrapper {
+  position: relative;
 }
+
+.report-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 10;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(42, 36, 32, .18);
+  padding: 1rem;
+  width: 260px;
+}
+
 .report-panel-title {
   margin: 0 0 0.6rem;
   font-size: 0.86rem;
   font-weight: 700;
   color: var(--ink);
 }
+
 .report-textarea {
   width: 100%;
   border: 1px solid var(--hairline);
@@ -1316,15 +1358,18 @@ const addComment = async () => {
   font-family: inherit;
   resize: vertical;
 }
+
 .report-textarea:focus {
   outline: none;
   border-color: var(--plum);
 }
+
 .report-panel-actions {
   display: flex;
   gap: 0.5rem;
   margin-top: 0.7rem;
 }
+
 .report-btn-cancel {
   flex: 1;
   padding: 0.45rem;
@@ -1335,10 +1380,12 @@ const addComment = async () => {
   border-radius: 4px;
   cursor: pointer;
 }
+
 .report-btn-cancel:hover {
   border-color: var(--ink);
   color: var(--ink);
 }
+
 .report-btn-submit {
   flex: 1;
   padding: 0.45rem;
@@ -1351,9 +1398,11 @@ const addComment = async () => {
   cursor: pointer;
   transition: background 0.18s ease;
 }
+
 .report-btn-submit:hover:not(:disabled) {
   background: var(--plum-deep);
 }
+
 .report-btn-submit:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -1375,17 +1424,20 @@ const addComment = async () => {
   gap: 0.7rem;
   margin-bottom: 1.6rem;
 }
+
 .tagged-label {
   font-size: 0.8rem;
   color: var(--ink-soft);
   font-weight: 600;
   flex-shrink: 0;
 }
+
 .tagged-products .tag-cloud {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
 }
+
 .tagged-products .tag-chip {
   font-size: 0.78rem;
   padding: 0.32rem 0.8rem;
@@ -1397,6 +1449,7 @@ const addComment = async () => {
   font-weight: 600;
   transition: all 0.18s ease;
 }
+
 .tagged-products .tag-chip:hover {
   border-color: var(--plum);
   background: var(--paper);
@@ -1408,6 +1461,7 @@ const addComment = async () => {
   border-radius: 8px;
   padding: 1.3rem;
 }
+
 .comment-title {
   font-family: 'Noto Serif TC', serif;
   font-weight: 700;
@@ -1418,6 +1472,7 @@ const addComment = async () => {
   margin-bottom: 1rem;
   color: var(--ink);
 }
+
 .comment-title .dot,
 .side-title .dot {
   width: 6px;
@@ -1426,43 +1481,120 @@ const addComment = async () => {
   background: var(--ochre);
 }
 
-.comments-list{ display:flex; flex-direction:column; gap:1rem; margin-bottom:1.1rem; }
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+}
+
 /* 跟 CommunityView.vue「載入更多穿搭」同一顆按鈕樣式 */
-.load-more-comments-wrap{ text-align:center; margin-bottom:1.3rem; }
-.btn-load-comments{
-  background:transparent; border:1px solid var(--ink); color:var(--ink);
-  border-radius:999px; padding:.5rem 1.6rem; font-size:.82rem; letter-spacing:.03em;
-  transition:all .2s ease;
+.load-more-comments-wrap {
+  text-align: center;
+  margin-bottom: 1.3rem;
 }
-.btn-load-comments:hover{ background:var(--ink); color:var(--cream); }
-.comment-thread{ display:flex; flex-direction:column; gap:.5rem; }
-.comment-row{ display:flex; align-items:flex-start; gap:.6rem; }
-.comment-row.comment-reply{ margin-left:2.4rem; } /* 往內縮排，跟 IG 的回覆呈現方式一樣 */
-.comment-avatar{ width:28px; height:28px; border-radius:50%; object-fit:cover; flex-shrink:0; }
-.comment-row > a{ flex-shrink:0; line-height:0; } /* 留言大頭貼外面包的連結：跟原本純 <img> 時視覺一樣，不要有底線、不要被 flex 壓縮 */
-.comment-bubble{
-  background:var(--paper);
-  border:1px solid var(--hairline);
-  border-radius:4px;
-  padding:.55rem .9rem;
-  font-size:.85rem; color:var(--ink);
-  width:100%;
-  display:flex; align-items:baseline; flex-wrap:wrap; gap:.4rem;
+
+.btn-load-comments {
+  background: transparent;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: .5rem 1.6rem;
+  font-size: .82rem;
+  letter-spacing: .03em;
+  transition: all .2s ease;
 }
-.comment-user{
-  font-weight:700; margin-right:.1rem;
-  color:var(--ink); text-decoration:none; /* 原本是純文字，現在改成連結，要蓋掉瀏覽器預設的藍字加底線 */
+
+.btn-load-comments:hover {
+  background: var(--ink);
+  color: var(--cream);
 }
-.comment-user:hover{ text-decoration:underline; } /* 保留一點「可以點」的提示，不用整段都變色 */
-.comment-meta{ display:flex; align-items:center; gap:.6rem; margin-left:auto; flex-shrink:0; }
-.comment-time{ font-size:.72rem; color:var(--ink-soft); white-space:nowrap; }
-.btn-reply{
-  background:none; border:none; padding:0;
-  font-size:.78rem; color:var(--ink-soft); cursor:pointer;
+
+.comment-thread {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
 }
+
+.comment-row {
+  display: flex;
+  align-items: flex-start;
+  gap: .6rem;
+}
+
+.comment-row.comment-reply {
+  margin-left: 2.4rem;
+}
+
+/* 往內縮排，跟 IG 的回覆呈現方式一樣 */
+.comment-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.comment-row>a {
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+/* 留言大頭貼外面包的連結：跟原本純 <img> 時視覺一樣，不要有底線、不要被 flex 壓縮 */
+.comment-bubble {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: .55rem .9rem;
+  font-size: .85rem;
+  color: var(--ink);
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: .4rem;
+}
+
+.comment-user {
+  font-weight: 700;
+  margin-right: .1rem;
+  color: var(--ink);
+  text-decoration: none;
+  /* 原本是純文字，現在改成連結，要蓋掉瀏覽器預設的藍字加底線 */
+}
+
+.comment-user:hover {
+  text-decoration: underline;
+}
+
+/* 保留一點「可以點」的提示，不用整段都變色 */
+.comment-meta {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.comment-time {
+  font-size: .72rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.btn-reply {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: .78rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
 .btn-reply:hover {
   color: var(--plum);
 }
+
 .reply-count {
   font-size: 0.76rem;
   color: var(--ochre);
@@ -1478,6 +1610,7 @@ const addComment = async () => {
   color: var(--ink-soft);
   margin-bottom: 0.5rem;
 }
+
 .btn-cancel-reply {
   border: none;
   background: var(--hairline);
@@ -1494,6 +1627,7 @@ const addComment = async () => {
     background 0.18s ease,
     color 0.18s ease;
 }
+
 .btn-cancel-reply:hover {
   background: var(--plum);
   color: #fff;
@@ -1504,6 +1638,7 @@ const addComment = async () => {
   gap: 0.6rem;
   margin-bottom: 1.3rem;
 }
+
 .comment-input {
   flex: 1;
   border: 1px solid var(--hairline);
@@ -1515,12 +1650,15 @@ const addComment = async () => {
   outline: none;
   transition: border-color 0.18s ease;
 }
+
 .comment-input:focus {
   border-color: var(--plum);
 }
+
 .comment-input::placeholder {
   color: var(--ink-soft);
 }
+
 .btn-send {
   background: var(--ink);
   color: var(--paper);
@@ -1532,6 +1670,7 @@ const addComment = async () => {
   white-space: nowrap;
   transition: background 0.18s ease;
 }
+
 .btn-send:hover {
   background: var(--plum-deep);
 }
@@ -1544,6 +1683,7 @@ const addComment = async () => {
   padding: 1.4rem 1.3rem;
   margin-bottom: 1.5rem;
 }
+
 .side-title {
   font-family: 'Noto Serif TC', serif;
   font-weight: 700;
@@ -1561,6 +1701,7 @@ const addComment = async () => {
   gap: 0.8rem;
   margin-bottom: 1.2rem;
 }
+
 .product-row {
   display: flex;
   align-items: center;
@@ -1569,12 +1710,18 @@ const addComment = async () => {
   border-radius: 8px;
   padding: 0.55rem;
 }
+
 /* router-link 但視覺上不像連結（不變色、不加底線） */
-.product-link{
-  display:flex; align-items:center; gap:.7rem;
-  flex:1; min-width:0;
-  color:inherit; text-decoration:none;
+.product-link {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
 }
+
 .product-thumb {
   width: 56px;
   height: 56px;
@@ -1582,10 +1729,12 @@ const addComment = async () => {
   object-fit: cover;
   flex-shrink: 0;
 }
+
 .product-info {
   flex: 1;
   min-width: 0;
 }
+
 .product-name {
   font-size: 0.83rem;
   font-weight: 700;
@@ -1595,17 +1744,20 @@ const addComment = async () => {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
 .product-price {
   font-size: 0.8rem;
   color: var(--ochre);
   font-weight: 600;
   margin: 0;
 }
+
 .similar-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 0.6rem;
 }
+
 .similar-thumb {
   display: block;
   aspect-ratio: 3/4;
@@ -1614,12 +1766,14 @@ const addComment = async () => {
   background: var(--cream);
   cursor: pointer;
 }
+
 .similar-thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   transition: transform 0.3s ease;
 }
+
 .similar-thumb:hover img {
   transform: scale(1.06);
 }
@@ -1628,6 +1782,7 @@ const addComment = async () => {
   .post-image {
     height: 380px;
   }
+
   .post-main-card {
     padding: 1.1rem;
   }

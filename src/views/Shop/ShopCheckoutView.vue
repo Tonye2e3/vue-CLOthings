@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/ShopCart'
 import { computed } from 'vue'
@@ -105,6 +105,33 @@ const shippingFee = computed(() => {
 const finalTotal = computed(() => {
   return checkoutTotal.value + shippingFee.value
 })
+
+//================================================
+// Demo 資料
+const demoData = [
+  {
+    label: '王世賢',
+    name: '王世賢',
+    phone: '0912345678',
+    address: '桃園市中壢區中大路300號',
+  },
+]
+
+function selectDemoData(event) {
+  const selected = demoData[event.target.value]
+
+  if (!selected) {
+    form.value.name = ''
+    form.value.phone = ''
+    form.value.address = ''
+    return
+  }
+
+  form.value.name = selected.name
+  form.value.phone = selected.phone
+  form.value.address = selected.address
+}
+//=================================================
 </script>
 
 <template>
@@ -123,17 +150,11 @@ const finalTotal = computed(() => {
 
         <!-- 有商品：列出勾選的商品 -->
         <div v-else>
-          <div
-            v-for="product in checkoutItems"
-            :key="product.productSpecificationId"
-            class="d-flex align-items-center gap-3 border-bottom py-3"
-          >
+          <div v-for="product in checkoutItems" :key="product.productSpecificationId"
+            class="d-flex align-items-center gap-3 border-bottom py-3">
             <!-- 商品圖片 -->
-            <img
-              :src="getImageUrl(product.image)"
-              :alt="product.productName"
-              style="width: 56px; height: 56px; object-fit: cover; border-radius: 6px"
-            />
+            <img :src="getImageUrl(product.image)" :alt="product.productName"
+              style="width: 56px; height: 56px; object-fit: cover; border-radius: 6px" />
             <!-- 名稱 + 規格 -->
             <div class="flex-fill">
               <div class="fw-semibold">{{ product.productName }}</div>
@@ -150,6 +171,20 @@ const finalTotal = computed(() => {
       <!-- 收件資訊：之後做成收件人 / 地址 / 付款方式表單 -->
       <section class="mb-4">
         <h2 class="h5 fw-bold mb-3">收件資訊</h2>
+
+        <!-- 測試快速帶入 -->
+        <div class="demo-data">
+          <label for="demoData">測試快速帶入</label>
+
+          <select id="demoData" @change="selectDemoData">
+            <option value="">請選擇測試選項</option>
+
+            <option v-for="(item, index) in demoData" :key="item.name" :value="index">
+              {{ item.label }}
+            </option>
+          </select>
+        </div>
+        <!-- =========================== -->
 
         <div class="mb-3">
           <label class="form-label">收件人姓名</label>
