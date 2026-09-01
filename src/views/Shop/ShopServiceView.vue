@@ -19,13 +19,58 @@ async function submitForm() {
     alert('送出失敗，請稍後再試')
   }
 }
-const email = 'sandy881133@gmail.com'
+
+// 取得客服郵箱地址
+const email = ref('')
+
+async function getContactEmail() {
+  try {
+    const response = await api.get('/contact/email')
+
+    email.value = response.data.email
+  } catch (error) {
+    console.error('獲取郵箱地址失敗：', error)
+  }
+}
+// 在組件掛載時獲取客服郵箱地址
+getContactEmail()
 
 function mailtoLink(subject) {
   const s = encodeURIComponent(subject)
   const body = encodeURIComponent('您好，我想詢問：')
-  return `mailto:${email}?subject=${s}&body=${body}`
+  return `mailto:${email.value}?subject=${s}&body=${body}`
 }
+//===========================================
+// 測試用範例資料
+const demoData = [
+  {
+    name: '王小明',
+    email: 'test@example.com',
+    phone: '0912345678',
+    title: '諮詢問題',
+    content: '您好，我想詢問關於訂單的問題。'
+  },
+  {
+    name: '李小華',
+    email: 'test@example.com',
+    phone: '0912345678',
+    title: '諮詢問題',
+    content: '您好，我想詢問關於訂單的問題。'
+  },
+  {
+    name: '陳大文',
+    email: 'test@example.com',
+    phone: '0912345678',
+    title: '諮詢問題',
+    content: '您好，我想詢問關於訂單的問題。'
+  },
+]
+// 隨機選擇一筆範例資料並填入表單
+function selectDemoData() {
+  const selected = demoData[Math.floor(Math.random() * demoData.length)]
+  form.value = { ...selected }
+}
+//===========================================
 </script>
 
 <template>
@@ -72,6 +117,9 @@ function mailtoLink(subject) {
     <section class="form-block">
       <h2 class="block-title">或直接留言給我們</h2>
 
+      <!-- // 測試用按鈕，點擊後會自動填入範例資料 -->
+      <button @click="selectDemoData" class="btn-submit">填入範例資料</button>
+
       <div v-if="sent" class="success-msg">✅ 已收到您的訊息，我們會盡快回覆！</div>
 
       <div v-else class="form">
@@ -92,21 +140,25 @@ function mailtoLink(subject) {
   margin: 0 auto;
   padding: 48px 24px;
 }
+
 .page-title {
   font-size: 1.75rem;
   font-weight: 700;
   margin-bottom: 8px;
 }
+
 .subtitle {
   color: #888;
   margin-bottom: 32px;
 }
+
 .contact-block {
   border: 1px solid #eee;
   border-radius: 8px;
   padding: 8px 24px;
   margin-bottom: 32px;
 }
+
 .contact-item {
   display: flex;
   align-items: center;
@@ -114,26 +166,32 @@ function mailtoLink(subject) {
   padding: 16px 0;
   border-bottom: 1px solid #f5f5f5;
 }
+
 .contact-item:last-child {
   border-bottom: none;
 }
+
 .label {
   font-weight: 600;
   min-width: 130px;
 }
+
 .value {
   color: #444;
 }
+
 .block-title {
   font-size: 1.1rem;
   font-weight: 700;
   margin-bottom: 16px;
 }
+
 .topic-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
+
 .topic-btn {
   display: flex;
   align-items: center;
@@ -145,13 +203,16 @@ function mailtoLink(subject) {
   color: #111;
   transition: all 0.15s ease;
 }
+
 .topic-btn:hover {
   border-color: #111;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
+
 .topic-icon {
   font-size: 1.5rem;
 }
+
 .mail-hint {
   margin-top: 16px;
   font-size: 0.85rem;
@@ -162,17 +223,20 @@ function mailtoLink(subject) {
 .form-block {
   margin-top: 32px;
 }
+
 .form {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
+
 .input {
   padding: 12px;
   border: 1px solid #ccc;
   border-radius: 6px;
   font-family: inherit;
 }
+
 .btn-submit {
   padding: 12px;
   background: #111;
@@ -181,6 +245,7 @@ function mailtoLink(subject) {
   border-radius: 6px;
   cursor: pointer;
 }
+
 .success-msg {
   padding: 24px;
   background: #f0f9f0;
@@ -188,6 +253,7 @@ function mailtoLink(subject) {
   text-align: center;
   color: #2a7a2a;
 }
+
 @media (max-width: 480px) {
   .topic-grid {
     grid-template-columns: 1fr;
