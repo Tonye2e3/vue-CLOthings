@@ -78,14 +78,12 @@ async function setupTwoFactor() {
   try {
     const resp = await api.get('/User/2fa/setup')
 
-     // 🟢 暫時新增
-    console.log('2FA setup 回傳：', resp.data)
 
     twoFactorSetup.secret = resp.data.secret
     twoFactorSetup.otpAuthUrl = resp.data.otpAuthUrl
     twoFactorSetup.code = ''
 
-     // 把後端提供的 otpAuthUrl 轉成 QR Code
+    // 把後端提供的 otpAuthUrl 轉成 QR Code
     twoFactorQrCode.value = await QRCode.toDataURL(
       twoFactorSetup.otpAuthUrl
     )
@@ -104,7 +102,7 @@ async function enableTwoFactor() {
   if (!/^\d{6}$/.test(twoFactorSetup.code)) {
     alert('請輸入 6 位數驗證碼')
     return
-  } 
+  }
   try {
     const resp = await api.post('/User/2fa/enable', {
       code: twoFactorSetup.code,
@@ -376,21 +374,13 @@ const changePassword = async () => {
             </span>
 
             <!-- 已驗證 -->
-            <span
-              v-if="userData.email && userData.emailVerified"
-              class="email-status email-status-verified"
-            >
+            <span v-if="userData.email && userData.emailVerified" class="email-status email-status-verified">
               ✓ 已驗證
             </span>
 
             <!-- 尚未驗證 -->
             <template v-if="userData.email && !userData.emailVerified">
-              <button
-                type="button"
-                class="email-resend-btn"
-                title="點擊寄送驗證信"
-                @click="resendVerificationEmail"
-              >
+              <button type="button" class="email-resend-btn" title="點擊寄送驗證信" @click="resendVerificationEmail">
                 <span class="email-status email-status-unverified"> 立即驗證 </span>
               </button>
             </template>
@@ -421,12 +411,8 @@ const changePassword = async () => {
             <p class="password-description">建議定期更新密碼以保護帳戶安全。</p>
           </div>
 
-          <button
-            v-if="!isChangingPassword"
-            type="button"
-            class="user-btn user-btn-secondary"
-            @click="isChangingPassword = true"
-          >
+          <button v-if="!isChangingPassword" type="button" class="user-btn user-btn-secondary"
+            @click="isChangingPassword = true">
             修改密碼
           </button>
         </div>
@@ -437,23 +423,13 @@ const changePassword = async () => {
           <div class="user-form-group">
             <label class="user-form-label"> 目前密碼 </label>
 
-            <input
-              v-model="passwordData.currentPassword"
-              type="password"
-              class="form-control"
-              placeholder="請輸入目前密碼"
-            />
+            <input v-model="passwordData.currentPassword" type="password" class="form-control" placeholder="請輸入目前密碼" />
           </div>
 
           <div class="user-form-group">
             <label class="user-form-label"> 新密碼 </label>
 
-            <input
-              v-model="passwordData.newPassword"
-              type="password"
-              class="form-control"
-              placeholder="請輸入新密碼"
-            />
+            <input v-model="passwordData.newPassword" type="password" class="form-control" placeholder="請輸入新密碼" />
 
             <span v-if="passwordData.newPassword" class="validation-error">
               {{ isValidPassword(passwordData.newPassword) }}
@@ -463,20 +439,12 @@ const changePassword = async () => {
           <div class="user-form-group">
             <label class="user-form-label"> 確認新密碼 </label>
 
-            <input
-              v-model="passwordData.confirmPassword"
-              type="password"
-              class="form-control"
-              placeholder="請再次輸入新密碼"
-            />
+            <input v-model="passwordData.confirmPassword" type="password" class="form-control" placeholder="請再次輸入新密碼" />
 
-            <span
-              v-if="
-                passwordData.confirmPassword &&
-                passwordData.newPassword !== passwordData.confirmPassword
-              "
-              class="validation-error"
-            >
+            <span v-if="
+              passwordData.confirmPassword &&
+              passwordData.newPassword !== passwordData.confirmPassword
+            " class="validation-error">
               兩次輸入的新密碼不一致
             </span>
           </div>
@@ -497,138 +465,97 @@ const changePassword = async () => {
      二階段驗證
 =============================== -->
 
-<div class="user-divider"></div>
+      <div class="user-divider"></div>
 
-<div class="two-factor-section">
-  <div class="two-factor-header">
-    <div>
-      <h3 class="password-title">二階段驗證</h3>
+      <div class="two-factor-section">
+        <div class="two-factor-header">
+          <div>
+            <h3 class="password-title">二階段驗證</h3>
 
-      <p class="password-description">
-        使用 Authenticator 驗證碼，加強帳戶登入安全性。
-      </p>
-    </div>
+            <p class="password-description">
+              使用 Authenticator 驗證碼，加強帳戶登入安全性。
+            </p>
+          </div>
 
-    <!-- 已啟用 -->
-    <div v-if="userData.twoFactorEnabled" class="two-factor-action">
-      <span class="two-factor-status two-factor-enabled">
-        ✓ 已啟用
-      </span>
+          <!-- 已啟用 -->
+          <div v-if="userData.twoFactorEnabled" class="two-factor-action">
+            <span class="two-factor-status two-factor-enabled">
+              ✓ 已啟用
+            </span>
 
-      <button
-        type="button"
-        class="user-btn user-btn-secondary"
-        @click="showDisableTwoFactor"
-      >
-        停用
-      </button>
-    </div>
+            <button type="button" class="user-btn user-btn-secondary" @click="showDisableTwoFactor">
+              停用
+            </button>
+          </div>
 
-    <!-- 未啟用 -->
-    <div v-else class="two-factor-action">
-      <span class="two-factor-status two-factor-disabled">
-        未啟用
-      </span>
+          <!-- 未啟用 -->
+          <div v-else class="two-factor-action">
+            <span class="two-factor-status two-factor-disabled">
+              未啟用
+            </span>
 
-      <button
-        type="button"
-        class="user-btn user-btn-primary"
-        @click="setupTwoFactor"
-      >
-        啟用
-      </button>
-    </div>
-  </div>
+            <button type="button" class="user-btn user-btn-primary" @click="setupTwoFactor">
+              啟用
+            </button>
+          </div>
+        </div>
 
-  <!-- 停用二階段驗證確認區 -->
-<div
-  v-if="userData.twoFactorEnabled && isDisablingTwoFactor"
-  class="two-factor-setup"
->
-  <p class="two-factor-setup-title">
-    停用二階段驗證
-  </p>
+        <!-- 停用二階段驗證確認區 -->
+        <div v-if="userData.twoFactorEnabled && isDisablingTwoFactor" class="two-factor-setup">
+          <p class="two-factor-setup-title">
+            停用二階段驗證
+          </p>
 
-  <p>
-    請輸入 Authenticator 目前顯示的 6 位數驗證碼。
-  </p>
+          <p>
+            請輸入 Authenticator 目前顯示的 6 位數驗證碼。
+          </p>
 
-  <div class="two-factor-verify">
-    <input
-      v-model.trim="disableTwoFactorCode"
-      type="text"
-      inputmode="numeric"
-      maxlength="6"
-      autocomplete="one-time-code"
-      placeholder="000000"
-      class="two-factor-code-input"
-    />
+          <div class="two-factor-verify">
+            <input v-model.trim="disableTwoFactorCode" type="text" inputmode="numeric" maxlength="6"
+              autocomplete="one-time-code" placeholder="000000" class="two-factor-code-input" />
 
-    <button
-      type="button"
-      class="user-btn user-btn-secondary"
-      @click="disableTwoFactor"
-    >
-      確認停用
-    </button>
-  </div>
-</div>
+            <button type="button" class="user-btn user-btn-secondary" @click="disableTwoFactor">
+              確認停用
+            </button>
+          </div>
+        </div>
 
-  <!-- 暫時確認 setup API 是否成功 -->
-  <div
-  v-if="isSettingUpTwoFactor"
-  class="two-factor-setup"
->
-  <p class="two-factor-setup-title">
-    使用 Microsoft Authenticator 掃描 QR Code
-  </p>
+        <!-- 暫時確認 setup API 是否成功 -->
+        <div v-if="isSettingUpTwoFactor" class="two-factor-setup">
+          <p class="two-factor-setup-title">
+            使用 Microsoft Authenticator 掃描 QR Code
+          </p>
 
-  <!-- 🟢 QR Code -->
-  <div class="two-factor-qr">
-    <img
-      v-if="twoFactorQrCode"
-      :src="twoFactorQrCode"
-      alt="二階段驗證 QR Code"
-    />
-  </div>
+          <!-- 🟢 QR Code -->
+          <div class="two-factor-qr">
+            <img v-if="twoFactorQrCode" :src="twoFactorQrCode" alt="二階段驗證 QR Code" />
+          </div>
 
-  <!-- 🟢 手動輸入 Secret -->
-  <p class="two-factor-manual-text">
-    無法掃描？也可以手動輸入以下設定金鑰：
-  </p>
+          <!-- 🟢 手動輸入 Secret -->
+          <p class="two-factor-manual-text">
+            無法掃描？也可以手動輸入以下設定金鑰：
+          </p>
 
-  <code class="two-factor-secret">
-    {{ twoFactorSetup.secret }}
-  </code>
+          <code class="two-factor-secret">
+      {{ twoFactorSetup.secret }}
+    </code>
 
-  <!-- 🟢 新增：TOTP 驗證碼 -->
-<div class="two-factor-verify">
-  <label for="twoFactorCode">
-    輸入 Authenticator 顯示的 6 位數驗證碼
-  </label>
+          <!-- 🟢 新增：TOTP 驗證碼 -->
+          <div class="two-factor-verify">
+            <label for="twoFactorCode">
+              輸入 Authenticator 顯示的 6 位數驗證碼
+            </label>
 
-  <input
-    id="twoFactorCode"
-    v-model.trim="twoFactorSetup.code"
-    type="text"
-    inputmode="numeric"
-    maxlength="6"
-    autocomplete="one-time-code"
-    placeholder="000000"
-    class="two-factor-code-input"
-  />
+            <input id="twoFactorCode" v-model.trim="twoFactorSetup.code" type="text" inputmode="numeric" maxlength="6"
+              autocomplete="one-time-code" placeholder="000000" class="two-factor-code-input" />
 
-  <button
-    type="button"
-    class="user-btn user-btn-primary"
-    @click="enableTwoFactor"
-  >
-    確認啟用
-  </button>
-</div>
+            <button type="button" class="user-btn user-btn-primary" @click="enableTwoFactor">
+              確認啟用
+            </button>
+          </div>
 
-</div>
-</div>
+        </div>
+      </div>
     </div>
 
     <!-- ==============================
@@ -652,12 +579,7 @@ const changePassword = async () => {
         <div class="user-form-group">
           <label class="user-form-label"> 暱稱 </label>
 
-          <input
-            v-model="userData.username"
-            type="text"
-            class="form-control"
-            placeholder="請輸入暱稱"
-          />
+          <input v-model="userData.username" type="text" class="form-control" placeholder="請輸入暱稱" />
         </div>
 
         <!-- Email -->
@@ -665,12 +587,7 @@ const changePassword = async () => {
         <div class="user-form-group">
           <label class="user-form-label"> Email </label>
 
-          <input
-            v-model="userData.email"
-            type="email"
-            class="form-control"
-            placeholder="請輸入 Email"
-          />
+          <input v-model="userData.email" type="email" class="form-control" placeholder="請輸入 Email" />
 
           <span v-if="userData.email" class="validation-error">
             {{ isValidEmail(userData.email) }}
@@ -682,13 +599,7 @@ const changePassword = async () => {
         <div class="user-form-group">
           <label class="user-form-label"> 電話 </label>
 
-          <input
-            v-model="userData.phone"
-            type="tel"
-            maxlength="10"
-            class="form-control"
-            placeholder="例如：0912345678"
-          />
+          <input v-model="userData.phone" type="tel" maxlength="10" class="form-control" placeholder="例如：0912345678" />
 
           <span v-if="userData.phone" class="validation-error">
             {{ isValidPhone(userData.phone) }}
@@ -752,6 +663,7 @@ const changePassword = async () => {
   color: #dc3545;
   font-size: 12px;
 }
+
 .email-info {
   display: flex;
   align-items: center;
@@ -890,6 +802,7 @@ const changePassword = async () => {
 }
 
 @media (max-width: 576px) {
+
   .password-header,
   .two-factor-header {
     align-items: stretch;
