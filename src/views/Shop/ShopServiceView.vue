@@ -40,6 +40,37 @@ function mailtoLink(subject) {
   const body = encodeURIComponent('您好，我想詢問：')
   return `mailto:${email.value}?subject=${s}&body=${body}`
 }
+//===========================================
+// 測試用範例資料
+const demoData = [
+  {
+    name: '王小明',
+    email: 'test@example.com',
+    phone: '0912345678',
+    title: '諮詢問題',
+    content: '您好，我想詢問關於訂單的問題。'
+  },
+  {
+    name: '李小華',
+    email: 'test@example.com',
+    phone: '0912345678',
+    title: '諮詢問題',
+    content: '您好，我想詢問關於訂單的問題。'
+  },
+  {
+    name: '陳大文',
+    email: 'test@example.com',
+    phone: '0912345678',
+    title: '諮詢問題',
+    content: '您好，我想詢問關於訂單的問題。'
+  },
+]
+// 隨機選擇一筆範例資料並填入表單
+function selectDemoData() {
+  const selected = demoData[Math.floor(Math.random() * demoData.length)]
+  form.value = { ...selected }
+}
+//===========================================
 </script>
 
 <template>
@@ -85,6 +116,9 @@ function mailtoLink(subject) {
 
     <section class="form-block">
       <h2 class="block-title">或直接留言給我們</h2>
+
+      <!-- // 測試用按鈕，點擊後會自動填入範例資料 -->
+      <button @click="selectDemoData" class="btn-submit">填入範例資料</button>
 
       <div v-if="sent" class="success-msg">✅ 已收到您的訊息，我們會盡快回覆！</div>
 
