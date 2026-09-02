@@ -528,7 +528,7 @@ const addComment = async () => {
     })
   } catch (err) {
     console.error('送出留言失敗：', err)
-    alert('留言失敗，請稍後再試一次！')
+    alert('請登入後再留言！')
     return
   }
 
